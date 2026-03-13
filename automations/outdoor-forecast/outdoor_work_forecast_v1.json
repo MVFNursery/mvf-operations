@@ -1,0 +1,281 @@
+{
+  "name": "Outdoor Work Forecast",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "id": "2600cca9-d735-4ec7-a6ee-8ae03a626b90",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "latitude",
+              "value": 40.4672,
+              "type": "number"
+            },
+            {
+              "id": "2",
+              "name": "longitude",
+              "value": -76.9253,
+              "type": "number"
+            },
+            {
+              "id": "3",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "forecast_days",
+              "value": 14,
+              "type": "number"
+            },
+            {
+              "id": "5",
+              "name": "weights",
+              "value": {
+                "precip": 0.35,
+                "temp": 0.3,
+                "wind": 0.2,
+                "humidity": 0.15
+              },
+              "type": "object"
+            },
+            {
+              "id": "6",
+              "name": "monthly_temp_ranges",
+              "value": {
+                "1": [
+                  30,
+                  55
+                ],
+                "2": [
+                  32,
+                  58
+                ],
+                "3": [
+                  38,
+                  72
+                ],
+                "4": [
+                  45,
+                  78
+                ],
+                "5": [
+                  50,
+                  82
+                ],
+                "6": [
+                  58,
+                  88
+                ],
+                "7": [
+                  62,
+                  90
+                ],
+                "8": [
+                  65,
+                  92
+                ],
+                "9": [
+                  55,
+                  85
+                ],
+                "10": [
+                  45,
+                  78
+                ],
+                "11": [
+                  38,
+                  68
+                ],
+                "12": [
+                  30,
+                  55
+                ]
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8edb2159-26ba-4016-ad89-53c2602d86ab",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "latitude",
+              "value": "={{ $json.latitude }}"
+            },
+            {
+              "name": "longitude",
+              "value": "={{ $json.longitude }}"
+            },
+            {
+              "name": "timezone",
+              "value": "={{ $json.timezone }}"
+            },
+            {
+              "name": "forecast_days",
+              "value": "={{ $json.forecast_days }}"
+            },
+            {
+              "name": "daily",
+              "value": "temperature_2m_max,precipitation_probability_max,windspeed_10m_max,relative_humidity_2m_max,apparent_temperature_max,apparent_temperature_min,precipitation_sum,precipitation_hours,uv_index_max"
+            },
+            {
+              "name": "temperature_unit",
+              "value": "fahrenheit"
+            },
+            {
+              "name": "wind_speed_unit",
+              "value": "mph"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "06b6e825-0ea8-4058-9d29-2bfcd8a177fc",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        688,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $(\"Config\").first().json;\nconst weather = $input.first().json;\n\nconst weights = config.weights;\nconst monthlyRanges = config.monthly_temp_ranges;\n\nconst scoredDays = [];\n\nfor (let i = 0; i < weather.daily.time.length; i++) {\n  const date = weather.daily.time[i];\n  const temp = weather.daily.temperature_2m_max[i];\n  const apparentTemp = weather.daily.apparent_temperature_max[i];\n  const precip = weather.daily.precipitation_probability_max[i];\n  const precipSum = weather.daily.precipitation_sum[i];\n  const precipHours = weather.daily.precipitation_hours[i];\n  const wind = weather.daily.windspeed_10m_max[i];\n  const humidity = weather.daily.relative_humidity_2m_max[i];\n  \n  // Convert precipitation from mm to inches\n  const precipInches = precipSum / 25.4;\n  \n  // Precipitation veto: if actual rain > 0.3 inches OR rain hours > 4, force Indoor\n  const precipVeto = precipInches > 0.3 || precipHours > 4;\n  \n  if (precipVeto) {\n    scoredDays.push({\n      date,\n      score: 0,\n      band: 'Indoor',\n      temp,\n      apparentTemp,\n      precip,\n      precipInches,\n      wind,\n      humidity,\n      notes: 'Rain likely most of the day, stay inside'\n    });\n    continue;\n  }\n  \n  // Get month from date\n  const month = new Date(date).getMonth() + 1;\n  const [minTemp, maxTemp] = monthlyRanges[month];\n  \n  // Calculate component scores (0-100)\n  // Apparent Temperature: 100 if in range, decreases as it goes outside\n  let tempScore = 100;\n  if (apparentTemp < minTemp) {\n    tempScore = Math.max(0, 100 - (minTemp - apparentTemp) * 5);\n  } else if (apparentTemp > maxTemp) {\n    tempScore = Math.max(0, 100 - (apparentTemp - maxTemp) * 5);\n  }\n  \n  // Precipitation probability: 100 at 0%, 0 at 100%\n  const precipScore = 100 - precip;\n  \n  // Wind: Tighter thresholds\n  // 0-10mph = 100pts, 11-15mph = 70pts, 16-20mph = 40pts, 21-25mph = 15pts, over 25mph = 0pts\n  let windScore;\n  if (wind <= 10) windScore = 100;\n  else if (wind <= 15) windScore = 70;\n  else if (wind <= 20) windScore = 40;\n  else if (wind <= 25) windScore = 15;\n  else windScore = 0;\n  \n  // Humidity: optimal at 50%, decreases as it moves away\n  const humidityScore = Math.max(0, 100 - Math.abs(humidity - 50) * 2);\n  \n  // Weighted score\n  let score = Math.round(\n    tempScore * weights.temp +\n    precipScore * weights.precip +\n    windScore * weights.wind +\n    humidityScore * weights.humidity\n  );\n  \n  // Apply vetos and caps\n  // Month-aware feels-like temperature floor\n  // Jan/Feb = 25°F, Mar/Apr = 28°F, May/Jun = 40°F, Jul/Aug = 55°F, Sep/Oct = 35°F, Nov/Dec = 28°F\n  let monthlyMinTemp;\n  if (month === 1 || month === 2) monthlyMinTemp = 25;\n  else if (month === 3 || month === 4) monthlyMinTemp = 28;\n  else if (month === 5 || month === 6) monthlyMinTemp = 40;\n  else if (month === 7 || month === 8) monthlyMinTemp = 55;\n  else if (month === 9 || month === 10) monthlyMinTemp = 35;\n  else monthlyMinTemp = 28; // Nov/Dec\n  \n  if (apparentTemp < monthlyMinTemp) {\n    score = Math.min(score, 25); // Indoor cap\n  }\n  \n  // Freezing cap: below 32°F can never be better than Marginal\n  if (apparentTemp < 32) {\n    score = Math.min(score, 59); // Marginal maximum\n  }\n  \n  // Feels-like Prime block: below 40°F can never be Prime\n  if (apparentTemp < 40) {\n    score = Math.min(score, 79); // Good maximum\n  }\n  \n  // Summer heat ceiling: above 95°F cap at Marginal, above 103°F cap at Indoor\n  if (apparentTemp > 103) {\n    score = Math.min(score, 35); // Indoor maximum\n  } else if (apparentTemp > 95) {\n    score = Math.min(score, 59); // Marginal maximum\n  }\n  \n  // Combined bad condition veto: wind + cold\n  // May-Oct: wind > 18mph AND apparent temp < 45°F\n  // Mar-Apr: wind > 22mph AND apparent temp < 45°F (softer threshold for early spring)\n  if (month >= 5 && month <= 10) {\n    if (wind > 18 && apparentTemp < 45) {\n      score = Math.min(score, 35);\n    }\n  } else if (month === 3 || month === 4) {\n    if (wind > 22 && apparentTemp < 45) {\n      score = Math.min(score, 35);\n    }\n  }\n  \n  // Wind veto: > 25mph cap at 25 (Indoor), > 20mph cap at 45 (Marginal max), 16-20mph cap at 65 (Good max, lower end)\n  if (wind > 25) {\n    score = Math.min(score, 25);\n  } else if (wind > 20) {\n    score = Math.min(score, 45);\n  } else if (wind >= 16) {\n    score = Math.min(score, 65); // Good maximum, lower end\n  }\n  \n  // Determine band\n  let band;\n  if (score >= 80) band = 'Prime';\n  else if (score >= 60) band = 'Good';\n  else if (score >= 40) band = 'Marginal';\n  else band = 'Indoor';\n  \n  // Generate narrative notes (max 12 words)\n  let notes = '';\n  if (apparentTemp > 103) {\n    notes = 'Extreme heat, unsafe for outdoor work';\n  } else if (apparentTemp > 95) {\n    notes = 'Very hot, take frequent breaks and hydrate';\n  } else if (wind > 25) {\n    notes = 'High wind makes outdoor work difficult';\n  } else if (wind > 20) {\n    notes = 'Strong winds, challenging conditions';\n  } else if (apparentTemp < monthlyMinTemp) {\n    notes = 'Too cold for safe outdoor work';\n  } else if (apparentTemp < 32) {\n    notes = 'Freezing temps, limited outdoor work possible';\n  } else if (wind > 18 && apparentTemp < 45 && month >= 5 && month <= 10) {\n    notes = 'Cold and windy, uncomfortable combination';\n  } else if (wind > 22 && apparentTemp < 45 && (month === 3 || month === 4)) {\n    notes = 'Cold and windy, uncomfortable combination';\n  } else if (apparentTemp < 40) {\n    notes = 'Cold but calm and dry, bundle up';\n  } else if (wind >= 16) {\n    notes = 'Moderate wind, some tasks may be difficult';\n  } else if (band === 'Prime') {\n    notes = 'Ideal conditions, low wind and comfortable temps';\n  } else if (band === 'Good') {\n    notes = 'Good day for outdoor work';\n  } else if (band === 'Marginal') {\n    notes = 'Workable but not ideal conditions';\n  } else {\n    notes = 'Indoor work recommended';\n  }\n  \n  scoredDays.push({\n    date,\n    score,\n    band,\n    temp,\n    apparentTemp,\n    precip,\n    precipInches,\n    wind,\n    humidity,\n    notes\n  });\n}\n\nreturn scoredDays.map(day => ({ json: day }));"
+      },
+      "id": "92b95cb2-fa12-4479-8623-f5b20071c9b8",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "mtnviewfarm41@gmail.com",
+        "subject": "=🌿 Outdoor Work Forecast — {{ $now.toFormat(\"MMMM d, yyyy\") }}",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n<style>\ntable { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }\nth, td { border: 1px solid #ddd; padding: 8px; text-align: left; }\nth { background-color: #4CAF50; color: white; }\n</style>\n</head>\n<body>\n<h2>🌿 14-Day Outdoor Work Forecast</h2>\n<table>\n<tr>\n<th>Date</th>\n<th>Day</th>\n<th>Score</th>\n<th>Band</th>\n<th>High Temp (°F)</th>\n<th>Feels Like (°F)</th>\n<th>Precip %</th>\n<th>Rain (in)</th>\n<th>Wind (mph)</th>\n<th>Humidity %</th>\n<th>Notes</th>\n</tr>\n{{ $input.all().map(item => {\n  const date = new Date(item.json.date);\n  const dayOfWeek = date.toLocaleDateString(\"en-US\", { weekday: \"short\" });\n  const formattedDate = date.toLocaleDateString(\"en-US\", { month: \"short\", day: \"numeric\" });\n  let bgColor;\n  if (item.json.band === \"Prime\") bgColor = \"#C8E6C9\";\n  else if (item.json.band === \"Good\") bgColor = \"#B2DFDB\";\n  else if (item.json.band === \"Marginal\") bgColor = \"#FFF9C4\";\n  else bgColor = \"#FFCDD2\";\n  return `<tr style=\"background-color: ${bgColor}\">\n    <td>${formattedDate}</td>\n    <td>${dayOfWeek}</td>\n    <td>${item.json.score}</td>\n    <td>${item.json.band}</td>\n    <td>${item.json.temp}</td>\n    <td>${item.json.apparentTemp}</td>\n    <td>${item.json.precip}</td>\n    <td>${item.json.precipInches.toFixed(2)}</td>\n    <td>${item.json.wind}</td>\n    <td>${item.json.humidity}</td>\n    <td>${item.json.notes}</td>\n  </tr>`;\n}).join(\"\") }}\n</table>\n</body>\n</html>",
+        "options": {}
+      },
+      "id": "66ff7642-bbca-43d0-8248-7e67294d1176",
+      "name": "Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1136,
+        304
+      ],
+      "webhookId": "845d4a1a-ee0d-465b-839a-ca7ae60fe0b9",
+      "executeOnce": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "uOBYcQ6br5965hJh",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "fc2a21b3-499d-4d2d-806d-31020ad0e88e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c4b9d8c8d0fce703e9b6ed83f9db0b918faec6604b86bb1d38d371c2bb966214"
+  },
+  "id": "QtgP2yLUD0uwOSqR",
+  "tags": []
+}
