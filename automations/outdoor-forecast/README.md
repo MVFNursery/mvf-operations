@@ -78,7 +78,7 @@ Used for scoring only (not hard caps). Apparent temp inside range scores 100pts 
 | Month | Range (°F) | Month | Range (°F) |
 |---|---|---|---|
 | Jan | 30–55 | Jul | 62–90 |
-| Feb | 32��58 | Aug | 65–92 |
+| Feb | 32-58 | Aug | 65–92 |
 | Mar | 38–72 | Sep | 55–85 |
 | Apr | 45–78 | Oct | 45–78 |
 | May | 50–82 | Nov | 38–68 |
