@@ -1,0 +1,27 @@
+{
+  "name": "Species Trainer",
+  "short_name": "Species",
+  "description": "Native plant identification trainer with spaced repetition",
+  "start_url": "/mvf-operations/mvf_trainer_v2.html",
+  "scope": "/mvf-operations/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f0e8",
+  "theme_color": "#2d5016",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/mvf-operations/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/mvf-operations/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["education", "lifestyle"]
+}

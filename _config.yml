@@ -1,0 +1,17 @@
+# GitHub Pages configuration for Species Trainer
+# This tells Jekyll (GitHub's build system) not to process these files
+
+# Disable Jekyll processing — serve files as-is
+plugins: []
+
+# Allow service worker and manifest to be served correctly
+include:
+  - sw.js
+  - manifest.json
+  - icon.svg
+
+# Exclude development files
+exclude:
+  - README.md
+  - "*.py"
+  - node_modules

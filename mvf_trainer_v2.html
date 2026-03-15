@@ -1,0 +1,2215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2d5016">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Species Trainer">
+<link rel="manifest" href="manifest.json">
+<title>Species Trainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1a0e; --ink2: #3d3a28; --ink3: #6b6650;
+    --paper: #f5f0e8; --paper2: #ece5d4; --paper3: #d8d0b8;
+    --green: #2d5016; --green2: #4a7c28; --green3: #8aad5a; --green4: #c8dba8;
+    --amber: #c47a1e; --amber2: #f0c060; --amber3: #fdecc8;
+    --red: #8b2a1a; --red2: #d4604a; --red3: #fdd8d2;
+    --blue: #1a3a5c; --blue2: #2a5a8c; --blue3: #d0e4f4;
+    --correct: #2d5016; --wrong: #8b2a1a; --partial: #7a5a10;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--paper); color: var(--ink); font-family: 'Crimson Pro', Georgia, serif; font-size: 17px; line-height: 1.55; min-height: 100vh; }
+  body::before { content: ''; position: fixed; inset: 0; background-image: repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(0,0,0,0.02) 31px, rgba(0,0,0,0.02) 32px); pointer-events: none; z-index: 0; }
+  #app { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 0.5rem 1.25rem 1.5rem; }
+
+  /* ── HEADER ── */
+  header { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0 0.45rem; border-bottom: 2px solid var(--green); margin-bottom: 0.8rem; }
+  .header-title { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 700; color: var(--green); line-height: 1; }
+  .header-title em { font-style: italic; font-weight: 500; }
+  .header-dataset { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink3); flex: 1; }
+  .header-actions { display: flex; align-items: center; gap: 0.5rem; }
+  .icon-btn { background: none; border: none; cursor: pointer; color: var(--ink3); padding: 0.2rem 0.3rem; border-radius: 3px; font-size: 16px; transition: color 0.12s, background 0.12s; }
+  .icon-btn:hover { color: var(--green); background: var(--green4); }
+
+  /* ── PROFILE BAR ── */
+  .profile-bar { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.65rem; flex-wrap: wrap; }
+  .profile-chip { font-family: 'Crimson Pro', serif; font-size: 13px; padding: 0.2rem 0.65rem; border-radius: 20px; border: 1.5px solid var(--paper3); background: var(--paper2); color: var(--ink3); cursor: pointer; transition: all 0.12s; }
+  .profile-chip.active { background: var(--green); color: white; border-color: var(--green); }
+  .profile-chip:hover:not(.active) { border-color: var(--green3); color: var(--ink); }
+  .profile-add { font-size: 13px; color: var(--ink3); cursor: pointer; padding: 0.2rem 0.5rem; border-radius: 20px; border: 1.5px dashed var(--paper3); background: none; font-family: 'Crimson Pro', serif; transition: all 0.12s; }
+  .profile-add:hover { border-color: var(--green3); color: var(--green); }
+  .profile-input { font-family: 'Crimson Pro', serif; font-size: 13px; padding: 0.2rem 0.5rem; border: 1.5px solid var(--green3); border-radius: 20px; background: white; color: var(--ink); outline: none; width: 120px; }
+
+  /* ── STATS BAR ── */
+  .stats-bar { display: flex; gap: 1px; margin-bottom: 0.65rem; background: var(--paper3); border-radius: 4px; overflow: hidden; border: 1px solid var(--paper3); }
+  .stat { flex: 1; text-align: center; padding: 0.28rem 0.25rem; background: var(--paper2); }
+  .stat .val { font-family: 'Playfair Display', serif; font-size: 1.05rem; color: var(--green); font-weight: 700; display: block; }
+  .stat .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink3); }
+
+  /* ── MODE TABS ── */
+  .mode-tabs { display: flex; margin-bottom: 0.65rem; border: 1.5px solid var(--green); border-radius: 4px; overflow: hidden; }
+  .mode-tab { flex: 1; padding: 0.32rem 1rem; background: var(--paper2); border: none; cursor: pointer; font-family: 'Crimson Pro', serif; font-size: 14px; color: var(--ink3); transition: all 0.15s; letter-spacing: 0.03em; }
+  .mode-tab:not(:last-child) { border-right: 1px solid var(--green); }
+  .mode-tab.active { background: var(--green); color: var(--paper); font-weight: 600; }
+  .mode-tab:hover:not(.active) { background: var(--green4); color: var(--ink); }
+
+  /* ── FILTER / DOTS BAR ── */
+  .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .filter-bar label { font-size: 12px; color: var(--ink3); }
+  .filter-bar select { font-family: 'Crimson Pro', serif; font-size: 13px; padding: 0.12rem 0.45rem; border: 1px solid var(--paper3); border-radius: 3px; background: var(--paper2); color: var(--ink); }
+  .progress-dots { display: flex; gap: 3px; flex-wrap: wrap; flex: 1; justify-content: flex-end; }
+  .progress-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--paper3); cursor: default; }
+  .progress-dot.known { background: var(--green2); }
+  .progress-dot.learning { background: var(--amber2); }
+  .progress-dot.struggling { background: var(--red2); }
+  .dot-legend { display: flex; gap: 0.5rem; font-size: 10px; color: var(--ink3); align-items: center; white-space: nowrap; }
+  .dot-legend span { display: inline-flex; align-items: center; gap: 2px; }
+  .dot-legend i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; }
+
+  /* ── CARD ── */
+  .card { background: white; border: 1.5px solid var(--paper3); border-radius: 6px; padding: 0.9rem 1.15rem; margin-bottom: 0.5rem; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left-width: 4px; }
+  .card.ask-card    { border-left-color: var(--green2); }
+  .card.result-correct { border-left-color: var(--green2); background: #f5faf0; }
+  .card.result-wrong   { border-left-color: var(--red2);   background: #fdf5f3; }
+  .card.result-partial { border-left-color: var(--amber);  background: #fdf8ed; }
+  .card.result-neutral { border-left-color: var(--paper3); }
+
+  /* ── CARD INTERIOR ── */
+  .card-header { margin-bottom: 0.5rem; }
+  .species-sci  { font-family: 'Playfair Display', serif; font-size: 1.25rem; font-style: italic; color: var(--ink); font-weight: 500; }
+  .species-common { font-size: 14px; color: var(--ink2); }
+  .species-hidden { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--paper3); font-style: italic; user-select: none; letter-spacing: 0.05em; }
+  .type-badge { display: inline-block; font-size: 11px; padding: 1px 9px; border-radius: 20px; background: var(--green4); color: var(--green); letter-spacing: 0.05em; font-weight: 600; margin-top: 0.2rem; }
+  .type-badge.hidden-badge { background: var(--paper2); color: var(--paper3); }
+  .level-badge { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 20px; margin-left: 0.4rem; font-weight: 600; letter-spacing: 0.06em; vertical-align: middle; }
+  .level-badge.l1 { background: var(--green4); color: var(--green); }
+  .level-badge.l2 { background: var(--amber3); color: var(--amber); }
+  .level-badge.l3 { background: var(--blue3); color: var(--blue2); }
+  .level-badge.l4 { background: #ede; color: #707; }
+  /* Inline mastery indicator in card header */
+  .mastery-inline { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.15rem; }
+  .mastery-level-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; padding: 1px 6px; border-radius: 3px; flex-shrink: 0; }
+  .mastery-level-tag.l1 { background: var(--green4); color: var(--green); }
+  .mastery-level-tag.l2 { background: var(--amber3); color: var(--amber); }
+  .mastery-level-tag.l3 { background: var(--blue3); color: var(--blue2); }
+  .mastery-level-tag.l4 { background: #ede; color: #707; }
+  .mastery-track { flex: 1; max-width: 120px; height: 4px; background: var(--paper3); border-radius: 2px; overflow: hidden; }
+  .mastery-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+  .mastery-pct { font-size: 10px; color: var(--ink3); flex-shrink: 0; }
+  .divider { border: none; border-top: 1px solid var(--paper3); margin: 0.55rem 0; }
+  .question-text { font-size: 1.1rem; color: var(--ink); margin-bottom: 0.65rem; line-height: 1.4; }
+  .answer-input { width: 100%; font-family: 'Crimson Pro', serif; font-size: 1rem; padding: 0.4rem 0.75rem; border: 1.5px solid var(--paper3); border-radius: 4px; background: var(--paper); color: var(--ink); transition: border-color 0.15s; margin-bottom: 0.5rem; resize: vertical; }
+  .answer-input:focus { outline: none; border-color: var(--green2); background: white; }
+  .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .btn { font-family: 'Crimson Pro', serif; font-size: 14px; padding: 0.35rem 0.9rem; border-radius: 3px; border: 1.5px solid; cursor: pointer; transition: all 0.12s; letter-spacing: 0.02em; }
+  .btn-primary  { background: var(--green); color: white; border-color: var(--green); }
+  .btn-primary:hover { background: var(--green2); border-color: var(--green2); }
+  .btn-secondary { background: transparent; color: var(--ink2); border-color: var(--paper3); }
+  .btn-secondary:hover { background: var(--paper2); }
+  .btn-correct  { background: var(--correct); color: white; border-color: var(--correct); }
+  .btn-partial  { background: var(--partial); color: white; border-color: var(--partial); }
+  .btn-wrong    { background: var(--wrong);   color: white; border-color: var(--wrong); }
+  .btn-sm { font-size: 12px; padding: 0.2rem 0.6rem; }
+
+  /* ── RESULT CARD ── */
+  .result-banner { padding: 0.4rem 0.7rem; border-radius: 4px; margin-bottom: 0.55rem; font-size: 14px; font-weight: 600; }
+  .result-banner.correct { background: var(--green4); color: var(--green); }
+  .result-banner.partial { background: var(--amber3); color: var(--partial); }
+  .result-banner.wrong   { background: var(--red3);   color: var(--wrong); }
+  .correct-answer { font-size: 13px; color: var(--ink2); margin-bottom: 0.35rem; }
+  .correct-answer strong { color: var(--ink); }
+  .ai-grade { font-size: 13px; color: var(--ink3); font-style: italic; margin-bottom: 0.55rem; padding: 0.35rem 0.55rem; background: var(--paper2); border-radius: 3px; border-left: 3px solid var(--green3); }
+  .fun-fact { margin-top: 0.55rem; padding: 0.4rem 0.7rem; background: var(--paper2); border-left: 3px solid var(--amber); font-size: 12px; color: var(--ink2); border-radius: 0 3px 3px 0; }
+  .fun-fact-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--amber); font-weight: 600; margin-bottom: 0.1rem; }
+
+  /* ── SPECIES PHOTO ── */
+  .species-photo-wrap { margin: 0.6rem 0 0.2rem; border-radius: 5px; overflow: hidden; background: var(--paper2); min-height: 160px; display: flex; align-items: center; justify-content: center; position: relative; }
+  .species-photo-wrap img { width: 100%; max-height: 240px; object-fit: cover; display: block; opacity: 0; transition: opacity 0.4s ease; border-radius: 5px; }
+  .species-photo-wrap img.loaded { opacity: 1; }
+  .species-photo-credit { font-size: 10px; color: var(--ink3); text-align: right; margin-top: 0.15rem; font-style: italic; }
+  .species-photo-loading { font-size: 12px; color: var(--ink3); font-style: italic; position: absolute; }
+
+  /* ── COACH METER ── */
+  .coach-wrap { margin: 0.45rem 0 0.5rem; padding: 0.4rem 0.7rem; background: var(--paper2); border-radius: 4px; border-left: 3px solid var(--red2); }
+  .coach-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.2rem; }
+  .coach-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink3); }
+  .coach-score { font-family: 'Playfair Display', serif; font-size: 0.9rem; font-weight: 700; }
+  .coach-score.low { color: var(--red2); } .coach-score.mid { color: var(--amber); } .coach-score.high { color: var(--green2); }
+  .coach-bar-wrap { height: 3px; background: var(--paper3); border-radius: 2px; overflow: hidden; }
+  .coach-bar { height: 100%; border-radius: 2px; transition: width 0.4s, background 0.4s; }
+  .coach-quote { font-size: 11px; color: var(--ink3); font-style: italic; margin-top: 0.18rem; }
+
+  /* ── THINKING DOTS ── */
+  .thinking-dots span { animation: blink 1.2s infinite; font-size: 1.3rem; line-height: 1; }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100% { opacity: 0.15; } 40% { opacity: 1; } }
+
+  /* ── NAV BAR ── */
+  .nav-bar { display: flex; border-bottom: 2px solid var(--paper3); margin-bottom: 0.8rem; }
+  .nav-item { padding: 0.3rem 1.1rem; font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.12s; }
+  .nav-item.active { color: var(--green); border-bottom-color: var(--green); font-weight: 600; }
+  .nav-item:hover:not(.active) { color: var(--ink2); }
+
+  /* ── BROWSE / SPECIES ── */
+  .species-list { display: flex; flex-direction: column; gap: 2px; }
+  .species-item { display: flex; align-items: center; gap: 0.65rem; padding: 0.35rem 0.7rem; border-radius: 3px; cursor: pointer; transition: background 0.1s; }
+  .species-item:hover { background: var(--paper2); }
+  .species-item .sci { font-style: italic; font-size: 14px; flex: 1; color: var(--ink); }
+  .species-item .com { font-size: 12px; color: var(--ink3); }
+  .score-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .score-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 2px 7px; border-radius: 12px; }
+  .score-chip.high   { background: var(--green4); color: var(--green); }
+  .score-chip.mid    { background: var(--amber3); color: var(--partial); }
+  .score-chip.low    { background: var(--red3);   color: var(--wrong); }
+  .score-chip.unseen { background: var(--paper2); color: var(--ink3); }
+  .attr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem 1.25rem; margin-top: 0.75rem; }
+  .attr-row { display: flex; flex-direction: column; }
+  .attr-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink3); }
+  .attr-val { font-size: 13px; color: var(--ink); }
+  .attr-val.empty { color: var(--paper3); font-style: italic; font-size: 12px; }
+
+  /* ── LOADER SCREEN ── */
+  .loader-screen { max-width: 520px; margin: 2rem auto; text-align: center; }
+  .loader-screen h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--green); margin-bottom: 0.5rem; }
+  .loader-screen p { font-size: 14px; color: var(--ink3); margin-bottom: 1.5rem; line-height: 1.6; }
+  .drop-zone { border: 2px dashed var(--paper3); border-radius: 8px; padding: 2rem 1.5rem; cursor: pointer; transition: all 0.15s; background: var(--paper2); }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--green3); background: var(--green4); }
+  .drop-zone input[type=file] { display: none; }
+  .drop-zone-label { font-size: 15px; color: var(--ink3); }
+  .drop-zone-label strong { color: var(--green); }
+  .csv-preview { margin-top: 1.25rem; text-align: left; }
+  .csv-preview table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .csv-preview th { background: var(--paper2); padding: 0.3rem 0.5rem; border: 1px solid var(--paper3); font-weight: 600; text-align: left; }
+  .csv-preview td { padding: 0.25rem 0.5rem; border: 1px solid var(--paper3); vertical-align: top; }
+  .csv-preview .row-label { font-size: 10px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.08em; background: var(--paper2); }
+  .tag-chip { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 600; }
+  .tag-primary  { background: var(--green4); color: var(--green); }
+  .tag-display  { background: var(--blue3); color: var(--blue2); }
+  .tag-category { background: var(--amber3); color: var(--amber); }
+  .tag-notes    { background: #ede; color: #707; }
+  .tag-id       { background: var(--paper3); color: var(--ink3); }
+  .tag-level1   { background: var(--green4); color: var(--green); }
+  .tag-level2   { background: var(--amber3); color: var(--amber); }
+  .tag-level3   { background: var(--blue3);  color: var(--blue2); }
+  .tag-level4   { background: #ede; color: #707; }
+  .tag-skip     { background: var(--paper2); color: var(--ink3); }
+
+  /* ── SETTINGS SCREEN ── */
+  .settings-screen { max-width: 620px; margin: 0 auto; }
+  .settings-section { margin-bottom: 1.25rem; }
+  .settings-section h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--green); margin-bottom: 0.6rem; border-bottom: 1px solid var(--paper3); padding-bottom: 0.25rem; }
+  .level-buckets { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .level-bucket { flex: 1; min-width: 140px; background: var(--paper2); border-radius: 6px; padding: 0.6rem 0.75rem; border: 1.5px solid var(--paper3); }
+  .level-bucket h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem; }
+  .level-bucket.lv1 h4 { color: var(--green); }
+  .level-bucket.lv2 h4 { color: var(--amber); }
+  .level-bucket.lv3 h4 { color: var(--blue2); }
+  .level-bucket.lv4 h4 { color: #707; }
+  .level-bucket.lv-skip h4 { color: var(--ink3); }
+  .level-bucket.drag-target { border-color: var(--green3); background: var(--green4); }
+  .field-pill { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 12px; background: white; border: 1px solid var(--paper3); margin: 2px; cursor: grab; user-select: none; transition: box-shadow 0.1s; }
+  .field-pill:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
+  .field-pill.dragging { opacity: 0.5; }
+  .dataset-info { font-size: 13px; color: var(--ink3); line-height: 1.7; }
+  .dataset-info strong { color: var(--ink); }
+  .io-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+
+  /* ── MISC ── */
+  .empty-state { text-align: center; padding: 2rem; color: var(--ink3); font-style: italic; font-size: 14px; }
+  .unlock-notice { font-size: 12px; color: var(--amber); font-style: italic; margin-top: 0.3rem; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .modal { background: white; border-radius: 8px; padding: 1.5rem; max-width: 380px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+  .modal h3 { font-family: 'Playfair Display', serif; font-size: 1.15rem; color: var(--ink); margin-bottom: 0.6rem; }
+  .modal p { font-size: 14px; color: var(--ink3); margin-bottom: 1rem; line-height: 1.6; }
+  .modal .btn-row { justify-content: flex-end; }
+
+  @media (max-width: 500px) {
+    #app { padding: 0.4rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom)); }
+    .attr-grid { grid-template-columns: 1fr; }
+    .level-buckets { flex-direction: column; }
+    .header-title { font-size: 1.15rem; }
+    /* Larger touch targets on mobile */
+    .btn { padding: 0.6rem 1.1rem; font-size: 15px; min-height: 44px; }
+    .btn-correct, .btn-partial, .btn-wrong { flex: 1; justify-content: center; }
+    .btn-row { gap: 0.4rem; }
+    .mode-tab { padding: 0.5rem 0.5rem; min-height: 44px; }
+    .nav-item { padding: 0.5rem 1rem; min-height: 44px; display: flex; align-items: center; }
+    .profile-chip { min-height: 36px; padding: 0.3rem 0.75rem; }
+    .card { padding: 0.85rem 1rem; }
+    .answer-input { font-size: 16px; } /* prevents iOS zoom on input focus */
+    .filter-bar select { min-height: 36px; font-size: 15px; }
+    /* Swipe hint overlay */
+    .swipe-hint { display: flex; }
+  }
+  @media (max-width: 500px) and (orientation: landscape) {
+    #app { padding: 0.3rem calc(0.75rem + env(safe-area-inset-right)) 0.3rem calc(0.75rem + env(safe-area-inset-left)); }
+    .card { padding: 0.65rem 0.9rem; }
+  }
+  /* Safe area for iPhone notch on all sizes */
+  #app {
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+  }
+  /* Swipe gesture visual feedback */
+  .card-swipeable { transition: transform 0.15s ease, opacity 0.15s ease; touch-action: pan-y; }
+  .card-swipeable.swiping { transition: none; }
+  .swipe-hint { display: none; position: absolute; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; opacity: 0; transition: opacity 0.1s; pointer-events: none; padding: 0.3rem 0.6rem; border-radius: 3px; }
+  .swipe-hint-right { right: 1rem; color: var(--correct); background: var(--green4); }
+  .swipe-hint-left  { left: 1rem;  color: var(--wrong);   background: var(--red3); }
+  /* Offline banner */
+  .offline-banner { display: none; position: fixed; bottom: env(safe-area-inset-bottom, 0); left: 0; right: 0; background: var(--amber); color: white; text-align: center; font-size: 13px; padding: 0.4rem; z-index: 200; }
+  .offline-banner.visible { display: block; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="offline-banner" id="offlineBanner">⚡ Offline — study continues, AI grading and photos unavailable</div>
+  <header>
+    <div class="header-title">Species <em>Trainer</em></div>
+    <div class="header-dataset" id="headerDataset">No dataset loaded</div>
+    <div class="header-actions">
+      <button class="icon-btn" id="btnSettings" title="Settings" onclick="showScreen('settings')">⚙</button>
+    </div>
+  </header>
+  <div id="root"></div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════════
+// CONSTANTS & CONFIG
+// ═══════════════════════════════════════════════════════════════════
+
+const APP_VERSION = '2.0';
+const LEVEL_UNLOCK_THRESHOLD = 0.75; // 75% correct to unlock next level
+const MAX_INTERVAL_DAYS = 30;
+
+// Alias dictionary for auto-recognizing column roles
+const ROLE_ALIASES = {
+  primary: ['scientific name','latin name','sci name','binomial','scientific','species name'],
+  display: ['common name','common','display name','name','vernacular name','vernacular'],
+  category: ['plant type','type','category','group','class','form'],
+  id: ['id','usda symbol','symbol','code','identifier','uid'],
+  notes: ['pa notes','notes','fun fact','remarks','description','comment','comments','obs','observations'],
+  notes_alt: ['alternate common names','alternate name','alternate','also known as','other names','alt name','alt common name'],
+};
+
+// Rank aliases — recognized as askable biological hierarchy columns
+const RANK_ALIASES = {
+  family:  ['family','fam.','plant family'],
+  genus:   ['genus','gen.'],
+  species: ['species','sp.','spec.'],
+};
+
+// Columns that get auto-assigned a level when Row 2 is absent
+// Key = lowercase column name, value = level number
+const AUTO_LEVEL_MAP = {
+  // L1 — Basic ID
+  'flower color':           1, 'flowering months':        1,
+  'height (feet)':          1, 'height':                  1,
+  'sun exposure':           1, 'sun':                     1,
+  'soil moisture':          1, 'moisture':                1,
+  'plant family':           1, 'family':                  1,
+  // L2 — Ecology
+  'lifespan':               2, 'growth rate':             2,
+  'drought tolerance':      2, 'pollinator value':        2,
+  'monarchs':               2, 'hummingbirds':            2,
+  'workhorse':              2, 'showy':                   2,
+  // L3 — Culture
+  'leaf retention':         3, 'growth form':             3,
+  'soil texture':           3, 'ph (range)':              3,
+  'propagation':            3, 'shape and orientation':   3,
+  'native bees (except bombus)': 3, 'bombus':             3,
+  'butterflies':            3, 'moths':                   3,
+  // L4 — Expert (previously mapped)
+  'active growth period':   4, 'fire tolerance':          4,
+  'salt tolerance':         4, 'fertility requirement':   4,
+  'resprout ability':       4, 'hedge tolerance':         4,
+  'palatability (browsing/grazing)': 4,
+  // L4 — Expert (previously unmapped — added from full column list)
+  'are we growing this right now?': 4,
+  'native status':          4,
+  'distribution in usa':    4,
+  'fall conspicuous':       4,
+  'moisture use':           4,
+  'commercially available': 4,
+  'benefits to pollinators':4,
+  'pollinators':            4,
+  'honey bees':             4,
+  'beetles, wasps, flies':  4,
+  'nesting and structure (bees)': 4,
+  'larval host (monarch)':  4,
+  'larval host (butterfly)':4,
+  'larval host (moth)':     4,
+  'larval species (lepidoptera)': 4,
+  'bats':                   4,
+  'wind':                   4,
+};
+
+// Baked-in default dataset (MVF PA Native Plants)
+// Can be replaced at runtime by loading a CSV via Settings
+// ═══════════════════════════════════════════════════════════════════
+// TODO: DATA SYNC — RE-IMPORT FROM GOOGLE SHEETS SOON
+// The baked-in dataset below was derived from the v1 HTML file (mvf_plant_study.html)
+// which was itself enriched from the original Google Sheet "PA Natives Master List".
+// Changes made IN THIS APP that are NOT reflected in the Google Sheet:
+//   - Multi-value fields converted from comma-separated to semicolon-separated
+//     (sun, moisture, flower_color, propagation, plant_type, workhorse)
+//     e.g. "Sun, Part Shade" → "Sun; Part Shade"
+//   - UTF-8 BOM added to CSV export (spreadsheet display fix, no data change)
+//   - No species were added or removed here
+//
+// Changes made IN THE GOOGLE SHEET that are NOT yet reflected here:
+//   - Whatever cleanup was done after the last export (unknown — re-import to find out)
+//
+// RECOMMENDED PROCESS to re-sync:
+//   1. Open the Google Sheet "PA Natives Master List"
+//   2. Add Row 2 with role/level tags matching mvf_plants_v2.csv Row 2 exactly
+//   3. For multi-value fields, do a find/replace: ", " → "; " in Sun, Moisture,
+//      Flower Color, Propagation, Plant Type, Workhorse columns ONLY
+//   4. Export as CSV (File → Download → CSV)
+//   5. Load it via the gear icon → Load new CSV in the app
+//   6. The fingerprint will change, triggering a fresh progress start — so export
+//      your current progress JSON first (gear → Export progress) and re-import after
+//   7. Update mvf_plants_v2.csv in the GitHub repo to match
+//
+// SOURCE OF TRUTH going forward: Google Sheet → CSV → app.
+// The baked-in JSON below should be treated as a SNAPSHOT, not the master record.
+// ═══════════════════════════════════════════════════════════════════
+const BUILTIN_DATASET_RAW = {"name":"MVF Nursery \u2014 PA Native Plants","fingerprint":"builtin_mvf","headers":["USDA Symbol","Scientific Name","Common Name","Alternate Name","Plant Type","Family","Flower Color","Bloom","Height","Sun","Moisture","Lifespan","Growth Rate","Drought Tolerance","Pollinator Value","Monarchs","Hummingbirds","Workhorse","Soil Texture","pH Range","Growth Form","Leaf Retention","Propagation","Showy","PA Notes"],"tags":["id","primary","display","notes_alt","category","1","1","1","1","1","1","2","2","2","2","2","2","2","3","3","3","3","3","3","notes"],"rows":[{"_rowIndex":0,"usda_symbol":"ACSA2","scientific_name":"Acer saccharinum","common_name":"silver maple","alternate_name":"","plant_type":"Tree","family":"Sapindaceae","flower_color":"Red / yellow-green","bloom":"Feb-Mar","height":"50\u2013100","sun":"Sun; Part Shade","moisture":"Wet; Moist","lifespan":"Long","growth_rate":"Rapid","drought_tolerance":"Low","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"4\u20137.3","growth_form":"Single Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root; Cutting","showy":"Yes","pa_notes":"First tree to flower in PA \u2014 late Feb to mid Mar in zone 6b","_id":"ACSA2"},{"_rowIndex":1,"usda_symbol":"ACMI2","scientific_name":"Achillea millefolium","common_name":"common yarrow","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"White (occasionally pink)","bloom":"May-Aug","height":"1-3 ft","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Medium","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / Sandy loam / Clay loam","ph_range":"5.5-8","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Container; Sprig","showy":"Yes","pa_notes":"","_id":"ACMI2"},{"_rowIndex":2,"usda_symbol":"AGFO","scientific_name":"Agastache foeniculum","common_name":"blue giant hyssop","alternate_name":"","plant_type":"Shrub; Herb (perennial)","family":"Lamiaceae","flower_color":"Blue","bloom":"Jul-Sep","height":"2\u20134","sun":"Sun; Part Shade","moisture":"Dry to medium (well-drained)","lifespan":"Short-lived perennial","growth_rate":"Moderate to fast","drought_tolerance":"Medium (once established)","pollinator_value":"Very High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy loam / Loam","ph_range":"6-8","growth_form":"Clump-forming","leaf_retention":"Deciduous","propagation":"","showy":"Yes","pa_notes":"Self-seeds readily in PA \u2014 can colonize in good conditions. Deer and rabbit resistant. Short-lived 2-4 yrs \u2014 allow some to go to seed for natural replacement.","_id":"AGFO"},{"_rowIndex":3,"usda_symbol":"AGSC","scientific_name":"Agastache scrophulariifolia","common_name":"purple giant hyssop","alternate_name":"","plant_type":"Shrub; Herb (perennial)","family":"Lamiaceae","flower_color":"Pale purple (nearly white at distance)","bloom":"Jul\u2013Sep","height":"3-6 ft (up to 6 ft in rich soil / 3-4 ft in average)","sun":"Sun; Part Shade; Shade","moisture":"Medium to medium-dry","lifespan":"Perennial","growth_rate":"Moderate","drought_tolerance":"Low to medium","pollinator_value":"Very High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / Sandy loam","ph_range":"","growth_form":"Clump-forming","leaf_retention":"Deciduous","propagation":"","showy":"Yes","pa_notes":"Threatened or endangered in several eastern states \u2014 confirm PA status. Needs soil disturbance to persist. Key plant for federally endangered Rusty Patched Bumblebee (Bombus fervidus).","_id":"AGSC"},{"_rowIndex":4,"usda_symbol":"AGAL5","scientific_name":"Ageratina altissima","common_name":"white snakeroot","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"White","bloom":"Aug-Oct","height":"2-5 ft (typically 3-4 ft in PA conditions)","sun":"Part shade / shade (tolerates sun with moisture)","moisture":"Moist to dry (tolerates dry in shade)","lifespan":"Perennial","growth_rate":"Moderate to rapid","drought_tolerance":"Low to medium","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"","growth_form":"Rhizomatous / clump-forming","leaf_retention":"Deciduous","propagation":"","showy":"Yes","pa_notes":"Contains tremetol \u2014 toxic to livestock and humans \u2014 advise customers. Can be aggressive self-seeder in disturbed moist soil.","_id":"AGAL5"},{"_rowIndex":5,"usda_symbol":"AMCA4","scientific_name":"Amelanchier canadensis","common_name":"Canadian serviceberry","alternate_name":"","plant_type":"Tree; Shrub","family":"Rosaceae","flower_color":"White","bloom":"Mar-Apr","height":"15-25 ft","sun":"Sun; Part Shade","moisture":"Moist / wet preferred (tolerates dry)","lifespan":"Long","growth_rate":"Moderate","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy loam / Loam / Clay (adaptable)","ph_range":"4.5-6.5","growth_form":"Multiple stem / suckering","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root","showy":"Yes","pa_notes":"Commonly confused with A. arborea in nursery trade. Blooms with shad fish runs on Susquehanna. Spreads by suckers.","_id":"AMCA4"},{"_rowIndex":6,"usda_symbol":"AMLA","scientific_name":"Amelanchier laevis","common_name":"Allegheny serviceberry","alternate_name":"","plant_type":"Tree; Shrub","family":"Rosaceae","flower_color":"White","bloom":"Apr (early spring before leaves)","height":"15-25 ft (rarely to 40 ft in ideal conditions)","sun":"Sun; Part Shade; Shade","moisture":"Moist preferred (tolerates dry \u2014 sensitive to drought)","lifespan":"Short","growth_rate":"Moderate","drought_tolerance":"Medium","pollinator_value":"Medium","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / sandy loam","ph_range":"4.5-6.5","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root","showy":"Yes","pa_notes":"Juiciest berries of all serviceberry species. Sweeter than A. arborea. Buy named cultivars for best form.","_id":"AMLA"},{"_rowIndex":7,"usda_symbol":"ANGE","scientific_name":"Andropogon gerardii","common_name":"big bluestem","alternate_name":"","plant_type":"Graminoid (perennial)","family":"Poaceae","flower_color":"Red; brown; green","bloom":"Jul-Sep","height":"6\u20138","sun":"Sun; Part Shade","moisture":"Dry","lifespan":"Long","growth_rate":"Moderate","drought_tolerance":"High","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Clay / loam / sandy loam (very adaptable)","ph_range":"6\u20137.5","growth_form":"Bunch","leaf_retention":"Deciduous","propagation":"Seed","showy":"No","pa_notes":"","_id":"ANGE"},{"_rowIndex":8,"usda_symbol":"ANCA8","scientific_name":"Anemone canadensis","common_name":"Canada anemone","alternate_name":"","plant_type":"Herb (perennial)","family":"Ranunculaceae","flower_color":"White","bloom":"May-Jul","height":"1-2 ft","sun":"Sun / part shade","moisture":"Wet; Moist","lifespan":"Perennial","growth_rate":"Rapid","drought_tolerance":"","pollinator_value":"Medium","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"","showy":"Yes","pa_notes":"","_id":"ANCA8"},{"_rowIndex":9,"usda_symbol":"AQCA","scientific_name":"Aquilegia canadensis","common_name":"red columbine","alternate_name":"","plant_type":"Herb (perennial)","family":"Ranunculaceae","flower_color":"Red; yellow","bloom":"Apr\u2013May","height":"1-2.5 ft","sun":"Sun; Part Shade","moisture":"Wet; Moist; Dry","lifespan":"Short-lived perennial (self-seeds)","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Rocky / loam / sandy (well-drained)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"AQCA"},{"_rowIndex":10,"usda_symbol":"ARME6","scientific_name":"Aronia melanocarpa","common_name":"black chokeberry","alternate_name":"Aronia Berry","plant_type":"Shrub","family":"Rosaceae","flower_color":"White","bloom":"May","height":"4-6 ft","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Long","growth_rate":"Moderate to slow","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"","growth_form":"Multiple stem / suckering","leaf_retention":"","propagation":"","showy":"","pa_notes":"","_id":"ARME6"},{"_rowIndex":11,"usda_symbol":"ASCA","scientific_name":"Asarum canadense","common_name":"Wild ginger","alternate_name":"","plant_type":"Herb (perennial)","family":"Aristolochiaceae","flower_color":"Reddish-brown (hidden under leaves)","bloom":"Apr\u2013Jun","height":"0.5-1 ft","sun":"Part Shade; Shade","moisture":"Dry","lifespan":"Perennial","growth_rate":"Moderate","drought_tolerance":"","pollinator_value":"Medium","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"","growth_form":"Rhizomatous","leaf_retention":"","propagation":"","showy":"","pa_notes":"","_id":"ASCA"},{"_rowIndex":12,"usda_symbol":"ASAM","scientific_name":"Asclepias amplexicaulis","common_name":"clasping milkweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asclepiadaceae","flower_color":"Pink / lavender-green","bloom":"May-Jul","height":"1-3 ft","sun":"","moisture":"","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Pollinator","soil_texture":"Sandy / rocky (well-drained)","ph_range":"","growth_form":"Single unbranched stem","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"Fairly rare milkweed \u2014 protected in some states. Single unbranched stem is distinctive.","_id":"ASAM"},{"_rowIndex":13,"usda_symbol":"ASEX","scientific_name":"Asclepias exaltata","common_name":"poke milkweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asclepiadaceae","flower_color":"White","bloom":"Jun\u2013Jul","height":"3\u20134","sun":"Part Shade; Shade","moisture":"Moist; Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"Yes","workhorse":"Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"ASEX"},{"_rowIndex":14,"usda_symbol":"ASIN","scientific_name":"Asclepias incarnata","common_name":"swamp milkweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asclepiadaceae","flower_color":"Pink; rose","bloom":"Jun\u2013Sep","height":"3\u20135","sun":"Sun; Part Shade","moisture":"Moist","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"None","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"5\u20138","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Sprig","showy":"Yes","pa_notes":"","_id":"ASIN"},{"_rowIndex":15,"usda_symbol":"ASPU2","scientific_name":"Asclepias purpurascens","common_name":"purple milkweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asclepiadaceae","flower_color":"Purple","bloom":"May\u2013Jul","height":"2.5\u20133.5","sun":"Sun","moisture":"Moist; Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"ASPU2"},{"_rowIndex":16,"usda_symbol":"ASQU","scientific_name":"Asclepias quadrifolia","common_name":"fourleaf milkweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asclepiadaceae","flower_color":"","bloom":"May\u2013Jun","height":"","sun":"","moisture":"","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"ASQU"},{"_rowIndex":17,"usda_symbol":"ASSY","scientific_name":"Asclepias syriaca","common_name":"common milkweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asclepiadaceae","flower_color":"Purple","bloom":"Jun\u2013Aug","height":"2\u20133","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"ASSY"},{"_rowIndex":18,"usda_symbol":"ASTU","scientific_name":"Asclepias tuberosa","common_name":"butterfly milkweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asclepiadaceae","flower_color":"Orange","bloom":"Jun\u2013Aug","height":"1\u20133","sun":"Sun; Part Shade","moisture":"Dry","lifespan":"Moderate","growth_rate":"Slow","drought_tolerance":"High","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"4.8\u20136.8","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container","showy":"Yes","pa_notes":"","_id":"ASTU"},{"_rowIndex":19,"usda_symbol":"ASVA","scientific_name":"Asclepias variegata","common_name":"redring milkweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asclepiadaceae","flower_color":"White","bloom":"May\u2013Jul","height":"2.5\u20133","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"ASVA"},{"_rowIndex":20,"usda_symbol":"ASVE","scientific_name":"Asclepias verticillata","common_name":"whorled milkweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asclepiadaceae","flower_color":"Purple","bloom":"Jun\u2013Sep","height":"1\u20132","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"ASVE"},{"_rowIndex":21,"usda_symbol":"ASVI","scientific_name":"Asclepias viridiflora","common_name":"green comet milkweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asclepiadaceae","flower_color":"Green","bloom":"Jun\u2013Sep","height":"1\u20133","sun":"sun","moisture":"Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Pollinator","soil_texture":"Coarse","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"ASVI"},{"_rowIndex":22,"usda_symbol":"ASTR","scientific_name":"Asimina triloba","common_name":"pawpaw","alternate_name":"","plant_type":"Tree; Shrub","family":"Annonaceae","flower_color":"Red\u2013brown","bloom":"Apr (before or with leaf emergence)","height":"15-30 ft typical (rarely to 40 ft)","sun":"sun; part shade; shade","moisture":"Moist; Dry","lifespan":"Short","growth_rate":"Slow","drought_tolerance":"Low","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Rich loam / sandy loam","ph_range":"5.5-7.0","growth_form":"Single Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root","showy":"No","pa_notes":"Requires cross-pollination for fruit \u2014 plant 2+ trees. Fruit attracts opossums and raccoons. Largest native edible fruit in North America.","_id":"ASTR"},{"_rowIndex":23,"usda_symbol":"BAAU","scientific_name":"Baptisia australis","common_name":"blue false indigo","alternate_name":"","plant_type":"Herb (perennial)","family":"Fabaceae","flower_color":"Blue\u2013purple","bloom":"May-Jun","height":"3-4 ft","sun":"Sun","moisture":"Moist; Dry","lifespan":"Long (decades)","growth_rate":"","drought_tolerance":"High","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Medium","ph_range":"","growth_form":"Single crown / tap root","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"Single deep taproot \u2014 do not divide or transplant once established. Takes 3-4 years from seed to flower. Very long-lived once established.","_id":"BAAU"},{"_rowIndex":24,"usda_symbol":"CAPA5","scientific_name":"Caltha palustris","common_name":"yellow marsh marigold","alternate_name":"","plant_type":"Herb (perennial)","family":"Ranunculaceae","flower_color":"Yellow","bloom":"Apr\u2013May","height":"1\u20131.5","sun":"Sun; Part Shade; Shade","moisture":"Wet","lifespan":"Moderate","growth_rate":"Slow","drought_tolerance":"None","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Clay loam / loam (moist to wet)","ph_range":"4.9\u20136.8","growth_form":"Single Crown","leaf_retention":"Deciduous","propagation":"Seed; Container","showy":"Yes","pa_notes":"","_id":"CAPA5"},{"_rowIndex":25,"usda_symbol":"CASC5","scientific_name":"Camassia scilloides","common_name":"Wild Hyacinth","alternate_name":"","plant_type":"Herb (perennial)","family":"Liliaceae","flower_color":"Violet","bloom":"Apr\u2013May","height":"1\u20132","sun":"Sun; Part Shade","moisture":"Wet; Moist","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Pollinator","soil_texture":"Loam / clay loam","ph_range":"4.2\u20136.5","growth_form":"Single Crown","leaf_retention":"Deciduous","propagation":"Seed; Bulb","showy":"Yes","pa_notes":"","_id":"CASC5"},{"_rowIndex":26,"usda_symbol":"Campanula_americana","scientific_name":"Campanula americana","common_name":"Tall Bellflower","alternate_name":"","plant_type":"Annual or biennial (self-seeds to persist)","family":"Campanulaceae","flower_color":"Blue-violet","bloom":"Jun-Aug","height":"3-6 ft","sun":"Part shade / shade","moisture":"Moist","lifespan":"Annual or biennial (self-seeds)","growth_rate":"","drought_tolerance":"","pollinator_value":"","monarchs":"","hummingbirds":"","workhorse":"","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"","pa_notes":"Annual or biennial NOT reliably perennial \u2014 self-seeds to persist. Listed as Endangered in New York State.","_id":"Campanula_americana"},{"_rowIndex":27,"usda_symbol":"CAPE6","scientific_name":"Carex pensylvanica","common_name":"Pennsylvania sedge","alternate_name":"","plant_type":"Graminoid (perennial)","family":"Cyperaceae","flower_color":"","bloom":"Apr-May","height":"0.5-0.7 ft (6-8 in when blooming)","sun":"Full sun to full shade","moisture":"Dry to medium","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"None Known","monarchs":"","hummingbirds":"","workhorse":"Workhorse","soil_texture":"","ph_range":"","growth_form":"Rhizomatous","leaf_retention":"","propagation":"","showy":"No","pa_notes":"","_id":"CAPE6"},{"_rowIndex":28,"usda_symbol":"CECA4","scientific_name":"Cercis canadensis","common_name":"eastern redbud","alternate_name":"","plant_type":"Tree; Shrub","family":"Fabaceae","flower_color":"Pink","bloom":"Mar-Apr (confirmed)","height":"10\u201330","sun":"Sun; Part Shade","moisture":"Moist","lifespan":"Short","growth_rate":"Slow","drought_tolerance":"High","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay / sandy (adaptable)","ph_range":"5\u20137.9","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root; Cutting","showy":"Yes","pa_notes":"","_id":"CECA4"},{"_rowIndex":29,"usda_symbol":"CHLA5","scientific_name":"Chasmanthium latifolium","common_name":"Indian woodoats","alternate_name":"","plant_type":"Graminoid (perennial)","family":"Poaceae","flower_color":"Green","bloom":"Jul-Sep","height":"2-5 ft","sun":"Part shade to shade (tolerates sun with moisture)","moisture":"Wet; Moist; Dry","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Medium","pollinator_value":"Medium","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay loam (moist / fertile)","ph_range":"5\u20137","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Bare root","showy":"No","pa_notes":"","_id":"CHLA5"},{"_rowIndex":30,"usda_symbol":"CHGL2","scientific_name":"Chelone glabra","common_name":"white turtlehead","alternate_name":"","plant_type":"Herb (perennial)","family":"Scrophulariaceae","flower_color":"White","bloom":"Jul\u2013Sep","height":"2-3 ft","sun":"Sun; Part Shade; Shade","moisture":"Wet","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay loam (moist)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"CHGL2"},{"_rowIndex":31,"usda_symbol":"COCO13","scientific_name":"Conoclinium coelestinum","common_name":"blue mistflower","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Blue","bloom":"Jun\u2013Aug","height":"2\u20133","sun":"Sun / part shade (tolerates shade)","moisture":"Wet; Moist","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Medium","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay loam","ph_range":"5.5\u20137.5","growth_form":"Single Crown","leaf_retention":"Deciduous","propagation":"Seed; Sprig","showy":"Yes","pa_notes":"","_id":"COCO13"},{"_rowIndex":32,"usda_symbol":"COLA5","scientific_name":"Coreopsis lanceolata","common_name":"lanceleaf coreopsis","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Yellow","bloom":"Apr\u2013Jun","height":"2\u20133","sun":"Sun","moisture":"Moist; Dry","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy loam / loam (well-drained)","ph_range":"6\u20137","growth_form":"Single Crown","leaf_retention":"Deciduous","propagation":"Seed; Container","showy":"Yes","pa_notes":"","_id":"COLA5"},{"_rowIndex":33,"usda_symbol":"COSE16","scientific_name":"Cornus sericea","common_name":"redosier dogwood","alternate_name":"","plant_type":"Shrub","family":"Cornaceae","flower_color":"White","bloom":"May-Jun","height":"6-9 ft (to 10 ft unpruned)","sun":"Sun; Part Shade","moisture":"Wet; Moist","lifespan":"Moderate","growth_rate":"Rapid","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay / sandy (very adaptable)","ph_range":"4.8\u20137.5","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Cutting","showy":"Yes","pa_notes":"","_id":"COSE16"},{"_rowIndex":34,"usda_symbol":"COAM3","scientific_name":"Corylus americana","common_name":"American hazelnut","alternate_name":"","plant_type":"Shrub","family":"Betulaceae","flower_color":"White","bloom":"Mar-Apr","height":"8-12 ft","sun":"Sun; Part Shade","moisture":"Dry","lifespan":"Short","growth_rate":"Moderate","drought_tolerance":"Medium","pollinator_value":"Low","monarchs":"","hummingbirds":"","workhorse":"Workhorse","soil_texture":"Loam / sandy loam","ph_range":"5\u20137","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root","showy":"No","pa_notes":"","_id":"COAM3"},{"_rowIndex":35,"usda_symbol":"DEEX","scientific_name":"Delphinium exaltatum","common_name":"tall larkspur","alternate_name":"","plant_type":"Herb (perennial)","family":"Ranunculaceae","flower_color":"Blue to purple (occasionally white)","bloom":"Jul-Sep","height":"3-6 ft","sun":"Full sun to part shade","moisture":"Moist (well-drained)","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Medium","monarchs":"","hummingbirds":"","workhorse":"Pollinator","soil_texture":"","ph_range":"","growth_form":"Rhizomatous","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"DEEX"},{"_rowIndex":36,"usda_symbol":"DECA7","scientific_name":"Desmodium canadense","common_name":"showy ticktrefoil","alternate_name":"","plant_type":"Herb (perennial)","family":"Fabaceae","flower_color":"Pink / rose-purple","bloom":"Jul-Aug","height":"3-6 ft","sun":"Sun / part shade","moisture":"Moist; Dry","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"DECA7"},{"_rowIndex":37,"usda_symbol":"ECPU","scientific_name":"Echinacea purpurea","common_name":"purple coneflower","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Rose\u2013purple","bloom":"Jun-Sep (sometimes reblooms fall)","height":"2\u20134","sun":"Sun","moisture":"Dry","lifespan":"Long","growth_rate":"Moderate","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / sandy loam / clay (well-drained)","ph_range":"6.5\u20137.2","growth_form":"Single Stem","leaf_retention":"Deciduous","propagation":"Seed","showy":"Yes","pa_notes":"","_id":"ECPU"},{"_rowIndex":38,"usda_symbol":"ELHY","scientific_name":"Elymus hystrix","common_name":"eastern bottlebrush grass","alternate_name":"","plant_type":"Graminoid (perennial)","family":"Poaceae","flower_color":"Green (insignificant)","bloom":"Jun-Aug","height":"2-4 ft","sun":"Part shade to shade","moisture":"Moist to dry","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Medium","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"No","pa_notes":"","_id":"ELHY"},{"_rowIndex":39,"usda_symbol":"ERSP","scientific_name":"Eragrostis spectabilis","common_name":"purple lovegrass","alternate_name":"","plant_type":"Graminoid (perennial)","family":"Poaceae","flower_color":"Red","bloom":"Aug-Oct","height":"1-2 ft","sun":"Sun","moisture":"Dry","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"High","pollinator_value":"Low","monarchs":"","hummingbirds":"","workhorse":"Workhorse","soil_texture":"","ph_range":"4\u20137.5","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed","showy":"No","pa_notes":"","_id":"ERSP"},{"_rowIndex":40,"usda_symbol":"Eutrochium_fistulosum","scientific_name":"Eutrochium fistulosum","common_name":"joe pye weed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Pink / mauve","bloom":"Jul-Sep","height":"4-7 ft","sun":"Sun / part shade","moisture":"Moist to wet","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"","monarchs":"","hummingbirds":"","workhorse":"","soil_texture":"","ph_range":"","growth_form":"Rhizomatous / clump-forming","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"Eutrochium_fistulosum"},{"_rowIndex":41,"usda_symbol":"EUMA9","scientific_name":"Eutrochium maculatum","common_name":"spotted joe pye weed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Pink","bloom":"Jul\u2013Sep","height":"4\u20138","sun":"Sun; Part Shade","moisture":"Wet","lifespan":"Moderate","growth_rate":"Rapid","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"5.5\u20137","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Container; Bare root; Sprig","showy":"Yes","pa_notes":"","_id":"EUMA9"},{"_rowIndex":42,"usda_symbol":"GYDI","scientific_name":"Gymnocladus dioicus","common_name":"Kentucky coffeetree","alternate_name":"","plant_type":"Tree","family":"Fabaceae","flower_color":"White","bloom":"May-Jun","height":"60-80 ft typical (to 100 ft exceptional)","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Long","growth_rate":"Slow","drought_tolerance":"Medium","pollinator_value":"High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay / sandy (adaptable)","ph_range":"6\u20138","growth_form":"","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root; Cutting","showy":"Yes","pa_notes":"","_id":"GYDI"},{"_rowIndex":43,"usda_symbol":"HEAN2","scientific_name":"Helianthus angustifolius","common_name":"swamp sunflower","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Yellow","bloom":"Sep-Nov","height":"4-6 ft","sun":"Sun","moisture":"Wet; Moist","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Medium","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy loam / clay loam (moist)","ph_range":"4\u20137","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Sprig","showy":"Yes","pa_notes":"","_id":"HEAN2"},{"_rowIndex":44,"usda_symbol":"HETU","scientific_name":"Helianthus tuberosus","common_name":"Jerusalem artichoke","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Yellow","bloom":"Jul\u2013Sep","height":"6\u201310","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Moderate","growth_rate":"Rapid","drought_tolerance":"High","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay (tolerates most)","ph_range":"4\u20137","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Tuber","showy":"Yes","pa_notes":"Highly invasive once established \u2014 tubers persist for years and extremely difficult to remove. Advise customers of spreading habit.","_id":"HETU"},{"_rowIndex":45,"usda_symbol":"HILA2","scientific_name":"Hibiscus laevis","common_name":"rose mallow","alternate_name":"","plant_type":"Herb (perennial)","family":"Malvaceae","flower_color":"Pink; white; red","bloom":"Jun\u2013Aug","height":"5\u20137","sun":"Sun; Part Shade","moisture":"Wet","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Low","pollinator_value":"High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Clay loam / loam (moist to wet)","ph_range":"5.5\u20137.2","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root; Cutting","showy":"Yes","pa_notes":"","_id":"HILA2"},{"_rowIndex":46,"usda_symbol":"HYAR","scientific_name":"Hydrangea arborescens","common_name":"wild hydrangea","alternate_name":"","plant_type":"Shrub","family":"Hydrangeaceae","flower_color":"White","bloom":"Jun\u2013Aug","height":"3-5 ft (confirmed)","sun":"Part shade (tolerates full sun with consistent moisture)","moisture":"Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam (rich / moist / well-drained)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"HYAR"},{"_rowIndex":47,"usda_symbol":"HYPR","scientific_name":"Hypericum prolificum","common_name":"shrubby St. Johnswort","alternate_name":"","plant_type":"Shrub","family":"Clusiaceae","flower_color":"Yellow","bloom":"Jun-Aug","height":"1-4 ft","sun":"Sun","moisture":"Moist; Dry","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Low","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy / rocky / clay (very adaptable)","ph_range":"4.6\u20137.2","growth_form":"Single Crown","leaf_retention":"Deciduous","propagation":"Sprig","showy":"Yes","pa_notes":"Threatened in New York and endangered in New Jersey \u2014 healthy PA populations are important. Deer and rabbit resistant due to hypericin toxin. No nectar \u2014 only pollen \u2014 bumblebees dominate.","_id":"HYPR"},{"_rowIndex":48,"usda_symbol":"ILVE","scientific_name":"Ilex verticillata","common_name":"common winterberry","alternate_name":"","plant_type":"Shrub","family":"Aquifoliaceae","flower_color":"White","bloom":"May-Jun (confirmed)","height":"6\u201310","sun":"Sun; Part Shade; Shade","moisture":"Wet; Moist","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Clay loam / loam (moist / wet)","ph_range":"4.5\u20137.5","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root","showy":"No","pa_notes":"","_id":"ILVE"},{"_rowIndex":49,"usda_symbol":"IRCR","scientific_name":"Iris cristata","common_name":"dwarf crested iris","alternate_name":"","plant_type":"Herb (perennial)","family":"Iridaceae","flower_color":"Blue","bloom":"Apr\u2013May","height":"0.5-0.8 ft (confirmed)","sun":"Part shade to shade (confirmed)","moisture":"Dry","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Medium","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Rocky / loam (well-drained)","ph_range":"","growth_form":"Rhizomatous","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"IRCR"},{"_rowIndex":50,"usda_symbol":"LECA8","scientific_name":"Lespedeza capitata","common_name":"Round-headed bush clover","alternate_name":"","plant_type":"Herb (perennial)","family":"Fabaceae","flower_color":"White","bloom":"Aug-Sep","height":"2.5","sun":"Sun; Part Shade","moisture":"Dry","lifespan":"Long","growth_rate":"Slow","drought_tolerance":"High","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy / sandy loam","ph_range":"5.7\u20138.2","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed","showy":"No","pa_notes":"","_id":"LECA8"},{"_rowIndex":51,"usda_symbol":"Liatris_scariosa_var_nieuwlandii","scientific_name":"Liatris scariosa var. nieuwlandii","common_name":"Northern Blazing Star","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Purple","bloom":"Aug-Sep","height":"2-3 ft","sun":"Full sun to part sun","moisture":"Dry to medium","lifespan":"Perennial","growth_rate":"","drought_tolerance":"High","pollinator_value":"","monarchs":"","hummingbirds":"","workhorse":"","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"Blooms top-down on stalk \u2014 may need staking. Deer and rabbit browse. Monarch butterfly favorite on migration. Not common across most of range.","_id":"Liatris_scariosa_var_nieuwlandii"},{"_rowIndex":52,"usda_symbol":"LISP","scientific_name":"Liatris spicata","common_name":"dense blazing star","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Pink\u2013purple","bloom":"Jul\u2013Sep","height":"2\u20134","sun":"Sun; Part Shade","moisture":"Wet; Moist; Dry","lifespan":"Moderate","growth_rate":"Slow","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay (tolerates wet)","ph_range":"5.6\u20137.5","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Container; Corm","showy":"Yes","pa_notes":"","_id":"LISP"},{"_rowIndex":53,"usda_symbol":"LIBE3","scientific_name":"Lindera benzoin","common_name":"northern spicebush","alternate_name":"","plant_type":"Shrub","family":"Lauraceae","flower_color":"Yellow\u2013green","bloom":"Mar-Apr","height":"4\u20137","sun":"Sun; Part Shade; Shade","moisture":"Wet; Moist","lifespan":"Long","growth_rate":"Slow","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay loam (moist)","ph_range":"4.5\u20136","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root","showy":"Yes","pa_notes":"","_id":"LIBE3"},{"_rowIndex":54,"usda_symbol":"LOCA2","scientific_name":"Lobelia cardinalis","common_name":"cardinal flower","alternate_name":"","plant_type":"Herb (perennial)","family":"Campanulaceae","flower_color":"Red","bloom":"Jun\u2013Aug","height":"2\u20135","sun":"Part Shade; Shade","moisture":"Wet; Moist","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Medium","pollinator_value":"High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay loam (moist)","ph_range":"5.8\u20137.8","growth_form":"Single Stem","leaf_retention":"Deciduous","propagation":"Seed; Container","showy":"Yes","pa_notes":"","_id":"LOCA2"},{"_rowIndex":55,"usda_symbol":"LOSI","scientific_name":"Lobelia siphilitica","common_name":"great blue lobelia","alternate_name":"","plant_type":"Herb (perennial)","family":"Campanulaceae","flower_color":"Blue","bloom":"Jun\u2013Aug","height":"2\u20135","sun":"Sun","moisture":"Wet; Moist","lifespan":"Short-lived perennial (self-seeds)","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay (moist to wet)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"LOSI"},{"_rowIndex":56,"usda_symbol":"LOSE","scientific_name":"Lonicera sempervirens","common_name":"coral honeysuckle","alternate_name":"","plant_type":"Vine","family":"Caprifoliaceae","flower_color":"Red","bloom":"Jul\u2013Sep","height":"10\u201320","sun":"Part Shade; Shade","moisture":"Moist; Dry","lifespan":"Long","growth_rate":"Rapid","drought_tolerance":"Low","pollinator_value":"High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / sandy loam (well-drained)","ph_range":"6\u20138.5","growth_form":"Multiple Stem","leaf_retention":"Evergreen","propagation":"Seed; Container; Bare root","showy":"Yes","pa_notes":"","_id":"LOSE"},{"_rowIndex":57,"usda_symbol":"LUPE3","scientific_name":"Lupinus perennis","common_name":"wild lupine","alternate_name":"","plant_type":"Herb (perennial)","family":"Fabaceae","flower_color":"Blue\u2013purple","bloom":"Apr\u2013Jun","height":"1\u20133","sun":"Sun","moisture":"Dry","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy / sandy loam (confirmed coarse)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"Host plant for Karner Blue butterfly (federally endangered). Sandy soil is non-negotiable \u2014 will fail in heavy clay.","_id":"LUPE3"},{"_rowIndex":58,"usda_symbol":"Lupinus_perennis_subsp_perennis","scientific_name":"Lupinus perennis subsp. perennis","common_name":"Sundial Lupine","alternate_name":"","plant_type":"Herb (perennial)","family":"Fabaceae","flower_color":"Blue-purple","bloom":"Apr-Jun","height":"1-3 ft","sun":"Full sun","moisture":"Dry","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"","monarchs":"","hummingbirds":"","workhorse":"","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"","pa_notes":"Subspecies of L. perennis \u2014 same attributes apply. Sandy soils non-negotiable. Karner Blue butterfly host.","_id":"Lupinus_perennis_subsp_perennis"},{"_rowIndex":59,"usda_symbol":"MODI","scientific_name":"Monarda didyma","common_name":"scarlet beebalm","alternate_name":"","plant_type":"Herb (perennial)","family":"Lamiaceae","flower_color":"Red","bloom":"Jul\u2013Sep","height":"3\u20136","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay loam (moist)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"MODI"},{"_rowIndex":60,"usda_symbol":"MOFI","scientific_name":"Monarda fistulosa","common_name":"wild bergamot","alternate_name":"","plant_type":"Shrub; Herb (perennial)","family":"Lamiaceae","flower_color":"Lavender","bloom":"May\u2013Sep","height":"2\u20134","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"None","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / sandy loam","ph_range":"6\u20138","growth_form":"Single Stem","leaf_retention":"Deciduous","propagation":"Seed; Container","showy":"Yes","pa_notes":"","_id":"MOFI"},{"_rowIndex":61,"usda_symbol":"MOPU","scientific_name":"Monarda punctata","common_name":"spotted bee balm","alternate_name":"","plant_type":"Shrub; Herb (annual or perennial)","family":"Lamiaceae","flower_color":"Purple","bloom":"Jun\u2013Aug","height":"1\u20132.5","sun":"Sun","moisture":"Moist","lifespan":"Annual to short-lived perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy / coarse loam (confirmed)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"MOPU"},{"_rowIndex":62,"usda_symbol":"MUCA2","scientific_name":"Muhlenbergia capillaris","common_name":"pink muhly grass","alternate_name":"","plant_type":"Graminoid (perennial)","family":"Poaceae","flower_color":"Red","bloom":"Sep-Nov (confirmed)","height":"2-3 ft","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Short","growth_rate":"Moderate","drought_tolerance":"Low","pollinator_value":"None Known","monarchs":"","hummingbirds":"","workhorse":"Workhorse","soil_texture":"","ph_range":"5.8\u20136.8","growth_form":"Bunch","leaf_retention":"Deciduous","propagation":"Seed; Sprig","showy":"No","pa_notes":"","_id":"MUCA2"},{"_rowIndex":63,"usda_symbol":"OPHU","scientific_name":"Opuntia humifusa","common_name":"Eastern Prickly Pear Cactus","alternate_name":"","plant_type":"Shrub","family":"Cactaceae","flower_color":"Yellow","bloom":"May\u2013Jul","height":"0.5\u20131","sun":"Sun","moisture":"Dry","lifespan":"Long","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy / rocky / coarse","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"OPHU"},{"_rowIndex":64,"usda_symbol":"PAVI2","scientific_name":"Panicum virgatum","common_name":"switchgrass","alternate_name":"","plant_type":"Graminoid (perennial)","family":"Poaceae","flower_color":"Green","bloom":"Jul\u2013Aug","height":"3\u20136","sun":"Sun; Part Shade","moisture":"Wet; Moist; Dry","lifespan":"Long","growth_rate":"Rapid","drought_tolerance":"Medium","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay / sandy (very adaptable)","ph_range":"4.5\u20138","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed","showy":"No","pa_notes":"","_id":"PAVI2"},{"_rowIndex":65,"usda_symbol":"PEDI","scientific_name":"Penstemon digitalis","common_name":"smooth beard tongue","alternate_name":"","plant_type":"Herb (perennial)","family":"Scrophulariaceae","flower_color":"White","bloom":"Jun\u2013Jul","height":"2\u20135","sun":"Sun","moisture":"Wet; Moist; Dry","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"High","pollinator_value":"Very High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay loam","ph_range":"5.5\u20137","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Container; Sprig","showy":"Yes","pa_notes":"","_id":"PEDI"},{"_rowIndex":66,"usda_symbol":"PHOP","scientific_name":"Physocarpus opulifolius","common_name":"ninebark","alternate_name":"","plant_type":"Shrub","family":"Rosaceae","flower_color":"White","bloom":"May-Jun","height":"3\u201310","sun":"Sun; Part Shade","moisture":"Moist","lifespan":"Moderate","growth_rate":"Slow","drought_tolerance":"High","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay / sandy (adaptable)","ph_range":"4.5\u20136.5","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root; Cutting","showy":"Yes","pa_notes":"","_id":"PHOP"},{"_rowIndex":67,"usda_symbol":"PHVI8","scientific_name":"Physostegia virginiana","common_name":"obedient plant","alternate_name":"","plant_type":"Herb (perennial)","family":"Lamiaceae","flower_color":"Pink","bloom":"Jun\u2013Sep","height":"2\u20133","sun":"Sun; Part Shade","moisture":"Wet; Moist","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay loam (moist)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"Spreads aggressively by rhizomes \u2014 can be invasive in garden settings. Self-sows readily.","_id":"PHVI8"},{"_rowIndex":68,"usda_symbol":"Polymnia_canadensis","scientific_name":"Polymnia canadensis","common_name":"Small-flowered leaf cup","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"White / pale yellow","bloom":"Jun-Oct","height":"3-6 ft","sun":"Part shade to shade","moisture":"Moist","lifespan":"Short-lived perennial (self-seeds)","growth_rate":"","drought_tolerance":"","pollinator_value":"","monarchs":"","hummingbirds":"","workhorse":"","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"","pa_notes":"Short-lived but self-seeds. Covered in bees when flowering. Also called Pale Leafcup.","_id":"Polymnia_canadensis"},{"_rowIndex":69,"usda_symbol":"PRVI","scientific_name":"Prunus virginiana","common_name":"chokecherry","alternate_name":"","plant_type":"Tree; Shrub","family":"Rosaceae","flower_color":"White","bloom":"Apr\u2013May","height":"10\u201330","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Short","growth_rate":"Rapid","drought_tolerance":"Medium","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / sandy loam / clay (adaptable)","ph_range":"5.2\u20138.4","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root","showy":"Yes","pa_notes":"","_id":"PRVI"},{"_rowIndex":70,"usda_symbol":"PYMU","scientific_name":"Pycnanthemum muticum","common_name":"clustered mountainmint","alternate_name":"","plant_type":"Herb (perennial)","family":"Lamiaceae","flower_color":"White / pale lavender","bloom":"Jul-Sep","height":"2-3 ft","sun":"","moisture":"Moist; Dry","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"No (but highly attractive to pollinators)","pa_notes":"","_id":"PYMU"},{"_rowIndex":71,"usda_symbol":"RAPI","scientific_name":"Ratibida pinnata","common_name":"gray-headed coneflower","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Yellow","bloom":"Jun\u2013Aug","height":"3\u20136","sun":"Sun","moisture":"Moist; Dry","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"Medium","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay loam","ph_range":"5.6\u20136.8","growth_form":"Single Crown","leaf_retention":"Deciduous","propagation":"Seed; Container","showy":"Yes","pa_notes":"","_id":"RAPI"},{"_rowIndex":72,"usda_symbol":"RHAR4","scientific_name":"Rhus aromatica","common_name":"fragrant sumac","alternate_name":"","plant_type":"Shrub","family":"Anacardiaceae","flower_color":"Green\u2013yellow","bloom":"Apr\u2013Jun","height":"3\u20136","sun":"Sun; Part Shade; Shade","moisture":"Moist; Dry","lifespan":"Long","growth_rate":"Slow","drought_tolerance":"High","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy / rocky / loam (adaptable)","ph_range":"5\u20138","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root","showy":"No","pa_notes":"","_id":"RHAR4"},{"_rowIndex":73,"usda_symbol":"ROPA","scientific_name":"Rosa palustris","common_name":"swamp rose","alternate_name":"","plant_type":"Shrub","family":"Rosaceae","flower_color":"Pink","bloom":"Jun-Jul","height":"5\u20137","sun":"Sun; Part Shade","moisture":"Wet","lifespan":"Long","growth_rate":"Moderate","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Clay loam / loam (moist to wet)","ph_range":"4\u20137","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root","showy":"Yes","pa_notes":"","_id":"ROPA"},{"_rowIndex":74,"usda_symbol":"RUFU2","scientific_name":"Rudbeckia fulgida","common_name":"black-eyed susan","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Yellow (orange-yellow rays / dark center)","bloom":"Jun-Oct","height":"1.5-3 ft","sun":"Sun / part shade","moisture":"Wet; Moist","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Medium","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"RUFU2"},{"_rowIndex":75,"usda_symbol":"RUHI2","scientific_name":"Rudbeckia hirta","common_name":"fuzzy rudbeckia","alternate_name":"","plant_type":"Herb (annual or perennial)","family":"Asteraceae","flower_color":"Yellow","bloom":"Jun\u2013Aug","height":"1.5\u20133.5","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Short","growth_rate":"Rapid","drought_tolerance":"Medium","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / sandy loam / clay","ph_range":"6\u20137","growth_form":"Single Stem","leaf_retention":"Deciduous","propagation":"Seed","showy":"Yes","pa_notes":"","_id":"RUHI2"},{"_rowIndex":76,"usda_symbol":"RULA3","scientific_name":"Rudbeckia laciniata","common_name":"cutleaf coneflower","alternate_name":"","plant_type":"Shrub; Herb (perennial)","family":"Asteraceae","flower_color":"Yellow; brown","bloom":"Jul\u2013Sep","height":"2\u201310","sun":"Sun; Part Shade; Shade","moisture":"Moist; Dry","lifespan":"Short","growth_rate":"Rapid","drought_tolerance":"High","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay (moist)","ph_range":"4.5\u20137","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Container","showy":"Yes","pa_notes":"","_id":"RULA3"},{"_rowIndex":77,"usda_symbol":"RUHU","scientific_name":"Ruellia humilis","common_name":"fringeleaf wild petunia","alternate_name":"","plant_type":"Herb (perennial)","family":"Acanthaceae","flower_color":"Lavender; purple","bloom":"May\u2013Jun","height":"1\u20133","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Short","growth_rate":"Moderate","drought_tolerance":"Medium","pollinator_value":"High","monarchs":"","hummingbirds":"Yes","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy / loam (well-drained)","ph_range":"4.5\u20137.5","growth_form":"Single Stem","leaf_retention":"Deciduous","propagation":"Seed; Container","showy":"Yes","pa_notes":"","_id":"RUHU"},{"_rowIndex":78,"usda_symbol":"Sambucus_canadensis","scientific_name":"Sambucus canadensis","common_name":"Black Elderberry","alternate_name":"","plant_type":"Shrub","family":"Adoxaceae","flower_color":"White (cream / lemon-scented)","bloom":"Jun-Jul","height":"5-12 ft","sun":"Sun to part shade","moisture":"Moist to wet (tolerates dry)","lifespan":"Short to moderate (suckering \u2014 individual stems short-lived)","growth_rate":"Rapid","drought_tolerance":"","pollinator_value":"","monarchs":"","hummingbirds":"","workhorse":"","soil_texture":"","ph_range":"","growth_form":"Multiple stem / suckering","leaf_retention":"Deciduous","propagation":"","showy":"Yes","pa_notes":"Self-fertile \u2014 only one plant needed for fruit. Prune to ground every 2-3 years for renewal. Leaves/stems/roots toxic \u2014 only ripe cooked berries and flowers are edible.","_id":"Sambucus_canadensis"},{"_rowIndex":79,"usda_symbol":"SAAL5","scientific_name":"Sassafras albidum","common_name":"sassafras","alternate_name":"","plant_type":"Tree; Shrub","family":"Lauraceae","flower_color":"Yellow\u2013green","bloom":"May\u2013Jun","height":"30\u201360","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Moderate","growth_rate":"Moderate","drought_tolerance":"High","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / sandy loam","ph_range":"4.5\u20137.3","growth_form":"Single Stem","leaf_retention":"Deciduous","propagation":"Seed; Container; Bare root; Sprig","showy":"Yes","pa_notes":"","_id":"SAAL5"},{"_rowIndex":80,"usda_symbol":"SCSC","scientific_name":"Schizachyrium scoparium","common_name":"little bluestem","alternate_name":"","plant_type":"Graminoid (perennial)","family":"Poaceae","flower_color":"Yellow; green; brown","bloom":"Aug\u2013Sep","height":"1\u20133","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Long","growth_rate":"Moderate","drought_tolerance":"High","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy / loam / rocky (well-drained)","ph_range":"5\u20138.4","growth_form":"Bunch","leaf_retention":"Deciduous","propagation":"Seed","showy":"No","pa_notes":"","_id":"SCSC"},{"_rowIndex":81,"usda_symbol":"SICA6","scientific_name":"Silene caroliniana","common_name":"sticky catchfly","alternate_name":"","plant_type":"Herb (perennial)","family":"Caryophyllaceae","flower_color":"Pink / rose","bloom":"Apr-Jun","height":"0.5-1 ft","sun":"Sun to part shade","moisture":"Dry","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Medium","monarchs":"","hummingbirds":"","workhorse":"Pollinator","soil_texture":"","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"SICA6"},{"_rowIndex":82,"usda_symbol":"SIPE2","scientific_name":"Silphium perfoliatum","common_name":"cup plant","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Yellow","bloom":"Jul\u2013Sep","height":"3\u20138","sun":"Sun","moisture":"Moist","lifespan":"","growth_rate":"Rapid","drought_tolerance":"Low","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay (moist)","ph_range":"4.5\u20137.5","growth_form":"","leaf_retention":"Deciduous","propagation":"Seed; Container","showy":"Yes","pa_notes":"Leaf bases form cups that hold water \u2014 wildlife use as drinking source. Can spread aggressively \u2014 allow space.","_id":"SIPE2"},{"_rowIndex":83,"usda_symbol":"SIAN3","scientific_name":"Sisyrinchium angustifolium","common_name":"narrowleaf blue-eyed grass","alternate_name":"","plant_type":"Herb (perennial)","family":"Iridaceae","flower_color":"Blue\u2013purple","bloom":"Apr\u2013May","height":"0.5\u20131","sun":"Sun; Part Shade","moisture":"Wet; Moist","lifespan":"Short","growth_rate":"Moderate","drought_tolerance":"Low","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / sandy loam","ph_range":"5\u20137","growth_form":"Bunch","leaf_retention":"Deciduous","propagation":"Seed; Bare root; Bulb","showy":"Yes","pa_notes":"","_id":"SIAN3"},{"_rowIndex":84,"usda_symbol":"SONE","scientific_name":"Solidago nemoralis","common_name":"gray goldenrod","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Yellow","bloom":"Aug\u2013Sep","height":"1\u20132.5","sun":"Sun; Part Shade","moisture":"Dry","lifespan":"Short","growth_rate":"Rapid","drought_tolerance":"Medium","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Sandy / loam / rocky","ph_range":"6.5\u20137.5","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Container; Cutting","showy":"Yes","pa_notes":"","_id":"SONE"},{"_rowIndex":85,"usda_symbol":"SOOD","scientific_name":"Solidago odora","common_name":"sweet goldenrod","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Yellow","bloom":"Sep\u2013Oct","height":"2-3 ft","sun":"Sun; Part Shade","moisture":"Moist; Dry","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Pollinator","soil_texture":"Sandy / loam (dry to medium)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"SOOD"},{"_rowIndex":86,"usda_symbol":"SORU2","scientific_name":"Solidago rugosa","common_name":"wrinkleleaf goldenrod","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Yellow","bloom":"Jul\u2013Sep","height":"4\u20136","sun":"Sun; Part Shade","moisture":"Wet; Moist; Dry","lifespan":"Moderate","growth_rate":"Rapid","drought_tolerance":"Medium","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay (moist to wet)","ph_range":"5\u20137.5","growth_form":"Rhizomatous","leaf_retention":"Deciduous","propagation":"Seed; Bare root; Sprig","showy":"Yes","pa_notes":"","_id":"SORU2"},{"_rowIndex":87,"usda_symbol":"SOSP2","scientific_name":"Solidago speciosa","common_name":"showy goldenrod","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Yellow","bloom":"Aug\u2013Sep","height":"1\u20136","sun":"Sun; Part Shade","moisture":"Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / sandy loam","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"SOSP2"},{"_rowIndex":88,"usda_symbol":"Stylophorum_diphyllum","scientific_name":"Stylophorum diphyllum","common_name":"Wood Poppy","alternate_name":"","plant_type":"Herb (perennial)","family":"Papaveraceae","flower_color":"Yellow","bloom":"Mar-May","height":"1-1.5 ft (12-18 in)","sun":"Part shade to full shade","moisture":"Moist to medium (may go dormant in dry)","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"","monarchs":"","hummingbirds":"","workhorse":"","soil_texture":"","ph_range":"","growth_form":"Clump-forming / rhizomatous","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"PA is eastern edge of native range. Self-seeds and colonizes. Goes dormant in dry summer. Seeds dispersed by ants. Threatened by garlic mustard and Japanese stiltgrass.","_id":"Stylophorum_diphyllum"},{"_rowIndex":89,"usda_symbol":"SYNO2","scientific_name":"Symphyotrichum novae-angliae","common_name":"New England aster","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Purple","bloom":"Aug\u2013Oct","height":"2.5\u20133.5","sun":"Sun","moisture":"Wet; Moist","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay (moist)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"SYNO2"},{"_rowIndex":90,"usda_symbol":"TROH","scientific_name":"Tradescantia ohiensis","common_name":"Ohio Spiderwort","alternate_name":"","plant_type":"Herb (perennial)","family":"Commelinaceae","flower_color":"Blue; violet","bloom":"Apr\u2013Jun","height":"1.5-2 ft","sun":"Sun; Part Shade","moisture":"Wet; Moist; Dry","lifespan":"Perennial","growth_rate":"","drought_tolerance":"","pollinator_value":"High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / sandy loam","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"TROH"},{"_rowIndex":91,"usda_symbol":"VENO","scientific_name":"Vernonia noveboracensis","common_name":"New York ironweed","alternate_name":"","plant_type":"Herb (perennial)","family":"Asteraceae","flower_color":"Purple","bloom":"Jul\u2013Sep","height":"3\u20137","sun":"Sun; Part Shade","moisture":"Wet; Moist","lifespan":"Short","growth_rate":"Moderate","drought_tolerance":"Medium","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay (moist to wet)","ph_range":"4.5\u20138","growth_form":"Multiple Stem","leaf_retention":"Deciduous","propagation":"Seed; Container","showy":"Yes","pa_notes":"","_id":"VENO"},{"_rowIndex":92,"usda_symbol":"Viburnum_trilobum","scientific_name":"Viburnum trilobum","common_name":"Cranberry Viburnum","alternate_name":"","plant_type":"Tree; Shrub","family":"Adoxaceae","flower_color":"White","bloom":"May-Jun","height":"8-12 ft","sun":"Sun to part shade","moisture":"Moist","lifespan":"Long","growth_rate":"","drought_tolerance":"","pollinator_value":"","monarchs":"","hummingbirds":"","workhorse":"","soil_texture":"","ph_range":"","growth_form":"Multiple stem / suckering","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"Buy from reputable native nursery \u2014 hybridizes with European V. opulus. Edible red berries ripen Aug-Sep \u2014 used like cranberries.","_id":"Viburnum_trilobum"},{"_rowIndex":93,"usda_symbol":"VIPE","scientific_name":"Viola pedata","common_name":"birdfoot violet","alternate_name":"","plant_type":"Herb (perennial)","family":"Violaceae","flower_color":"Violet","bloom":"Apr\u2013May","height":"0.2\u20130.4","sun":"Sun; Part Shade","moisture":"Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"","hummingbirds":"","workhorse":"Pollinator","soil_texture":"Sandy / rocky (well-drained)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"VIPE"},{"_rowIndex":94,"usda_symbol":"ZIAU","scientific_name":"Zizia aurea","common_name":"golden alexanders","alternate_name":"","plant_type":"Herb (perennial)","family":"Apiaceae","flower_color":"Yellow","bloom":"Apr\u2013Aug","height":"1\u20133","sun":"Sun; Part Shade","moisture":"Wet; Moist; Dry","lifespan":"","growth_rate":"","drought_tolerance":"","pollinator_value":"Very High","monarchs":"Yes","hummingbirds":"","workhorse":"Workhorse/Pollinator","soil_texture":"Loam / clay loam (moist)","ph_range":"","growth_form":"","leaf_retention":"","propagation":"","showy":"Yes","pa_notes":"","_id":"ZIAU"}]};
+
+
+// Coach quotes by tier
+const COACH_LOW  = ["No history yet — let's build some.","Starting from zero. Every expert did.","First attempt. Worth remembering.","Nothing on record yet. Answer a few and we'll see.","Unknown quantity. Show the work.","No data to go on. Let's change that.","Blank slate. Good time to start."];
+const COACH_MID  = ["Some exposure here. Keep reinforcing it.","Getting warmer. A few more reps will lock it in.","Partial recall — the pattern is forming.","Inconsistent so far. That's normal at this stage.","Building familiarity. Not there yet.","Some correct, some not. Worth revisiting."];
+const COACH_HIGH = ["Solid. Consistent answers here.","This one is sticking. Good.","Strong track record on this species.","Reliable. Keep the streak going.","Dialed in. Don't let it slip."];
+
+// ═══════════════════════════════════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════════════════════════════════
+
+const state = {
+  screen: 'study',        // study | settings
+  dataset: null,          // parsed dataset object
+  schema: null,           // derived schema from dataset
+  profiles: [],           // ['User1', 'User2', ...]
+  activeProfile: null,
+  progress: {},           // keyed by itemId
+  levelOverrides: {},     // field -> level number override
+  mode: 'openended',      // openended | namequiz
+  view: 'study',          // study | browse | species
+  filterCategory: 'all',
+  // TODO: Sun and Pollinator slicers removed pending data cleanup.
+  // Sun field contains free-text values (e.g. "Part shade to shade (tolerates sun with moisture)")
+  // that need normalization to a controlled vocabulary before a slicer is useful.
+  // Pollinator value is clean but low-cardinality — consider reintroducing as a checkbox group.
+  // Planned fix: add a 'sun_normalized' column to the CSV with values: Sun | Part Shade | Shade | Full Shade
+  current: null,
+  question: null,
+  phase: 'ask',
+  userAnswer: '',
+  gradeResult: null,
+  grading: false,
+  skipped: false,
+  speciesId: null,
+  session: null,
+  addingProfile: false,
+  pendingDataset: null,   // dataset awaiting user decision on progress
+  modalType: null,        // null | 'confirm-reload' | 'confirm-wipe'
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// STORAGE HELPERS
+// ═══════════════════════════════════════════════════════════════════
+
+function storageKey(suffix) {
+  const fp = state.dataset ? state.dataset.fingerprint : 'none';
+  const p  = state.activeProfile || 'default';
+  return `sptrain_${fp}_${p}_${suffix}`;
+}
+
+function saveProgress() {
+  try { localStorage.setItem(storageKey('progress'), JSON.stringify(state.progress)); } catch(e) {}
+}
+
+function loadProgress(fingerprint, profile) {
+  try {
+    const k = `sptrain_${fingerprint}_${profile}_progress`;
+    return JSON.parse(localStorage.getItem(k) || '{}');
+  } catch(e) { return {}; }
+}
+
+function saveProfiles() {
+  try { localStorage.setItem('sptrain_profiles', JSON.stringify(state.profiles)); } catch(e) {}
+}
+
+function loadProfiles() {
+  try { return JSON.parse(localStorage.getItem('sptrain_profiles') || '["Me"]'); } catch(e) { return ['Me']; }
+}
+
+function saveDatasetMeta() {
+  if (!state.dataset) return;
+  try { localStorage.setItem('sptrain_last_dataset', JSON.stringify({ fingerprint: state.dataset.fingerprint, name: state.dataset.name, rows: state.dataset.rows.length })); } catch(e) {}
+}
+
+function saveOverrides() {
+  if (!state.dataset) return;
+  try { localStorage.setItem(`sptrain_${state.dataset.fingerprint}_overrides`, JSON.stringify(state.levelOverrides)); } catch(e) {}
+}
+
+function loadOverrides(fingerprint) {
+  try { return JSON.parse(localStorage.getItem(`sptrain_${fingerprint}_overrides`) || '{}'); } catch(e) { return {}; }
+}
+
+function saveSession() {
+  try { localStorage.setItem(storageKey('session'), JSON.stringify(state.session)); } catch(e) {}
+}
+
+function loadSession(fingerprint, profile) {
+  try {
+    const k = `sptrain_${fingerprint}_${profile}_session`;
+    const s = JSON.parse(localStorage.getItem(k) || '{}');
+    const today = new Date().toDateString();
+    if (s.date !== today) return { date: today, todayAnswered: 0, streak: s.streak || 0, lastDate: s.date };
+    return s;
+  } catch(e) { return { date: new Date().toDateString(), todayAnswered: 0, streak: 0 }; }
+}
+
+function migrateV1() {
+  // Migrate v1 progress (key: mvf_plant_study_v1) to v2 format
+  try {
+    const v1 = JSON.parse(localStorage.getItem('mvf_plant_study_v1') || 'null');
+    if (!v1 || !v1.progress) return null;
+    return v1.progress; // return raw v1 progress for caller to use
+  } catch(e) { return null; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CSV PARSING & SCHEMA DETECTION
+// ═══════════════════════════════════════════════════════════════════
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) throw new Error('CSV must have at least 2 rows');
+
+  function splitRow(line) {
+    const out = []; let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { out.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    out.push(cur.trim());
+    return out.map(s => s.replace(/^"|"$/g, '').trim());
+  }
+
+  const headers = splitRow(lines[0]);
+
+  // Detect whether Row 2 is a tags row or actual data
+  // A tags row contains only known role/level tokens; a data row has real values
+  const VALID_TAGS = new Set(['primary','display','category','id','notes','notes_alt','1','2','3','4','']);
+  const row2 = splitRow(lines[1]);
+  const isTagRow = row2.every(cell => VALID_TAGS.has(cell.toLowerCase().trim()));
+
+  let tags, rows;
+  if (isTagRow) {
+    tags = row2;
+    rows = lines.slice(2).map(splitRow);
+  } else {
+    // No tag row — auto-assign roles and levels from column names
+    tags = headers.map(h => {
+      const cn = h.toLowerCase().trim();
+      // Check role aliases first
+      for (const [role, aliases] of Object.entries(ROLE_ALIASES)) {
+        if (aliases.includes(cn)) return role;
+      }
+      for (const [rank, aliases] of Object.entries(RANK_ALIASES)) {
+        if (aliases.includes(cn)) return '1'; // family/genus/species = L1
+      }
+      // Check auto level map
+      if (AUTO_LEVEL_MAP[cn] !== undefined) return String(AUTO_LEVEL_MAP[cn]);
+      return ''; // skip
+    });
+    rows = lines.slice(1).map(splitRow);
+  }
+
+  return { headers, tags, rows, autoTagged: !isTagRow };
+}
+
+function detectRole(colName, tag) {
+  const cn = colName.toLowerCase().trim();
+  const tg = (tag || '').toLowerCase().trim();
+
+  // Explicit tag takes priority
+  if (['primary','display','category','id','notes','notes_alt'].includes(tg)) return tg;
+  if (['1','2','3','4'].includes(tg)) return `level${tg}`;
+  if (tg === '') return 'skip';
+
+  // Alias detection from column name
+  for (const [role, aliases] of Object.entries(ROLE_ALIASES)) {
+    if (aliases.includes(cn)) return role;
+  }
+  for (const [rank, aliases] of Object.entries(RANK_ALIASES)) {
+    if (aliases.includes(cn)) return 'rank_' + rank;
+  }
+  return 'skip';
+}
+
+function buildSchema(headers, tags) {
+  const fields = headers.map((h, i) => {
+    const role = detectRole(h, tags[i]);
+    return { index: i, name: h, tag: tags[i] || '', role, key: h.toLowerCase().replace(/[^a-z0-9]/g,'_') };
+  });
+
+  const schema = {
+    fields,
+    primaryIdx: fields.findIndex(f => f.role === 'primary'),
+    displayIdx:  fields.findIndex(f => f.role === 'display'),
+    categoryIdx: fields.findIndex(f => f.role === 'category'),
+    idIdx:       fields.findIndex(f => f.role === 'id'),
+    notesIdx:    fields.findIndex(f => f.role === 'notes'),
+    notesAltIdx: fields.findIndex(f => f.role === 'notes_alt'),
+    levelFields: {
+      1: fields.filter(f => f.role === 'level1'),
+      2: fields.filter(f => f.role === 'level2'),
+      3: fields.filter(f => f.role === 'level3'),
+      4: fields.filter(f => f.role === 'level4'),
+    },
+  };
+
+  // Validate minimum requirements
+  if (schema.primaryIdx === -1 && schema.displayIdx === -1)
+    throw new Error('CSV must have at least one column tagged as "primary" or "display" (or named "Scientific Name" / "Common Name")');
+
+  return schema;
+}
+
+function buildDataset(csvText, filename) {
+  const { headers, tags, rows, autoTagged } = parseCSV(csvText);
+  const schema = buildSchema(headers, tags);
+
+  // Build item objects
+  const items = rows.filter(r => r.some(c => c)).map((row, i) => {
+    const item = { _rowIndex: i };
+    headers.forEach((h, j) => {
+      item[schema.fields[j].key] = row[j] || '';
+    });
+    // Derive id
+    const idField = schema.idIdx >= 0 ? schema.fields[schema.idIdx].key : null;
+    item._id = idField ? (item[idField] || `row_${i}`) : `row_${i}`;
+    return item;
+  });
+
+  // Fingerprint: hash of headers + tag row + row count
+  const fpStr = headers.join('|') + '§' + tags.join('|') + '§' + rows.length;
+  const fingerprint = simpleHash(fpStr);
+
+  // Dataset name from filename
+  const name = filename ? filename.replace(/\.(csv|tsv|txt)$/i, '').replace(/[_-]/g, ' ') : 'Unnamed Dataset';
+
+  return { name, fingerprint, headers, tags, schema, rows: items, autoTagged: !!autoTagged };
+}
+
+function simpleHash(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCHEMA + LEVEL RESOLUTION (with overrides)
+// ═══════════════════════════════════════════════════════════════════
+
+function getEffectiveLevel(field) {
+  if (state.levelOverrides[field.name] !== undefined) return state.levelOverrides[field.name];
+  const m = field.role.match(/^level(\d)$/);
+  return m ? parseInt(m[1]) : null;
+}
+
+function getFieldsForLevel(level) {
+  const { fields } = state.schema;
+  return fields.filter(f => getEffectiveLevel(f) === level);
+}
+
+function getAskableFields() {
+  const { fields } = state.schema;
+  return fields.filter(f => {
+    const lv = getEffectiveLevel(f);
+    return lv !== null;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PROGRESS & SCORING
+// ═══════════════════════════════════════════════════════════════════
+
+function getScore(itemId, fieldKey) {
+  const key = `${itemId}::${fieldKey}`;
+  return state.progress[key] || { seen: 0, correct: 0, skips: 0, interval: 1, lastSeen: 0, strangerScore: 1.0 };
+}
+
+function saveScore(itemId, fieldKey, s) {
+  const key = `${itemId}::${fieldKey}`;
+  state.progress[key] = s;
+  saveProgress();
+}
+
+function updateScore(itemId, fieldKey, result, skipped) {
+  const s = getScore(itemId, fieldKey);
+  s.seen++;
+  s.lastSeen = Date.now();
+  if (skipped) {
+    s.skips = (s.skips || 0) + 1;
+    s.interval = 1;
+    s.strangerScore = Math.max(0, (s.strangerScore || 1) - 0.3);
+  } else if (result === 'correct') {
+    s.correct++;
+    s.strangerScore = Math.min(5, (s.strangerScore || 1) + 0.6);
+    const boost = 1 + (s.strangerScore / 5);
+    s.interval = Math.min((s.interval || 1) * boost * 1.5, MAX_INTERVAL_DAYS);
+  } else if (result === 'partial') {
+    s.strangerScore = Math.min(5, (s.strangerScore || 1) + 0.2);
+    s.interval = Math.max(1, (s.interval || 1) * 0.75);
+  } else {
+    s.strangerScore = Math.max(0, (s.strangerScore || 1) - 0.5);
+    s.interval = Math.max(1, (s.interval || 1) * 0.4);
+  }
+  saveScore(itemId, fieldKey, s);
+}
+
+function getItemAccuracy(itemId, fields) {
+  if (!fields.length) return 0;
+  let correct = 0, total = 0;
+  for (const f of fields) {
+    const s = getScore(itemId, f.key);
+    const answered = s.seen - (s.skips || 0);
+    if (answered > 0) { total++; correct += s.correct / answered >= LEVEL_UNLOCK_THRESHOLD ? 1 : 0; }
+  }
+  return total === 0 ? 0 : correct / total;
+}
+
+function getItemLevel(itemId) {
+  // Returns the highest level this item is eligible for
+  for (let lv = 4; lv >= 1; lv--) {
+    const fields = getFieldsForLevel(lv);
+    if (!fields.length) continue;
+    if (lv === 1) return 1;
+    const prevFields = getFieldsForLevel(lv - 1);
+    if (!prevFields.length) return lv;
+    if (getItemAccuracy(itemId, prevFields) >= LEVEL_UNLOCK_THRESHOLD) return lv;
+  }
+  return 1;
+}
+
+function recordAnswer(wasCorrect) {
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+  state.session.todayAnswered = (state.session.todayAnswered || 0) + 1;
+
+  // Daily streak — increments once when you return the next day
+  if (state.session.lastDate === yesterday && state.session.todayAnswered === 1)
+    state.session.streak = (state.session.streak || 0) + 1;
+  else if (!state.session.lastDate || state.session.lastDate !== today)
+    if (state.session.todayAnswered === 1) state.session.streak = 1;
+
+  // Consecutive correct streak — only fully correct answers count; anything else resets
+  if (wasCorrect === true) {
+    state.session.consec = (state.session.consec || 0) + 1;
+    state.session.bestConsec = Math.max(state.session.consec, state.session.bestConsec || 0);
+  } else {
+    state.session.consec = 0;
+  }
+
+  state.session.date = today;
+  saveSession();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// QUESTION ENGINE
+// ═══════════════════════════════════════════════════════════════════
+
+function getItemValue(item, fieldOrIdx) {
+  if (typeof fieldOrIdx === 'number') return item[state.schema.fields[fieldOrIdx]?.key] || '';
+  return item[fieldOrIdx.key] || '';
+}
+
+function getPrimaryVal(item)  { const s = state.schema; return s.primaryIdx  >= 0 ? getItemValue(item, s.primaryIdx)  : ''; }
+function getDisplayVal(item)  { const s = state.schema; return s.displayIdx  >= 0 ? getItemValue(item, s.displayIdx)  : ''; }
+function getCategoryVal(item) { const s = state.schema; return s.categoryIdx >= 0 ? getItemValue(item, s.categoryIdx) : ''; }
+function getNotesVal(item)    { const s = state.schema; return s.notesIdx    >= 0 ? getItemValue(item, s.notesIdx)    : ''; }
+function getNotesAltVal(item) { const s = state.schema; return s.notesAltIdx >= 0 ? getItemValue(item, s.notesAltIdx) : ''; }
+
+function pickQuestion(item) {
+  const itemLevel = getItemLevel(item._id);
+  const schema = state.schema;
+
+  // Build candidate fields at or below item's current level
+  const candidates = [];
+  for (let lv = 1; lv <= itemLevel; lv++) {
+    candidates.push(...getFieldsForLevel(lv));
+  }
+  // Also include primary/display/category as askable
+  const askHeaders = [];
+  if (schema.primaryIdx >= 0)  askHeaders.push({ ...schema.fields[schema.primaryIdx],  role: 'primary',  _isHeader: true });
+  if (schema.displayIdx >= 0)  askHeaders.push({ ...schema.fields[schema.displayIdx],  role: 'display',  _isHeader: true });
+  if (schema.categoryIdx >= 0) askHeaders.push({ ...schema.fields[schema.categoryIdx], role: 'category', _isHeader: true });
+  candidates.push(...askHeaders);
+
+  if (!candidates.length) return null;
+
+  // Weight by how much the field needs work (overdue + low accuracy)
+  const now = Date.now();
+  const weighted = candidates.map(f => {
+    const s = getScore(item._id, f.key);
+    const due = s.lastSeen + (s.interval || 1) * 60000;
+    const answered = Math.max(1, (s.seen || 0) - (s.skips || 0));
+    const ratio = (s.correct || 0) / answered;
+    const overdue = Math.max(0, now - due);
+    const priority = s.seen === 0 ? 1e9 : overdue + (1 - ratio) * 1e6;
+    return { f, priority };
+  });
+
+  weighted.sort((a, b) => b.priority - a.priority);
+  const top = weighted.slice(0, Math.max(1, Math.ceil(weighted.length * 0.4)));
+  const pick = top[Math.floor(Math.random() * top.length)];
+  const field = pick.f;
+
+  const correctVal = getItemValue(item, field);
+
+  // Field-specific question phrasing for clarity
+  const displayName = getDisplayVal(item) || getPrimaryVal(item);
+  const QUESTION_PHRASES = {
+    bloom:                      `When does ${displayName} bloom? (months)`,
+    flowering_months:           `When does ${displayName} bloom? (months)`,
+    flower_color:               `What color are the flowers of ${displayName}?`,
+    height:                     `What is the typical height of ${displayName}?`,
+    height__feet_:              `What is the typical height of ${displayName}?`,
+    sun:                        `What are the sun/light requirements for ${displayName}?`,
+    sun_exposure:               `What are the sun/light requirements for ${displayName}?`,
+    moisture:                   `What are the soil moisture requirements for ${displayName}?`,
+    soil_moisture:              `What are the soil moisture requirements for ${displayName}?`,
+    family:                     `What plant family does ${displayName} belong to?`,
+    plant_family:               `What plant family does ${displayName} belong to?`,
+    growth_rate:                `What is the growth rate of ${displayName}?`,
+    drought_tolerance:          `How does ${displayName} tolerate drought?`,
+    pollinator_value:           `What is the pollinator value of ${displayName}?`,
+    lifespan:                   `What is the lifespan of ${displayName}?`,
+    soil_texture:               `What soil texture does ${displayName} prefer?`,
+    ph_range:                   `What is the preferred soil pH range for ${displayName}?`,
+    ph__range_:                 `What is the preferred soil pH range for ${displayName}?`,
+    growth_form:                `What is the growth form of ${displayName}?`,
+    leaf_retention:             `Is ${displayName} deciduous or evergreen?`,
+    propagation:                `How is ${displayName} typically propagated?`,
+    monarchs:                   `Does ${displayName} support monarchs?`,
+    hummingbirds:               `Does ${displayName} attract hummingbirds?`,
+    workhorse:                  `What is the ecological role designation of ${displayName}?`,
+    showy:                              `Are the flowers of ${displayName} considered showy?`,
+    wind:                               `Is ${displayName} wind-pollinated?`,
+    honey_bees:                         `Does ${displayName} support honey bees?`,
+    'beetles,_wasps,_flies':            `Does ${displayName} support beetles, wasps, or flies?`,
+    pollinators:                        `Which pollinators does ${displayName} support?`,
+    benefits_to_pollinators:            `What pollinator benefits does ${displayName} provide?`,
+    nesting_and_structure__bees_:       `Does ${displayName} provide nesting structure for bees?`,
+    larval_host__monarch_:              `Is ${displayName} a larval host for monarchs?`,
+    larval_host__butterfly_:            `Is ${displayName} a larval host for butterflies?`,
+    larval_host__moth_:                 `Is ${displayName} a larval host for moths?`,
+    larval_species__lepidoptera_:       `Which Lepidoptera species use ${displayName} as a larval host?`,
+    native_status:                      `What is the native status of ${displayName}?`,
+    distribution_in_usa:                `What is the US distribution of ${displayName}?`,
+    fall_conspicuous:                   `Is ${displayName} fall conspicuous?`,
+    moisture_use:                       `What is the moisture use classification for ${displayName}?`,
+    commercially_available:             `Is ${displayName} commercially available?`,
+    are_we_growing_this_right_now_:     `Are we currently growing ${displayName}?`,
+    fire_tolerance:                     `What is the fire tolerance of ${displayName}?`,
+    salt_tolerance:                     `What is the salt tolerance of ${displayName}?`,
+    fertility_requirement:              `What are the fertility requirements for ${displayName}?`,
+    resprout_ability:                   `Does ${displayName} have resprout ability?`,
+    hedge_tolerance:                    `Does ${displayName} tolerate hedge/clipping?`,
+    'palatability__browsing_grazing_':  `What is the browsing/grazing palatability of ${displayName}?`,
+  };
+
+  let questionText = '';
+  if (field.role === 'primary')        questionText = `What is the scientific name of this organism?`;
+  else if (field.role === 'display')   questionText = `What is the common name?`;
+  else if (field.role === 'category')  questionText = `What is the ${field.name.toLowerCase()}?`;
+  else questionText = QUESTION_PHRASES[field.key] || `What is the ${field.name.toLowerCase()} of ${displayName}?`;
+
+  return { field, questionText, answer: correctVal };
+}
+
+function pickNextItem() {
+  if (!state.dataset) return null;
+  let items = state.dataset.rows;
+  const schema = state.schema;
+
+  if (state.filterCategory && state.filterCategory !== 'all') {
+    const catKey = schema.categoryIdx >= 0 ? schema.fields[schema.categoryIdx].key : null;
+    if (catKey) items = items.filter(it => (it[catKey] || '').toLowerCase().includes(state.filterCategory.toLowerCase()));
+  }
+  if (!items.length) items = state.dataset.rows; // fallback — no matches, ignore filters
+
+  const now = Date.now();
+  const scored = items.map(item => {
+    const itemLevel = getItemLevel(item._id);
+    const fields = [];
+    for (let lv = 1; lv <= itemLevel; lv++) fields.push(...getFieldsForLevel(lv));
+    let minDue = Infinity, minRatio = 1;
+    for (const f of fields) {
+      const s = getScore(item._id, f.key);
+      const due = s.lastSeen + (s.interval || 1) * 60000;
+      const answered = Math.max(1, (s.seen || 0) - (s.skips || 0));
+      const ratio = (s.correct || 0) / answered;
+      if (s.seen === 0) { minDue = 0; minRatio = 0; break; }
+      minDue = Math.min(minDue, due);
+      minRatio = Math.min(minRatio, ratio);
+    }
+    const overdue = Math.max(0, now - minDue);
+    // Add a small random jitter so unseen items (all priority=1e6) don't sort alphabetically
+    const jitter = Math.random() * 1000;
+    const isUnseen = fields.every(f => getScore(item._id, f.key).seen === 0);
+    const priority = isUnseen ? (1e6 + jitter) : (overdue + (1 - minRatio) * 1e6 + jitter * 0.01);
+    return { item, priority };
+  });
+  scored.sort((a, b) => b.priority - a.priority);
+  const top = scored.slice(0, Math.max(1, Math.ceil(scored.length * 0.3)));
+  return top[Math.floor(Math.random() * top.length)].item;
+}
+
+function initCard() {
+  if (!state.dataset) return;
+  state.current = pickNextItem();
+  state.question = state.current ? pickQuestion(state.current) : null;
+  state.phase = 'ask';
+  state.userAnswer = '';
+  state.gradeResult = null;
+  state.grading = false;
+  state.skipped = false;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════════════════════════════
+
+function getStats() {
+  if (!state.dataset) return { total: 0, seen: 0, known: 0, unseen: 0, avgCoach: '—' };
+  const items = state.dataset.rows;
+  let seen = 0, known = 0, coachSum = 0, coachCount = 0;
+  for (const item of items) {
+    const l1 = getFieldsForLevel(1);
+    const hasAny = l1.some(f => getScore(item._id, f.key).seen > 0);
+    if (hasAny) seen++;
+    const acc = getItemAccuracy(item._id, l1);
+    if (acc >= LEVEL_UNLOCK_THRESHOLD) known++;
+    // avg coach score across all fields
+    const allF = getAskableFields();
+    for (const f of allF) {
+      const s = getScore(item._id, f.key);
+      if (s.seen > 0) { coachSum += (s.strangerScore || 1); coachCount++; }
+    }
+  }
+  const avgCoach = coachCount > 0 ? (coachSum / coachCount).toFixed(1) : '1.0';
+  return { total: items.length, seen, known, unseen: items.length - seen, avgCoach };
+}
+
+function getDotClass(itemId) {
+  const l1 = getFieldsForLevel(1);
+  const acc = getItemAccuracy(itemId, l1);
+  const hasSeen = l1.some(f => getScore(itemId, f.key).seen > 0);
+  if (!hasSeen) return '';
+  if (acc >= LEVEL_UNLOCK_THRESHOLD) return 'known';
+  if (acc >= 0.4) return 'learning';
+  return 'struggling';
+}
+
+function getScoreChipHTML(itemId) {
+  const l1 = getFieldsForLevel(1);
+  const acc = getItemAccuracy(itemId, l1);
+  const hasSeen = l1.some(f => getScore(itemId, f.key).seen > 0);
+  const lv = getItemLevel(itemId);
+  const lvLabel = `<span class="level-badge l${lv}">L${lv}</span>`;
+  if (!hasSeen) return `<span class="score-chip unseen">Unseen</span>${lvLabel}`;
+  if (acc >= LEVEL_UNLOCK_THRESHOLD) return `<span class="score-chip high">Known</span>${lvLabel}`;
+  if (acc >= 0.4) return `<span class="score-chip mid">Learning</span>${lvLabel}`;
+  return `<span class="score-chip low">Struggling</span>${lvLabel}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AI GRADING
+// ═══════════════════════════════════════════════════════════════════
+
+async function gradeAnswer(questionText, correctAnswer, userAnswer) {
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514', max_tokens: 200,
+        messages: [{ role: 'user', content: `Grade this quiz answer. Question: "${questionText}" Correct answer: "${correctAnswer}" User answered: "${userAnswer}"\n\nRespond with JSON only: {"grade":"CORRECT"|"PARTIAL"|"WRONG","feedback":"one sentence, max 15 words"}` }]
+      })
+    });
+    const data = await resp.json();
+    const text = data.content?.map(c => c.text || '').join('') || '';
+    const clean = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean);
+  } catch(e) { return { grade: null, feedback: 'AI grading unavailable — self-grade below.' }; }
+}
+
+async function generateFunFact(item) {
+  const primary = getPrimaryVal(item);
+  const display = getDisplayVal(item);
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514', max_tokens: 120,
+        messages: [{ role: 'user', content: `Give one interesting, memorable ecological or horticultural fun fact about ${primary}${display ? ' ('+display+')' : ''}. One sentence, 20 words max. No preamble, no "Did you know".` }]
+      })
+    });
+    const data = await resp.json();
+    return data.content?.map(c => c.text || '').join('').trim() || '';
+  } catch(e) { return ''; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SPECIES PHOTO
+// ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// SPECIES PHOTO
+// NOTE: Photos work when the HTML file is opened directly in a browser
+// (file:// or local server). They will not load inside claude.ai's
+// preview iframe due to CSP restrictions on connect-src and img-src.
+// All three sources (iNaturalist, Wikipedia, USDA) are blocked by:
+//   connect-src: only allows cdnjs/jsdelivr/tailwind/jquery/claudeusercontent
+//   img-src: only allows openstreetmap tiles, blob:, data:, self
+// ═══════════════════════════════════════════════════════════════════
+
+const SYMBOL_OVERRIDES = {
+  'Campanula americana':                'CAAM3',
+  'Eutrochium fistulosum':              'EUFI',
+  'Liatris scariosa var. nieuwlandii':  'LISCN',
+  'Lupinus perennis subsp. perennis':   'LUPEP3',
+  'Polymnia canadensis':                'POCA9',
+  'Sambucus canadensis':                'SACA',
+  'Stylophorum diphyllum':              'STDI2',
+  'Viburnum trilobum':                  'VITR',
+};
+
+const photoCache = {};
+
+function getUsdaSymbol(item) {
+  const schema = state.schema;
+  const idKey = schema.idIdx >= 0 ? schema.fields[schema.idIdx].key : null;
+  const fromData = idKey ? item[idKey] : '';
+  if (fromData) return fromData;
+  return SYMBOL_OVERRIDES[getPrimaryVal(item)] || null;
+}
+
+function timedFetch(url, opts, ms = 7000) {
+  return Promise.race([
+    fetch(url, opts),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+  ]);
+}
+
+async function fetchSpeciesPhoto(item) {
+  const scientific = getPrimaryVal(item);
+  if (!scientific) return null;
+  if (photoCache[scientific] !== undefined) return photoCache[scientific];
+  photoCache[scientific] = null; // mark in-flight
+
+  // 1. iNaturalist API — fetch() works, returns S3 CDN URLs for img src
+  try {
+    const resp = await timedFetch(
+      `https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(scientific)}&per_page=3&rank=species,subspecies`
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      const genus = scientific.split(' ')[0].toLowerCase();
+      const taxon = (data.results || []).find(t =>
+        t.name.toLowerCase().startsWith(genus) && t.default_photo?.medium_url
+      );
+      if (taxon?.default_photo?.medium_url) {
+        const result = {
+          url: taxon.default_photo.medium_url,
+          credit: `© ${taxon.default_photo.attribution || 'iNaturalist contributors'}`
+        };
+        photoCache[scientific] = result;
+        return result;
+      }
+    }
+  } catch(e) { console.log('[photo] iNat:', e.message); }
+
+  // 2. Wikipedia REST API — explicit CORS support, returns upload.wikimedia.org URLs
+  try {
+    const title = scientific.replace(/ /g, '_');
+    const resp = await timedFetch(
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=pageimages&format=json&pithumbsize=600&origin=*`
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      const src = Object.values(data?.query?.pages || {})[0]?.thumbnail?.source;
+      if (src) {
+        photoCache[scientific] = { url: src, credit: 'Wikimedia Commons' };
+        return photoCache[scientific];
+      }
+    }
+  } catch(e) { console.log('[photo] Wikipedia:', e.message); }
+
+  // 3. USDA PLANTS — try img src directly (no HEAD needed, onerror handles 404)
+  const symbol = getUsdaSymbol(item);
+  if (symbol) {
+    const url = `https://plants.usda.gov/ImageLibrary/standard/${symbol.toLowerCase()}_001_shp.jpg`;
+    photoCache[scientific] = { url, credit: 'USDA PLANTS Database', usda: true };
+    return photoCache[scientific];
+  }
+
+  return null;
+}
+
+// Detect if we're in a CSP-restricted context (claude.ai iframe)
+// by checking if the page origin matches known restricted hosts
+const PHOTO_DISABLED = (() => {
+  try {
+    const host = window.location.hostname;
+    return host === 'claude.ai' || host.endsWith('.claude.ai') ||
+           document.location.protocol === 'about:' ||
+           window.self !== window.top; // inside an iframe
+  } catch(e) { return true; } // cross-origin iframe — restricted
+})();
+
+function photoPlaceholderHTML(itemId) {
+  if (PHOTO_DISABLED) return ''; // no placeholder in restricted contexts
+  return `<div class="species-photo-wrap" id="photoWrap_${itemId}"><span class="species-photo-loading">↻ loading photo…</span></div>`;
+}
+
+async function loadAndInjectPhoto(item) {
+  if (PHOTO_DISABLED) return;
+  const photo = await fetchSpeciesPhoto(item);
+  injectPhoto(item, photo);
+}
+
+function injectPhoto(item, photo) {
+  const wrap = document.getElementById(`photoWrap_${item._id}`);
+  if (!wrap) return;
+  if (!photo) { wrap.style.display = 'none'; return; }
+  const img = document.createElement('img');
+  img.alt = getPrimaryVal(item);
+  img.style.cssText = 'width:100%;max-height:240px;object-fit:cover;display:block;opacity:0;transition:opacity 0.4s;border-radius:5px;';
+  img.onload = () => {
+    if (img.naturalWidth < 10) { wrap.style.display = 'none'; return; }
+    wrap.innerHTML = '';
+    wrap.style.minHeight = '';
+    wrap.appendChild(img);
+    img.style.opacity = '1';
+    const credit = document.createElement('div');
+    credit.className = 'species-photo-credit';
+    credit.textContent = photo.credit;
+    wrap.insertAdjacentElement('afterend', credit);
+  };
+  img.onerror = () => { wrap.style.display = 'none'; };
+  img.src = photo.url;
+}
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, (_, i) => Array.from({length: n+1}, (_, j) => i === 0 ? j : j === 0 ? i : 0));
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+    dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+function fuzzyMatch(answer, target) {
+  const a = answer.toLowerCase().trim();
+  const t = target.toLowerCase().trim();
+  if (a === t) return true;
+  if (t.includes(a) && a.length >= 4) return true;
+  if (a.includes(t)) return true;
+  return levenshtein(a, t) <= Math.max(2, Math.floor(t.length * 0.15));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// COACH METER HTML
+// ═══════════════════════════════════════════════════════════════════
+
+function coachMeterHTML(itemId) {
+  const fields = getAskableFields();
+  let scoreSum = 0, scoreCount = 0;
+  for (const f of fields) {
+    const s = getScore(itemId, f.key);
+    if (s.seen > 0) { scoreSum += (s.strangerScore || 1); scoreCount++; }
+  }
+  const score = scoreCount > 0 ? scoreSum / scoreCount : 1.0;
+  const pct = (score / 5) * 100;
+  const cls = score >= 3.5 ? 'high' : score >= 2 ? 'mid' : 'low';
+  const barColor = score >= 3.5 ? 'var(--green2)' : score >= 2 ? 'var(--amber)' : 'var(--red2)';
+  const quotes = score >= 3.5 ? COACH_HIGH : score >= 2 ? COACH_MID : COACH_LOW;
+  const seen = fields.reduce((acc, f) => acc + getScore(itemId, f.key).seen, 0);
+  const quote = quotes[seen % quotes.length];
+  return `<div class="coach-wrap">
+    <div class="coach-row">
+      <span class="coach-lbl">Coach's read</span>
+      <span class="coach-score ${cls}">${score.toFixed(1)} / 5</span>
+    </div>
+    <div class="coach-bar-wrap"><div class="coach-bar" style="width:${pct}%;background:${barColor};"></div></div>
+    <div class="coach-quote">${quote}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER: LOADER SCREEN
+// ═══════════════════════════════════════════════════════════════════
+
+function renderLoader() {
+  return `<div class="loader-screen">
+    <h2>Load Your Dataset</h2>
+    <p>Upload a CSV with two header rows:<br>
+    <strong>Row 1</strong> — column names &nbsp;|&nbsp; <strong>Row 2</strong> — role/level tags<br>
+    <a href="#" onclick="showCSVHelp();return false;" style="color:var(--green);font-size:13px;">How to format your CSV ↓</a></p>
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="csvFile" accept=".csv,.tsv,.txt">
+      <div class="drop-zone-label">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">📂</div>
+        <strong>Click to choose a CSV</strong><br>
+        <span style="font-size:13px;">or drag and drop here</span>
+      </div>
+    </div>
+    <div id="csvPreview"></div>
+    <div id="csvHelp" style="display:none;margin-top:1.25rem;text-align:left;">
+      <div class="card" style="border-left-color:var(--amber);">
+        <strong style="font-size:13px;color:var(--amber);">Row 2 tag reference</strong>
+        <div style="margin-top:0.5rem;display:flex;flex-wrap:wrap;gap:0.4rem;font-size:12px;">
+          <span class="tag-chip tag-primary">primary</span> Scientific / Latin name<br>
+          <span class="tag-chip tag-display">display</span> Common name<br>
+          <span class="tag-chip tag-category">category</span> Type/group badge<br>
+          <span class="tag-chip tag-notes">notes</span> Fun fact, shown on reveal<br>
+          <span class="tag-chip tag-id">id</span> Unique key (optional)<br>
+          <span class="tag-chip tag-level1">1</span> Level 1 question<br>
+          <span class="tag-chip tag-level2">2</span> Level 2 question<br>
+          <span class="tag-chip tag-level3">3</span> Level 3 question<br>
+          <span class="tag-chip tag-level4">4</span> Level 4 question<br>
+          <span class="tag-chip tag-skip">(blank)</span> In data, never asked
+        </div>
+        <div style="margin-top:0.75rem;font-size:12px;color:var(--ink3);">
+          Column names <em>Scientific Name</em>, <em>Common Name</em>, <em>Family</em>, <em>Genus</em>, <em>Species</em>, <em>Subspecies</em>, <em>Cultivar/Variety</em> are recognized automatically — no tag needed.
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER: STUDY SCREEN
+// ═══════════════════════════════════════════════════════════════════
+
+function renderStudy() {
+  if (!state.dataset || !state.current || !state.question) { initCard(); if (!state.current) return '<div class="empty-state">No items to study.</div>'; }
+
+  const item = state.current;
+  const q    = state.question;
+  const schema = state.schema;
+  const stats = getStats();
+  const todayAnswered = state.session?.todayAnswered || 0;
+  const streak = state.session?.consec || 0;
+  const dailyStreak = state.session?.streak || 0;
+  const pctKnown = stats.total > 0 ? Math.round(stats.known / stats.total * 100) : 0;
+
+  // Category filter
+  const catKey = schema.categoryIdx >= 0 ? schema.fields[schema.categoryIdx].key : null;
+  const categories = catKey ? [...new Set(state.dataset.rows.map(it => (it[catKey] || '').split(';')[0].trim()).filter(Boolean))].sort() : [];
+  const catOptions = ['<option value="all">All</option>', ...categories.map(c => `<option value="${c}" ${state.filterCategory === c ? 'selected' : ''}>${c}</option>`)].join('');
+
+  // Determine card class
+  let cardClass = 'ask-card';
+  let cardContent = '';
+
+  if (state.mode === 'namequiz') {
+    cardContent = renderNameQuizCard(item, q, schema, cardClass);
+    if (state.phase === 'answered') {
+      const g = state.gradeResult?.grade;
+      cardClass = g === 'CORRECT' ? 'result-correct' : g === 'SKIPPED' ? 'result-wrong' : 'result-wrong';
+    }
+  } else {
+    if (state.phase === 'ask') {
+      cardContent = renderOpenEndedAsk(item, q, schema);
+    } else if (state.grading) {
+      cardClass = 'result-neutral';
+      cardContent = renderGrading(item, q);
+    } else {
+      const g = state.gradeResult?.grade;
+      cardClass = g === 'CORRECT' ? 'result-correct' : g === 'PARTIAL' ? 'result-partial' : 'result-wrong';
+      cardContent = renderOpenEndedResult(item, q, schema);
+    }
+  }
+
+  return `
+    <div class="profile-bar">${renderProfileBar()}</div>
+    <div class="stats-bar">
+      <div class="stat"><span class="val">${todayAnswered}</span><span class="lbl">Today</span></div>
+      <div class="stat" title="Consecutive correct answers this session"><span class="val">${streak}${streak >= 3 ? ' 🔥' : ''}</span><span class="lbl">Streak</span></div>
+      <div class="stat" title="Days in a row you've studied"><span class="val">${dailyStreak}</span><span class="lbl">Days</span></div>
+      <div class="stat"><span class="val">${stats.known}</span><span class="lbl">Known</span></div>
+      <div class="stat"><span class="val">${pctKnown}%</span><span class="lbl">Mastered</span></div>
+      <div class="stat" title="Coach's average read across all studied items"><span class="val" style="color:${parseFloat(stats.avgCoach)>=3.5?'var(--green2)':parseFloat(stats.avgCoach)>=2?'var(--amber)':'var(--red2)'}">${stats.avgCoach}</span><span class="lbl">Coach</span></div>
+    </div>
+    <div class="mode-tabs">
+      <button class="mode-tab${state.mode==='openended'?' active':''}" onclick="setMode('openended')">Open-ended Q&A</button>
+      <button class="mode-tab${state.mode==='namequiz'?' active':''}" onclick="setMode('namequiz')">Name Quiz</button>
+    </div>
+    <div class="filter-bar">
+      ${catKey ? `<label>Type:</label><select onchange="setFilter(this.value,'category')">${catOptions}</select>` : ''}
+    </div>
+    <div class="card ${cardClass} card-swipeable">
+      <span class="swipe-hint swipe-hint-right">✓ GOT IT</span>
+      <span class="swipe-hint swipe-hint-left">${state.phase === 'ask' ? '→ SKIP' : '✗ MISSED'}</span>
+      ${cardContent}
+    </div>`;
+}
+
+function cardHeaderHTML(item, q, schema) {
+  const askingField = q?.field;
+  const askingPrimary  = askingField?.role === 'primary';
+  const askingDisplay  = askingField?.role === 'display';
+  const askingCategory = askingField?.role === 'category';
+
+  const primaryVal  = getPrimaryVal(item);
+  const displayVal  = getDisplayVal(item);
+  const categoryVal = getCategoryVal(item);
+  const lv = getItemLevel(item._id);
+
+  // L1 mastery for the progress bar (always show L1 as the base unlock metric)
+  const l1fields = getFieldsForLevel(1);
+  const l1acc = l1fields.length > 0 ? getItemAccuracy(item._id, l1fields) : 0;
+  const l1pct = Math.round(l1acc * 100);
+  const l1HasSeen = l1fields.some(f => getScore(item._id, f.key).seen > 0);
+  const barColor = l1pct >= 75 ? 'var(--green2)' : l1pct >= 40 ? 'var(--amber)' : 'var(--red2)';
+
+  const sciHTML = askingPrimary
+    ? `<div class="species-hidden">? ? ?</div>`
+    : primaryVal ? `<div class="species-sci">${primaryVal}</div>` : '';
+
+  const comHTML = askingDisplay
+    ? `<div class="species-hidden" style="font-size:1rem;">? ? ?</div>`
+    : displayVal ? `<div class="species-common">${displayVal}</div>` : '';
+
+  const catHTML = askingCategory
+    ? `<span class="type-badge hidden-badge">?</span>`
+    : categoryVal ? `<span class="type-badge">${categoryVal}</span>` : '';
+
+  const masteryHTML = `<div class="mastery-inline">
+    <span class="mastery-level-tag l${lv}">L${lv}</span>
+    <div class="mastery-track"><div class="mastery-fill" style="width:${l1pct}%;background:${barColor};"></div></div>
+    <span class="mastery-pct">${l1HasSeen ? l1pct + '%' : '—'}</span>
+  </div>`;
+
+  return `<div class="card-header">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+      <div style="min-width:0;">${sciHTML}${comHTML}</div>
+      <div style="flex-shrink:0;text-align:right;padding-top:0.1rem;">${masteryHTML}</div>
+    </div>
+    <div style="margin-top:0.2rem;">${catHTML}</div>
+  </div>`;
+}
+
+function renderOpenEndedAsk(item, q, schema) {
+  return `${cardHeaderHTML(item, q, schema)}
+    <hr class="divider">
+    <div class="question-text">${q.questionText}</div>
+    ${coachMeterHTML(item._id)}
+    <textarea class="answer-input" id="answerInput" rows="2" placeholder="Type your answer… Enter to submit · Esc to skip"></textarea>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="submitAnswer()">Submit</button>
+      <button class="btn btn-secondary" onclick="skipCard()">Skip</button>
+    </div>`;
+}
+
+function renderGrading(item, q) {
+  return `${cardHeaderHTML(item, q, state.schema)}
+    <hr class="divider">
+    <div class="question-text">${q.questionText}</div>
+    <div style="margin:1.2rem 0;display:flex;align-items:center;gap:0.6rem;color:var(--ink3);font-size:14px;">
+      <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
+      <span>Thinking</span>
+    </div>
+    <div style="font-size:13px;color:var(--ink3);">Your answer: <em>${state.userAnswer}</em></div>`;
+}
+
+function renderOpenEndedResult(item, q, schema) {
+  const r = state.gradeResult;
+  const skipped = r?.grade === 'SKIPPED';
+  const correct = r?.grade === 'CORRECT';
+  const partial = r?.grade === 'PARTIAL';
+  const cls = skipped ? 'wrong' : correct ? 'correct' : partial ? 'partial' : 'wrong';
+  const label = skipped ? '→ Skipped' : correct ? '✓ Correct' : partial ? '◐ Partial credit' : '✗ Incorrect';
+  const notes = getNotesVal(item);
+  const notesAlt = getNotesAltVal(item);
+  const funFact = notes || notesAlt || (item._generatedFact || '');
+
+  return `${cardHeaderHTML(item, null, schema)}
+    <hr class="divider">
+    <div class="result-banner ${cls}">${label}</div>
+    ${!skipped && r?.feedback ? `<div class="ai-grade">${r.feedback}</div>` : ''}
+    <div class="correct-answer">Correct answer: <strong>${q.answer}</strong></div>
+    ${state.userAnswer ? `<div style="font-size:13px;color:var(--ink3);margin-bottom:0.4rem;">Your answer: <em>${state.userAnswer}</em></div>` : ''}
+    ${photoPlaceholderHTML(item._id)}
+    ${funFact ? `<div class="fun-fact"><div class="fun-fact-lbl">Note</div>${funFact}</div>` : ''}
+    ${coachMeterHTML(item._id)}
+    <hr class="divider">
+    ${skipped
+      ? `<button id="btnGotIt" class="btn btn-primary" onclick="initCard();render()">Next →</button>`
+      : `<div class="btn-row">
+          <button id="btnGotIt" class="btn btn-correct" onclick="markResult('correct')">✓ Got it</button>
+          <button class="btn btn-partial" onclick="markResult('partial')">~ Partial</button>
+          <button class="btn btn-wrong" onclick="markResult('wrong')">✗ Missed</button>
+        </div>`
+    }`;
+}
+
+function renderNameQuizCard(item, q, schema) {
+  if (state.phase === 'ask') {
+    const primaryVal = getPrimaryVal(item);
+    const lv = getItemLevel(item._id);
+    const l1fields = getFieldsForLevel(1);
+    const l1acc = l1fields.length > 0 ? getItemAccuracy(item._id, l1fields) : 0;
+    const l1pct = Math.round(l1acc * 100);
+    const l1HasSeen = l1fields.some(f => getScore(item._id, f.key).seen > 0);
+    const barColor = l1pct >= 75 ? 'var(--green2)' : l1pct >= 40 ? 'var(--amber)' : 'var(--red2)';
+    return `<div class="card-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+        <div class="species-sci" style="font-size:1.6rem;">${primaryVal}</div>
+        <div style="flex-shrink:0;padding-top:0.2rem;">
+          <div class="mastery-inline">
+            <span class="mastery-level-tag l${lv}">L${lv}</span>
+            <div class="mastery-track"><div class="mastery-fill" style="width:${l1pct}%;background:${barColor};"></div></div>
+            <span class="mastery-pct">${l1HasSeen ? l1pct + '%' : '—'}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${coachMeterHTML(item._id)}
+    <div class="question-text">What is the common name?</div>
+    <input type="text" class="answer-input" id="answerInput" placeholder="Type the common name…" value="${state.userAnswer}" autocomplete="off">
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="submitNameQuiz()">Submit</button>
+      <button class="btn btn-secondary" onclick="skipCard()">Skip</button>
+    </div>`;
+  } else {
+    const r = state.gradeResult;
+    const skipped = r?.grade === 'SKIPPED';
+    const correct = r?.grade === 'CORRECT';
+    const cls = skipped ? 'wrong' : correct ? 'correct' : 'wrong';
+    const label = skipped ? '→ Skipped' : correct ? '✓ Correct — confirm below' : '✗ Not quite — confirm below';
+    const notes = getNotesVal(item);
+    const funFact = notes || (item._generatedFact || '');
+    return `${cardHeaderHTML(item, null, schema)}
+      <hr class="divider">
+      <div class="result-banner ${cls}">${label}</div>
+      <div class="correct-answer">Common name: <strong>${getDisplayVal(item)}</strong></div>
+      ${state.userAnswer ? `<div style="font-size:13px;color:var(--ink3);margin-bottom:0.4rem;">Your answer: <em>${state.userAnswer}</em></div>` : ''}
+      ${photoPlaceholderHTML(item._id)}
+      ${funFact ? `<div class="fun-fact"><div class="fun-fact-lbl">Note</div>${funFact}</div>` : ''}
+      ${coachMeterHTML(item._id)}
+      <hr class="divider">
+      ${skipped
+        ? `<button id="btnGotIt" class="btn btn-primary" onclick="initCard();render()">Next →</button>`
+        : `<div class="btn-row">
+            <button id="btnGotIt" class="btn btn-correct" onclick="markResult('correct')">✓ Got it</button>
+            <button class="btn btn-partial" onclick="markResult('partial')">~ Partial</button>
+            <button class="btn btn-wrong" onclick="markResult('wrong')">✗ Missed</button>
+          </div>`
+      }`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER: BROWSE & SPECIES DETAIL
+// ═══════════════════════════════════════════════════════════════════
+
+function renderBrowse() {
+  const schema = state.schema;
+  const sorted = [...state.dataset.rows].sort((a, b) => (getPrimaryVal(a) || '').localeCompare(getPrimaryVal(b) || ''));
+  const items = sorted.map(item => {
+    const dotClass = getDotClass(item._id);
+    const dotColor = dotClass === 'known' ? 'var(--green2)' : dotClass === 'learning' ? 'var(--amber2)' : dotClass === 'struggling' ? 'var(--red2)' : 'var(--paper3)';
+    return `<div class="species-item" onclick="viewSpecies('${item._id}')">
+      <span class="score-dot" style="background:${dotColor}"></span>
+      <span class="sci">${getPrimaryVal(item)}</span>
+      <span class="com">${getDisplayVal(item)}</span>
+      ${getScoreChipHTML(item._id)}
+    </div>`;
+  }).join('');
+  return `<div class="species-list">${items}</div>`;
+}
+
+function renderSpeciesDetail(itemId) {
+  const item = state.dataset.rows.find(it => it._id === itemId);
+  if (!item) return '<div class="empty-state">Item not found.</div>';
+  const schema = state.schema;
+
+  const attrFields = schema.fields.filter(f => {
+    const lv = getEffectiveLevel(f);
+    return lv !== null && !['primary','display','category','id','notes','notes_alt'].includes(f.role);
+  });
+
+  const attrRows = attrFields.map(f => {
+    const val = getItemValue(item, f);
+    return `<div class="attr-row">
+      <span class="attr-lbl">${f.name}</span>
+      <span class="attr-val${val ? '' : ' empty'}">${val || '—'}</span>
+    </div>`;
+  }).join('');
+
+  const notes = getNotesVal(item);
+  const notesAlt = getNotesAltVal(item);
+
+  return `
+    <button class="btn btn-secondary btn-sm" onclick="setView('browse')" style="margin-bottom:0.75rem;">← Back</button>
+    <div class="card ask-card">
+      <div style="margin-bottom:0.5rem;">${getScoreChipHTML(item._id)}</div>
+      <div class="species-sci">${getPrimaryVal(item)}</div>
+      <div class="species-common">${getDisplayVal(item)}</div>
+      ${getCategoryVal(item) ? `<span class="type-badge">${getCategoryVal(item)}</span>` : ''}
+      <hr class="divider">
+      ${photoPlaceholderHTML(item._id)}
+      <div class="attr-grid" style="margin-top:0.75rem;">${attrRows}</div>
+      ${notesAlt ? `<div class="fun-fact" style="margin-top:0.75rem;"><div class="fun-fact-lbl">Also known as</div>${notesAlt}</div>` : ''}
+      ${notes ? `<div class="fun-fact" style="margin-top:0.5rem;"><div class="fun-fact-lbl">Notes</div>${notes}</div>` : ''}
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="studyThis('${item._id}')">Study this species →</button>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER: SETTINGS SCREEN
+// ═══════════════════════════════════════════════════════════════════
+
+function renderSettings() {
+  if (!state.dataset) {
+    return `<div class="settings-screen">
+      <div class="empty-state">No dataset loaded. <a href="#" onclick="showScreen('loader');return false;" style="color:var(--green);">Load a CSV first.</a></div>
+    </div>`;
+  }
+  const schema = state.schema;
+  const ds = state.dataset;
+
+  // Banner: custom CSV was previously loaded but can't be restored (no file storage)
+  const missingBanner = state._customDatasetMissing ? `
+    <div style="margin-bottom:0.9rem;padding:0.5rem 0.85rem;background:var(--amber3);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;font-size:13px;color:var(--ink2);">
+      <strong style="color:var(--amber);">Dataset not restored</strong> — your last dataset
+      <strong>${state._customDatasetMissing.name}</strong>
+      (${state._customDatasetMissing.rows} items) can't be reloaded automatically.
+      Your progress is still saved. &nbsp;<button class="btn btn-secondary btn-sm" onclick="state._settingsShowLoader=true;render()">↑ Re-upload CSV now</button>
+    </div>` : '';
+
+  // Banner: currently on builtin dataset, nudge toward CSV if they have one
+  const builtinBanner = (!state._customDatasetMissing && ds.isBuiltin) ? `
+    <div style="margin-bottom:0.9rem;padding:0.5rem 0.85rem;background:var(--paper2);border-left:3px solid var(--paper3);border-radius:0 4px 4px 0;font-size:12px;color:var(--ink3);">
+      Using built-in MVF plants dataset. Upload a CSV below to use a different dataset.
+    </div>` : '';
+
+  // Build level buckets for drag UI
+  const buckets = {1: [], 2: [], 3: [], 4: [], 0: []};
+  schema.fields.forEach(f => {
+    if (['primary','display','category','id','notes','notes_alt'].includes(f.role)) return;
+    const lv = getEffectiveLevel(f);
+    if (lv && buckets[lv]) buckets[lv].push(f);
+    else buckets[0].push(f);
+  });
+
+  function bucketHTML(level, label, cls, fields) {
+    const pills = fields.map(f =>
+      `<span class="field-pill" draggable="true" data-field="${encodeURIComponent(f.name)}" ondragstart="onPillDragStart(event)" ondragend="onPillDragEnd(event)">${f.name}</span>`
+    ).join('');
+    return `<div class="level-bucket ${cls}" data-level="${level}" ondragover="onBucketDragOver(event)" ondrop="onBucketDrop(event)" ondragleave="onBucketDragLeave(event)">
+      <h4>${label}</h4>
+      <div id="bucket_${level}">${pills || '<span style="font-size:11px;color:var(--ink3);font-style:italic;">Drop fields here</span>'}</div>
+    </div>`;
+  }
+
+  return `<div class="settings-screen">
+    ${missingBanner}${builtinBanner}
+    <div class="settings-section">
+      <h3>Dataset</h3>
+      <div class="dataset-info">
+        <strong>${ds.name}</strong>${ds.isBuiltin ? ' <span style="font-size:11px;color:var(--ink3);">(built-in)</span>' : ''}<br>
+        ${ds.rows.length} items &nbsp;·&nbsp; ${schema.fields.length} columns &nbsp;·&nbsp; Fingerprint: <code style="font-size:11px;">${ds.fingerprint}</code>
+      </div>
+      <div class="io-row" style="margin-top:0.75rem;">
+        <button class="btn btn-secondary btn-sm" onclick="showScreen('loader')">↑ Load new CSV</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportProgress()">↓ Export progress</button>
+        <label class="btn btn-secondary btn-sm" style="cursor:pointer;">↑ Import progress<input type="file" accept=".json" style="display:none" onchange="importProgress(this)"></label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Level Configuration</h3>
+      <p style="font-size:13px;color:var(--ink3);margin-bottom:0.75rem;">Drag fields between levels. Changes override your CSV defaults and are saved automatically.</p>
+      <div class="level-buckets">
+        ${bucketHTML(1, 'Level 1 — Basic ID', 'lv1', buckets[1])}
+        ${bucketHTML(2, 'Level 2 — Ecology', 'lv2', buckets[2])}
+        ${bucketHTML(3, 'Level 3 — Culture', 'lv3', buckets[3])}
+        ${bucketHTML(4, 'Level 4 — Expert', 'lv4', buckets[4])}
+        ${bucketHTML(0, 'Skip — Never ask', 'lv-skip', buckets[0])}
+      </div>
+      <div style="margin-top:0.6rem;">
+        <button class="btn btn-secondary btn-sm" onclick="resetOverrides()">Reset to CSV defaults</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Profiles</h3>
+      <div class="profile-bar" style="margin-bottom:0;">${renderProfileBar()}</div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER: PROFILE BAR
+// ═══════════════════════════════════════════════════════════════════
+
+function renderProfileBar() {
+  const chips = state.profiles.map(p =>
+    `<button class="profile-chip${p === state.activeProfile ? ' active' : ''}" onclick="switchProfile('${p}')">${p}</button>`
+  ).join('');
+  const addBtn = state.addingProfile
+    ? `<input class="profile-input" id="profileInput" placeholder="Name…" onkeydown="onProfileKey(event)" autofocus>`
+    : `<button class="profile-add" onclick="startAddProfile()">+ Add</button>`;
+  return chips + addBtn;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER: MAIN RENDER DISPATCHER
+// ═══════════════════════════════════════════════════════════════════
+
+function render() {
+  const root = document.getElementById('root');
+  if (!root) return;
+
+  // Update header dataset label
+  const hd = document.getElementById('headerDataset');
+  if (hd) hd.textContent = state.dataset ? state.dataset.name : 'No dataset loaded';
+
+  if (state.screen === 'settings') {
+    const loaderSection = state._settingsShowLoader ? `<div class="settings-section" id="loaderSection">${renderLoader()}</div>` : '';
+    root.innerHTML = `
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+        <button class="btn btn-secondary btn-sm" onclick="showScreen('study')">← Back to study</button>
+        <span style="font-size:1.1rem;font-family:'Playfair Display',serif;color:var(--green);">Settings</span>
+      </div>
+      ${loaderSection}
+      ${renderSettings()}`;
+    setupDropZone();
+    setupDragDrop();
+    return;
+  }
+
+  // Study screen — nav tabs
+  const navBar = `<div class="nav-bar">
+    <div class="nav-item${state.view==='study'?' active':''}" onclick="setView('study')">Study</div>
+    <div class="nav-item${state.view==='browse'||state.view==='species'?' active':''}" onclick="setView('browse')">Browse All</div>
+  </div>`;
+
+  let content = '';
+  if (state.view === 'browse') content = renderBrowse();
+  else if (state.view === 'species') content = renderSpeciesDetail(state.speciesId);
+  else content = renderStudy();
+
+  root.innerHTML = navBar + content;
+
+  // Keyboard handlers
+  const inp = document.getElementById('answerInput');
+  if (inp) {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (state.mode === 'namequiz') submitNameQuiz();
+        else submitAnswer();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        skipCard();
+      }
+    });
+    inp.focus();
+  }
+
+  // On result card, focus "Got it" so a second Enter confirms correct
+  const gotIt = document.getElementById('btnGotIt');
+  if (gotIt) gotIt.focus();
+
+  // Trigger photo load if result card or species detail is showing
+  if (state.current && state.phase === 'answered' && document.getElementById(`photoWrap_${state.current._id}`)) {
+    loadAndInjectPhoto(state.current);
+  }
+  if (state.view === 'species' && state.speciesId) {
+    const speciesItem = state.dataset?.rows.find(it => it._id === state.speciesId);
+    if (speciesItem && document.getElementById(`photoWrap_${state.speciesId}`)) {
+      loadAndInjectPhoto(speciesItem);
+    }
+  }
+
+  // Setup swipe gestures on study card
+  setupSwipeGestures();
+
+  // Profile input focus
+  const pi = document.getElementById('profileInput');
+  if (pi) { pi.focus(); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCREEN / VIEW MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════
+
+function showScreen(s) {
+  if (s === 'loader') {
+    state.screen = 'settings';
+    state._settingsShowLoader = true;
+  } else {
+    state.screen = s;
+    state._settingsShowLoader = false;
+  }
+  if (s === 'study' && state.dataset && !state.current) initCard();
+  render();
+}
+
+function setView(v)  { state.view = v; render(); }
+function setMode(m)  { state.mode = m; initCard(); render(); }
+function setFilter(val, dim) {
+  if (dim === 'category') state.filterCategory = val;
+  else state.filterCategory = val; // default
+  initCard(); render();
+}
+
+function viewSpecies(id) { state.view = 'species'; state.speciesId = id; render(); }
+function studyThis(id) {
+  state.view = 'study';
+  const item = state.dataset.rows.find(it => it._id === id);
+  state.current = item;
+  state.question = item ? pickQuestion(item) : null;
+  state.phase = 'ask'; state.userAnswer = ''; state.gradeResult = null;
+  render();
+}
+
+function showCSVHelp() {
+  const el = document.getElementById('csvHelp');
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════════════════
+
+function skipCard() {
+  if (state.current && state.question) {
+    updateScore(state.current._id, state.question.field.key, 'wrong', true);
+    recordAnswer(false); // skip resets streak
+    state.userAnswer = '';
+    state.gradeResult = { grade: 'SKIPPED', feedback: '' };
+    state.phase = 'answered';
+    state.skipped = true;
+    render();
+  } else {
+    initCard(); render();
+  }
+}
+
+function submitNameQuiz() {
+  const inp = document.getElementById('answerInput');
+  const answer = (inp ? inp.value.trim() : '').toLowerCase();
+  if (!answer) { skipCard(); return; }
+  state.userAnswer = inp.value.trim();
+  const item = state.current;
+  const displayVal = getDisplayVal(item);
+  const notesAlt = getNotesAltVal(item);
+  const targets = [displayVal, notesAlt].filter(Boolean);
+  const isCorrect = targets.some(t => fuzzyMatch(answer, t));
+  // Set suggested grade — user confirms with Got it / Partial / Missed
+  state.gradeResult = { grade: isCorrect ? 'CORRECT' : 'WRONG', feedback: '' };
+  state.phase = 'answered';
+  const notes = getNotesVal(item);
+  if (!notes && !item._generatedFact) {
+    generateFunFact(item).then(fact => { if (fact) { item._generatedFact = fact; render(); } });
+  }
+  render();
+}
+
+async function submitAnswer() {
+  const inp = document.getElementById('answerInput');
+  const answer = inp ? inp.value.trim() : '';
+  if (!answer) { skipCard(); return; }
+  state.userAnswer = answer;
+  state.phase = 'answered';
+  state.grading = true;
+  render();
+  const result = await gradeAnswer(state.question.questionText, state.question.answer, answer);
+  state.gradeResult = result;
+  state.grading = false;
+  // Async fun fact if notes blank
+  const notes = getNotesVal(state.current);
+  if (!notes && !state.current._generatedFact) {
+    generateFunFact(state.current).then(fact => { if (fact) { state.current._generatedFact = fact; render(); } });
+  }
+  render();
+}
+
+function markResult(result) {
+  recordAnswer(result === 'correct'); // partial and wrong both reset streak
+  updateScore(state.current._id, state.question.field.key, result, false);
+  initCard(); render();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PROFILE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════
+
+function switchProfile(name) {
+  state.activeProfile = name;
+  if (state.dataset) {
+    state.progress = loadProgress(state.dataset.fingerprint, name);
+    state.session  = loadSession(state.dataset.fingerprint, name);
+    state.levelOverrides = loadOverrides(state.dataset.fingerprint);
+  }
+  initCard(); render();
+}
+
+function startAddProfile() { state.addingProfile = true; render(); }
+
+function onProfileKey(e) {
+  if (e.key === 'Enter') {
+    const val = e.target.value.trim();
+    if (val && !state.profiles.includes(val)) {
+      state.profiles.push(val);
+      saveProfiles();
+    }
+    state.addingProfile = false;
+    if (val) switchProfile(val);
+    else render();
+  } else if (e.key === 'Escape') {
+    state.addingProfile = false; render();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CSV LOADER
+// ═══════════════════════════════════════════════════════════════════
+
+function setupDropZone() {
+  const zone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('csvFile');
+  if (!zone || !fileInput) return;
+
+  zone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  });
+}
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const dataset = buildDataset(e.target.result, file.name);
+      // Check if same fingerprint as current — if so, just reload
+      const lastMeta = JSON.parse(localStorage.getItem('sptrain_last_dataset') || 'null');
+      if (lastMeta && lastMeta.fingerprint === dataset.fingerprint) {
+        activateDataset(dataset);
+        return;
+      }
+      // Different dataset — check if there's existing progress for the new one
+      const hasExistingProgress = state.profiles.some(p => {
+        const prog = loadProgress(dataset.fingerprint, p);
+        return Object.keys(prog).length > 0;
+      });
+      if (hasExistingProgress) {
+        // Has progress for this dataset — activate and resume
+        activateDataset(dataset);
+      } else {
+        // Brand new dataset — show preview and confirm
+        showCSVPreview(dataset, file.name);
+        state.pendingDataset = dataset;
+      }
+    } catch(err) {
+      document.getElementById('csvPreview').innerHTML =
+        `<div style="color:var(--red2);font-size:13px;margin-top:0.75rem;">Error: ${err.message}</div>`;
+    }
+  };
+  reader.readAsText(file);
+}
+
+function showCSVPreview(dataset, filename) {
+  const schema = dataset.schema;
+  const sampleRows = dataset.rows.slice(0, 3);
+
+  // Show only first 8 fields to keep preview manageable
+  const previewFields = dataset.schema.fields.slice(0, 8);
+
+  function tagChipHTML(field) {
+    const lv = field.role.match(/^level(\d)$/);
+    if (lv) return `<span class="tag-chip tag-level${lv[1]}">L${lv[1]}</span>`;
+    if (field.role === 'primary')   return `<span class="tag-chip tag-primary">primary</span>`;
+    if (field.role === 'display')   return `<span class="tag-chip tag-display">display</span>`;
+    if (field.role === 'category')  return `<span class="tag-chip tag-category">category</span>`;
+    if (field.role === 'notes' || field.role === 'notes_alt') return `<span class="tag-chip tag-notes">notes</span>`;
+    if (field.role === 'id')        return `<span class="tag-chip tag-id">id</span>`;
+    return `<span class="tag-chip tag-skip">skip</span>`;
+  }
+
+  const headerRow = previewFields.map(f => `<th>${f.name}</th>`).join('');
+  const tagRow    = previewFields.map(f => `<td class="row-label">${tagChipHTML(f)}</td>`).join('');
+  const dataRows  = sampleRows.map(row =>
+    `<tr>${previewFields.map(f => `<td>${row[f.key] || ''}</td>`).join('')}</tr>`
+  ).join('');
+
+  const moreFields = dataset.schema.fields.length - 8;
+
+  const autoTagNotice = dataset.autoTagged ? `
+    <div style="margin-bottom:0.6rem;padding:0.4rem 0.75rem;background:var(--amber3);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;font-size:12px;color:var(--ink2);">
+      <strong>No tag row detected</strong> — levels auto-assigned from column names.
+      Add a Row 2 with role/level tags to take full control.
+    </div>` : '';
+
+  document.getElementById('csvPreview').innerHTML = `
+    <div class="csv-preview">
+      ${autoTagNotice}
+      <div style="font-size:13px;color:var(--ink3);margin-bottom:0.5rem;">
+        <strong style="color:var(--ink);">${dataset.name}</strong> — ${dataset.rows.length} items, ${dataset.schema.fields.length} columns
+        ${moreFields > 0 ? `<span style="color:var(--ink3)"> (+${moreFields} more columns not shown)</span>` : ''}
+      </div>
+      <table>
+        <tr>${headerRow}</tr>
+        <tr>${tagRow}</tr>
+        ${dataRows}
+      </table>
+      <div style="margin-top:0.75rem;display:flex;gap:0.5rem;">
+        <button class="btn btn-primary" onclick="confirmLoadDataset()">Load this dataset</button>
+        <button class="btn btn-secondary" onclick="cancelLoadDataset()">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function confirmLoadDataset() {
+  if (state.pendingDataset) {
+    activateDataset(state.pendingDataset);
+    state.pendingDataset = null;
+  }
+}
+
+function cancelLoadDataset() {
+  state.pendingDataset = null;
+  document.getElementById('csvPreview').innerHTML = '';
+}
+
+function activateDataset(dataset) {
+  state.dataset = dataset;
+  state.schema  = dataset.schema;
+  state._settingsShowLoader = false;
+  state._customDatasetMissing = null;
+  state.levelOverrides = loadOverrides(dataset.fingerprint);
+  state.progress = loadProgress(dataset.fingerprint, state.activeProfile);
+  state.session  = loadSession(dataset.fingerprint, state.activeProfile);
+  saveDatasetMeta();
+  attemptV1Migration(dataset);
+  initCard();
+  state.screen = 'study';
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DRAG & DROP — LEVEL SETTINGS
+// ═══════════════════════════════════════════════════════════════════
+
+let dragFieldName = null;
+
+function onPillDragStart(e) {
+  dragFieldName = decodeURIComponent(e.target.dataset.field);
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onPillDragEnd(e) {
+  e.target.classList.remove('dragging');
+  dragFieldName = null;
+}
+
+function onBucketDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-target');
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function onBucketDragLeave(e) {
+  e.currentTarget.classList.remove('drag-target');
+}
+
+function onBucketDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-target');
+  if (!dragFieldName) return;
+  const level = parseInt(e.currentTarget.dataset.level);
+  // Save override
+  if (level === 0) {
+    state.levelOverrides[dragFieldName] = null; // null = skip
+  } else {
+    state.levelOverrides[dragFieldName] = level;
+  }
+  saveOverrides();
+  render(); // re-render settings
+}
+
+function setupDragDrop() {
+  // Buckets are set up via inline event handlers in renderSettings
+}
+
+function resetOverrides() {
+  state.levelOverrides = {};
+  saveOverrides();
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// EXPORT / IMPORT
+// ═══════════════════════════════════════════════════════════════════
+
+function exportProgress() {
+  if (!state.dataset) return;
+  const payload = {
+    version: APP_VERSION,
+    exported: new Date().toISOString(),
+    fingerprint: state.dataset.fingerprint,
+    datasetName: state.dataset.name,
+    profiles: state.profiles,
+    progressByProfile: {},
+    sessionByProfile: {},
+    levelOverrides: state.levelOverrides,
+  };
+  for (const p of state.profiles) {
+    payload.progressByProfile[p] = loadProgress(state.dataset.fingerprint, p);
+    payload.sessionByProfile[p]  = loadSession(state.dataset.fingerprint, p);
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `species_trainer_${state.dataset.fingerprint}_${new Date().toISOString().slice(0,10)}.json`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function importProgress(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const payload = JSON.parse(e.target.result);
+      if (!payload.fingerprint || !payload.progressByProfile) throw new Error('Invalid progress file');
+      if (payload.fingerprint !== state.dataset?.fingerprint) {
+        if (!confirm(`This progress file is for dataset "${payload.datasetName}" (${payload.fingerprint}), but current dataset is "${state.dataset?.name}" (${state.dataset?.fingerprint}). Import anyway?`)) return;
+      }
+      // Merge profiles
+      for (const p of (payload.profiles || [])) {
+        if (!state.profiles.includes(p)) state.profiles.push(p);
+      }
+      saveProfiles();
+      // Write progress
+      const fp = state.dataset?.fingerprint || payload.fingerprint;
+      for (const [p, prog] of Object.entries(payload.progressByProfile || {})) {
+        localStorage.setItem(`sptrain_${fp}_${p}_progress`, JSON.stringify(prog));
+      }
+      for (const [p, sess] of Object.entries(payload.sessionByProfile || {})) {
+        localStorage.setItem(`sptrain_${fp}_${p}_session`, JSON.stringify(sess));
+      }
+      if (payload.levelOverrides) {
+        state.levelOverrides = payload.levelOverrides;
+        saveOverrides();
+      }
+      // Reload current profile
+      state.progress = loadProgress(fp, state.activeProfile);
+      state.session  = loadSession(fp, state.activeProfile);
+      alert(`Progress imported for ${Object.keys(payload.progressByProfile).length} profile(s).`);
+      render();
+    } catch(err) { alert('Import failed: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+// Build a dataset object from the baked-in raw format (already parsed, no CSV needed)
+function buildDatasetFromRaw(raw) {
+  const schema = buildSchema(raw.headers, raw.tags);
+  return {
+    name: raw.name,
+    fingerprint: raw.fingerprint,
+    headers: raw.headers,
+    tags: raw.tags,
+    schema,
+    rows: raw.rows,
+    isBuiltin: true,
+  };
+}
+
+// Migrate v1 progress into the current dataset if no v2 progress exists yet
+function attemptV1Migration(dataset) {
+  if (Object.keys(state.progress).length > 0) return; // already have v2 progress
+  const v1prog = migrateV1();
+  if (!v1prog) return;
+  let migrated = 0;
+  for (const [itemId, s] of Object.entries(v1prog)) {
+    const item = dataset.rows.find(it => it._id === itemId);
+    if (!item) continue;
+    const l1fields = getFieldsForLevel(1);
+    for (const f of l1fields) {
+      const key = `${itemId}::${f.key}`;
+      state.progress[key] = {
+        seen: s.seen || 0, correct: s.correct || 0, skips: s.skips || 0,
+        interval: s.interval || 1, lastSeen: s.lastSeen || 0,
+        strangerScore: s.strangerScore || 1.0
+      };
+    }
+    migrated++;
+  }
+  if (migrated > 0) {
+    saveProgress();
+    console.log(`v1 migration: ${migrated} records imported`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+
+function init() {
+  state.profiles = loadProfiles();
+  state.activeProfile = state.profiles[0] || 'Me';
+
+  const lastMeta = JSON.parse(localStorage.getItem('sptrain_last_dataset') || 'null');
+  const useBuiltin = !lastMeta || lastMeta.fingerprint === 'builtin_mvf';
+
+  const dataset = buildDatasetFromRaw(BUILTIN_DATASET_RAW);
+  state.dataset = dataset;
+  state.schema  = dataset.schema;
+
+  if (useBuiltin) {
+    state.levelOverrides = loadOverrides('builtin_mvf');
+    state.progress = loadProgress('builtin_mvf', state.activeProfile);
+    state.session  = loadSession('builtin_mvf', state.activeProfile);
+    attemptV1Migration(dataset);
+  } else {
+    // User had a custom CSV — fall back to builtin data but flag the missing CSV
+    state.levelOverrides = loadOverrides(lastMeta.fingerprint);
+    state.progress = loadProgress(lastMeta.fingerprint, state.activeProfile);
+    state.session  = loadSession(lastMeta.fingerprint, state.activeProfile);
+    state._customDatasetMissing = lastMeta;
+    // Still try v1 migration in case they also had v1 plants progress
+    attemptV1Migration(dataset);
+  }
+
+  initCard();
+  state.screen = 'study';
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SWIPE GESTURES
+// ═══════════════════════════════════════════════════════════════════
+
+function setupSwipeGestures() {
+  const root = document.getElementById('root');
+  if (!root) return;
+  const card = root.querySelector('.card-swipeable');
+  if (!card) return;
+
+  let startX = 0, startY = 0, currentX = 0, isDragging = false;
+  const THRESHOLD = 80; // px to trigger action
+  const hintRight = card.querySelector('.swipe-hint-right');
+  const hintLeft  = card.querySelector('.swipe-hint-left');
+
+  card.addEventListener('touchstart', e => {
+    if (e.target.closest('textarea, input, select, button')) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    isDragging = true;
+    card.classList.add('swiping');
+  }, { passive: true });
+
+  card.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > Math.abs(dx) * 1.5) { isDragging = false; return; } // vertical scroll
+    currentX = dx;
+    const pct = Math.min(Math.abs(dx) / THRESHOLD, 1);
+    card.style.transform = `translateX(${dx * 0.4}px) rotate(${dx * 0.02}deg)`;
+    card.style.opacity = 1 - pct * 0.2;
+    if (hintRight) hintRight.style.opacity = dx > 20 ? pct : 0;
+    if (hintLeft)  hintLeft.style.opacity  = dx < -20 ? pct : 0;
+  }, { passive: true });
+
+  card.addEventListener('touchend', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    card.classList.remove('swiping');
+    card.style.transform = '';
+    card.style.opacity = '';
+    if (hintRight) hintRight.style.opacity = 0;
+    if (hintLeft)  hintLeft.style.opacity  = 0;
+
+    if (currentX > THRESHOLD) {
+      // Swipe right — Got it (only on result card)
+      if (state.phase === 'answered' && state.gradeResult?.grade !== 'SKIPPED') {
+        markResult('correct');
+      }
+    } else if (currentX < -THRESHOLD) {
+      // Swipe left — skip on ask card, missed on result card
+      if (state.phase === 'ask') {
+        skipCard();
+      } else if (state.phase === 'answered' && state.gradeResult?.grade !== 'SKIPPED') {
+        markResult('wrong');
+      }
+    }
+    currentX = 0;
+  }, { passive: true });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// OFFLINE DETECTION
+// ═══════════════════════════════════════════════════════════════════
+
+function updateOnlineStatus() {
+  const banner = document.getElementById('offlineBanner');
+  if (banner) banner.classList.toggle('visible', !navigator.onLine);
+}
+window.addEventListener('online',  updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+// ═══════════════════════════════════════════════════════════════════
+// SERVICE WORKER REGISTRATION
+// ═══════════════════════════════════════════════════════════════════
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('[sw] registered, scope:', reg.scope))
+      .catch(err => console.log('[sw] registration failed:', err));
+  });
+}
+
+init();
+</script>
+</body>
+</html>
