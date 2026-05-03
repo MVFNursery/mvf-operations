@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a2e0f">
+<title>MVFN Field</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #0f1a08;
+    --bg2: #1a2e0f;
+    --bg3: #243d18;
+    --surface: #1e3512;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.15);
+    --text: #e8f0e0;
+    --text2: #9ab88a;
+    --text3: #6a8a5a;
+    --green: #7ecf4f;
+    --green-dim: #4a8a28;
+    --amber: #f0b840;
+    --red: #e05050;
+    --done-bg: #162810;
+    --done-text: #4a7030;
+    --radius: 12px;
+    --header: 56px;
+    --filter: 48px;
+    --footer: 68px;
+  }
+  html, body {
+    height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px; overscroll-behavior: none;
+  }
+
+  /* HEADER */
+  .header {
+    position: fixed; top: 0; left: 0; right: 0; height: var(--header);
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 16px; gap: 12px; z-index: 100;
+  }
+  .header-logo { font-size: 12px; font-weight: 700; letter-spacing: 0.15em; color: var(--green); text-transform: uppercase; }
+  .header-title { flex: 1; font-size: 15px; font-weight: 500; }
+  .header-count { font-size: 12px; color: var(--text3); background: var(--bg3); padding: 3px 9px; border-radius: 99px; }
+  .refresh-btn {
+    width: 34px; height: 34px; border: none; background: var(--bg3);
+    border-radius: 8px; color: var(--text2); font-size: 17px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .refresh-btn:active { opacity: 0.6; }
+
+  /* MIC BUTTON in header */
+  .mic-btn {
+    width: 34px; height: 34px; border: none; background: var(--bg3);
+    border-radius: 8px; color: var(--text2); font-size: 17px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .mic-btn.listening { background: var(--red); color: white; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+  /* FILTER BAR */
+  .filter-bar {
+    position: fixed; top: var(--header); left: 0; right: 0; height: var(--filter);
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 12px; gap: 6px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; z-index: 99;
+    scrollbar-width: none;
+  }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-chip {
+    flex-shrink: 0; padding: 5px 13px; border-radius: 99px;
+    border: 1px solid var(--border2); background: transparent;
+    color: var(--text2); font-size: 12px; font-family: inherit; cursor: pointer;
+  }
+  .filter-chip.active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .filter-chip:active { opacity: 0.7; }
+
+  /* VOICE TRANSCRIPT BAR */
+  .transcript-bar {
+    position: fixed; top: calc(var(--header) + var(--filter)); left: 0; right: 0;
+    background: rgba(74,138,40,0.15); border-bottom: 1px solid var(--green-dim);
+    padding: 8px 16px; font-size: 13px; color: var(--green);
+    display: none; z-index: 98;
+  }
+  .transcript-bar.show { display: block; }
+
+  /* MAIN */
+  .main {
+    padding-top: calc(var(--header) + var(--filter) + 8px);
+    padding-bottom: calc(var(--footer) + 12px);
+    min-height: 100%;
+  }
+  .main.with-transcript { padding-top: calc(var(--header) + var(--filter) + 38px + 8px); }
+
+  /* TASK LIST */
+  .task-list { padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
+
+  /* TASK CARD */
+  .task-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; transition: opacity 0.2s;
+  }
+  .task-card.done { background: var(--done-bg); border-color: rgba(255,255,255,0.04); opacity: 0.45; }
+  .task-main { display: flex; align-items: flex-start; min-height: 64px; }
+
+  /* CHECK BUTTON */
+  .check-btn {
+    width: 56px; min-height: 64px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border: none; background: transparent;
+  }
+  .check-circle {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .task-card.done .check-circle { background: var(--green-dim); border-color: var(--green-dim); }
+  .check-icon { display: none; }
+  .task-card.done .check-icon { display: block; }
+  .check-btn:active .check-circle { border-color: var(--green); background: rgba(126,207,79,0.15); }
+
+  /* TASK CONTENT */
+  .task-content { flex: 1; padding: 12px 8px 12px 0; min-width: 0; cursor: pointer; }
+  .task-desc { font-size: 14px; line-height: 1.4; color: var(--text); word-break: break-word; }
+  .task-card.done .task-desc { color: var(--done-text); text-decoration: line-through; text-decoration-color: var(--done-text); }
+  .task-meta { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
+  .badge { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 500; }
+  .badge-bucket { background: rgba(126,207,79,0.12); color: var(--green); }
+  .badge-effort { background: rgba(240,184,64,0.12); color: var(--amber); }
+  .badge-project { background: rgba(255,255,255,0.06); color: var(--text3); }
+
+  /* EXPAND TOGGLE */
+  .expand-btn {
+    width: 36px; min-height: 64px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    border: none; background: transparent; color: var(--text3); font-size: 10px; cursor: pointer;
+  }
+
+  /* EXPANDED AREA */
+  .task-expand { display: none; padding: 0 12px 12px 56px; border-top: 1px solid var(--border); }
+  .task-expand.open { display: block; }
+  .task-notes-text { font-size: 12px; color: var(--text3); line-height: 1.5; margin-bottom: 8px; }
+  .note-row { display: flex; gap: 8px; align-items: flex-end; }
+  .note-input {
+    flex: 1; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 8px 10px; color: var(--text);
+    font-size: 13px; font-family: inherit; resize: none; min-height: 38px; max-height: 80px;
+  }
+  .note-input:focus { outline: none; border-color: var(--green-dim); }
+  .note-input::placeholder { color: var(--text3); }
+  .note-save-btn {
+    height: 38px; padding: 0 14px; background: var(--green-dim);
+    border: none; border-radius: 8px; color: var(--green);
+    font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; flex-shrink: 0;
+  }
+  .note-save-btn:active { opacity: 0.8; }
+
+  /* SECTION LABEL */
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); padding: 14px 12px 6px; }
+
+  /* EMPTY / LOADING */
+  .empty { text-align: center; padding: 60px 20px; color: var(--text3); font-size: 14px; }
+  .loading { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--text3); font-size: 14px; gap: 10px; }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border2); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* FOOTER */
+  .footer {
+    position: fixed; bottom: 0; left: 0; right: 0; height: var(--footer);
+    background: var(--bg2); border-top: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 12px; gap: 8px; z-index: 100;
+  }
+  .add-input {
+    flex: 1; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 10px 14px; color: var(--text);
+    font-size: 14px; font-family: inherit; height: 44px;
+  }
+  .add-input:focus { outline: none; border-color: var(--green-dim); }
+  .add-input::placeholder { color: var(--text3); }
+  .add-btn {
+    height: 44px; padding: 0 18px; background: var(--green-dim);
+    border: none; border-radius: 10px; color: var(--green);
+    font-size: 18px; font-weight: 700; font-family: inherit; cursor: pointer; flex-shrink: 0;
+  }
+  .add-btn:active { opacity: 0.8; }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: calc(var(--footer) + 10px); left: 50%;
+    transform: translateX(-50%) translateY(6px);
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text); font-size: 13px; padding: 9px 18px;
+    border-radius: 99px; opacity: 0; transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none; white-space: nowrap; z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--green-dim); color: var(--green); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-logo">MVFN</span>
+  <span class="header-title">Field</span>
+  <span class="header-count" id="countBadge">—</span>
+  <button class="mic-btn" id="micBtn" onclick="toggleVoice()" title="Voice input">🎤</button>
+  <button class="refresh-btn" onclick="loadTasks()" title="Refresh">↻</button>
+</div>
+
+<div class="filter-bar">
+  <button class="filter-chip active" onclick="setFilter('All',this)">All</button>
+  <button class="filter-chip" onclick="setFilter('Nursery',this)">Nursery</button>
+  <button class="filter-chip" onclick="setFilter('Property',this)">Property</button>
+  <button class="filter-chip" onclick="setFilter('Biz-Infra',this)">Biz-Infra</button>
+  <button class="filter-chip" onclick="setFilter('Personal',this)">Personal</button>
+</div>
+
+<div class="transcript-bar" id="transcriptBar"></div>
+
+<div class="main" id="main">
+  <div id="taskList" class="task-list">
+    <div class="loading"><div class="spinner"></div>Loading…</div>
+  </div>
+</div>
+
+<div class="footer">
+  <input class="add-input" id="quickAdd" type="text" placeholder="Quick add task…" autocomplete="off" autocorrect="off" spellcheck="false">
+  <button class="add-btn" onclick="quickAdd()">+</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG — update this to your MegaMachine Tailscale IP ──
+const N8N_BASE = 'http://100.99.3.36:5678/webhook';
+const WEBHOOK_POST = N8N_BASE + '/mvfn-field';
+const WEBHOOK_GET  = N8N_BASE + '/mvfn-field-get';
+// ──────────────────────────────────────────────────────────
+
+let allTasks = [];
+let activeFilter = 'All';
+let expandedId = null;
+
+// ── LOAD ──────────────────────────────────────────────────
+async function loadTasks() {
+  document.getElementById('taskList').innerHTML =
+    '<div class="loading"><div class="spinner"></div>Loading…</div>';
+  try {
+    const r = await fetch(WEBHOOK_GET);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    allTasks = Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : []);
+    renderTasks();
+  } catch(e) {
+    document.getElementById('taskList').innerHTML =
+      '<div class="empty">Could not load tasks.<br><small>' + e.message + '</small></div>';
+    showToast('Load failed', 'error');
+  }
+}
+
+// ── FILTER ────────────────────────────────────────────────
+function setFilter(bucket, el) {
+  activeFilter = bucket;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderTasks();
+}
+
+// ── RENDER ────────────────────────────────────────────────
+function renderTasks() {
+  const list = document.getElementById('taskList');
+  const open = allTasks.filter(t =>
+    t.status !== 'Done' && t.status !== 'Withdrawn' &&
+    (activeFilter === 'All' || t.bucket === activeFilter)
+  );
+  const done = allTasks.filter(t =>
+    t.status === 'Done' &&
+    (activeFilter === 'All' || t.bucket === activeFilter)
+  ).slice(-5);
+
+  document.getElementById('countBadge').textContent = open.length + ' open';
+
+  if (!open.length && !done.length) {
+    list.innerHTML = '<div class="empty">No tasks.</div>';
+    return;
+  }
+
+  let html = '';
+  open.forEach(t => { html += card(t); });
+  if (done.length) {
+    html += '<div class="section-label">Recently Done</div>';
+    done.forEach(t => { html += card(t); });
+  }
+  list.innerHTML = html;
+}
+
+function card(t) {
+  const id = t.task_id || '';
+  const isDone = t.status === 'Done';
+  const isOpen = expandedId === id;
+  return `
+  <div class="task-card${isDone?' done':''}" id="card-${esc(id)}">
+    <div class="task-main">
+      <button class="check-btn" onclick="completeTask('${esc(id)}')" aria-label="Complete">
+        <div class="check-circle">
+          <svg class="check-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M2 7l3.5 3.5L12 4" stroke="#7ecf4f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </button>
+      <div class="task-content" onclick="toggleExpand('${esc(id)}')">
+        <div class="task-desc">${escH(t.description||'(no description)')}</div>
+        <div class="task-meta">
+          ${t.bucket?`<span class="badge badge-bucket">${escH(t.bucket)}</span>`:''}
+          ${t.effort?`<span class="badge badge-effort">${escH(t.effort)}</span>`:''}
+          ${t.project_id?`<span class="badge badge-project">${escH(t.project_id)}</span>`:''}
+        </div>
+      </div>
+      <button class="expand-btn" onclick="toggleExpand('${esc(id)}')">${isOpen?'▲':'▼'}</button>
+    </div>
+    <div class="task-expand${isOpen?' open':''}" id="exp-${esc(id)}">
+      ${t.notes?`<div class="task-notes-text">${escH(t.notes)}</div>`:''}
+      <div class="note-row">
+        <textarea class="note-input" id="note-${esc(id)}" placeholder="Add note…" rows="1"></textarea>
+        <button class="note-save-btn" onclick="saveNote('${esc(id)}')">Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── ACTIONS ───────────────────────────────────────────────
+async function completeTask(taskId) {
+  const card = document.getElementById('card-' + taskId);
+  if (!card || card.classList.contains('done')) return;
+  card.classList.add('done');
+  showToast('Marking done…', '');
+  try {
+    const r = await post({ action: 'complete_task', task_id: taskId });
+    if (r.status === 'ok') {
+      const t = allTasks.find(x => x.task_id === taskId);
+      if (t) t.status = 'Done';
+      showToast('Done ✓', 'success');
+      setTimeout(renderTasks, 600);
+    } else {
+      card.classList.remove('done');
+      showToast('Failed', 'error');
+    }
+  } catch(e) {
+    card.classList.remove('done');
+    showToast('Failed — check connection', 'error');
+  }
+}
+
+async function saveNote(taskId) {
+  const inp = document.getElementById('note-' + taskId);
+  const note = inp ? inp.value.trim() : '';
+  if (!note) return;
+  showToast('Saving…', '');
+  try {
+    const r = await post({ action: 'update_task', task_id: taskId, notes: note });
+    if (r.status === 'ok') {
+      const t = allTasks.find(x => x.task_id === taskId);
+      if (t) t.notes = note;
+      expandedId = null;
+      renderTasks();
+      showToast('Saved ✓', 'success');
+    } else {
+      showToast('Save failed', 'error');
+    }
+  } catch(e) {
+    showToast('Save failed', 'error');
+  }
+}
+
+async function quickAdd() {
+  const inp = document.getElementById('quickAdd');
+  const desc = inp.value.trim();
+  if (!desc) return;
+  const bucket = activeFilter === 'All' ? 'Nursery' : activeFilter;
+  inp.value = '';
+  inp.blur();
+  showToast('Adding…', '');
+  try {
+    const r = await post({ action: 'add_task', description: desc, bucket });
+    if (r.status === 'ok') {
+      showToast('Added ✓', 'success');
+      loadTasks();
+    } else {
+      showToast('Add failed', 'error');
+    }
+  } catch(e) {
+    showToast('Add failed', 'error');
+  }
+}
+
+function toggleExpand(id) {
+  expandedId = expandedId === id ? null : id;
+  renderTasks();
+  if (expandedId) {
+    setTimeout(() => {
+      const el = document.getElementById('card-' + id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 40);
+  }
+}
+
+// ── VOICE ─────────────────────────────────────────────────
+let recognition = null;
+let isListening = false;
+
+function toggleVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    showToast('Voice not supported in this browser', 'error');
+    return;
+  }
+  if (isListening) {
+    recognition.stop();
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = () => {
+    isListening = true;
+    document.getElementById('micBtn').classList.add('listening');
+    showTranscript('Listening…');
+  };
+  recognition.onresult = (e) => {
+    const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+    showTranscript(transcript);
+    if (e.results[e.results.length-1].isFinal) {
+      handleVoiceCommand(transcript.trim());
+    }
+  };
+  recognition.onerror = (e) => {
+    showToast('Voice error: ' + e.error, 'error');
+    stopListening();
+  };
+  recognition.onend = () => { stopListening(); };
+  recognition.start();
+}
+
+function stopListening() {
+  isListening = false;
+  document.getElementById('micBtn').classList.remove('listening');
+  setTimeout(hideTranscript, 2000);
+}
+
+function handleVoiceCommand(text) {
+  const lower = text.toLowerCase();
+  // "add task [description]" or "new task [description]"
+  if (lower.startsWith('add task ') || lower.startsWith('new task ')) {
+    const desc = text.replace(/^(add task|new task)\s+/i, '');
+    document.getElementById('quickAdd').value = desc;
+    showTranscript('Adding: ' + desc);
+    quickAdd();
+    return;
+  }
+  // "done [partial task name]" — fuzzy match open tasks
+  if (lower.startsWith('done ') || lower.startsWith('complete ')) {
+    const query = text.replace(/^(done|complete)\s+/i, '').toLowerCase();
+    const match = allTasks.find(t =>
+      t.status !== 'Done' && t.description && t.description.toLowerCase().includes(query)
+    );
+    if (match) {
+      showTranscript('Completing: ' + match.description);
+      completeTask(match.task_id);
+    } else {
+      showTranscript('No match found for: ' + query);
+      showToast('No task matched', 'error');
+    }
+    return;
+  }
+  // Default — put in the add field
+  document.getElementById('quickAdd').value = text;
+  showTranscript('Tap + to add: ' + text);
+}
+
+function showTranscript(text) {
+  const bar = document.getElementById('transcriptBar');
+  bar.textContent = text;
+  bar.classList.add('show');
+  document.getElementById('main').classList.add('with-transcript');
+}
+function hideTranscript() {
+  document.getElementById('transcriptBar').classList.remove('show');
+  document.getElementById('main').classList.remove('with-transcript');
+}
+
+// ── UTILS ─────────────────────────────────────────────────
+async function post(body) {
+  const r = await fetch(WEBHOOK_POST, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => { t.className = 'toast'; }, 2400);
+}
+
+function esc(s) { return (s||'').replace(/['"<>&]/g, c => ({'\'':'&#39;','"':'&quot;','<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+function escH(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── INIT ──────────────────────────────────────────────────
+document.getElementById('quickAdd').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); quickAdd(); }
+});
+
+loadTasks();
+</script>
+</body>
+</html>
