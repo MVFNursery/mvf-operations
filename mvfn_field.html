@@ -253,13 +253,20 @@ async function loadTasks() {
     '<div class="loading"><div class="spinner"></div>Loading…</div>';
   try {
     const r = await fetch(WEBHOOK_GET);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!r.ok) {
+      const hint = r.status === 503 ? 'Make sure Tailscale is connected.' : 'HTTP ' + r.status;
+      throw new Error(hint);
+    }
     const data = await r.json();
     allTasks = Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : []);
     renderTasks();
   } catch(e) {
+    const isTailscale = e.message.includes('Tailscale') || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch');
+    const msg = isTailscale || e.message === 'Failed to fetch'
+      ? 'Make sure Tailscale is connected.'
+      : e.message;
     document.getElementById('taskList').innerHTML =
-      '<div class="empty">Could not load tasks.<br><small>' + e.message + '</small></div>';
+      '<div class="empty">Could not load tasks.<br><small>' + msg + '</small></div>';
     showToast('Load failed', 'error');
   }
 }
