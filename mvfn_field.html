@@ -100,9 +100,20 @@
   .task-list { padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
 
   /* TASK CARD */
+  .task-card-wrap { position: relative; border-radius: var(--radius); overflow: hidden; }
+  .swipe-reveal {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 80px;
+    background: var(--red); display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: white;
+    text-transform: uppercase; opacity: 0; transition: opacity 0.1s;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .task-card-wrap.swiping .swipe-reveal { opacity: 1; }
   .task-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); overflow: hidden; transition: opacity 0.2s;
+    border-radius: var(--radius); overflow: hidden;
+    transition: transform 0.2s ease, opacity 0.2s;
+    position: relative; will-change: transform;
   }
   .task-card.done { background: var(--done-bg); border-color: rgba(255,255,255,0.04); opacity: 0.45; }
   .task-main { display: flex; align-items: flex-start; min-height: 64px; }
@@ -114,7 +125,7 @@
     cursor: pointer; border: none; background: transparent;
   }
   .check-circle {
-    width: 26px; height: 26px; border-radius: 50%;
+    width: 22px; height: 22px; border-radius: 5px;
     border: 2px solid var(--border2);
     display: flex; align-items: center; justify-content: center;
     transition: all 0.15s;
@@ -188,6 +199,32 @@
     font-size: 18px; font-weight: 700; font-family: inherit; cursor: pointer; flex-shrink: 0;
   }
   .add-btn:active { opacity: 0.8; }
+
+  /* BUCKET PICKER SHEET */
+  .bucket-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: flex; align-items: flex-end; justify-content: center;
+    z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.18s;
+  }
+  .bucket-overlay.show { opacity: 1; pointer-events: all; }
+  .bucket-sheet {
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 20px 20px 32px; width: 100%; max-width: 480px;
+    transform: translateY(12px); transition: transform 0.18s;
+  }
+  .bucket-overlay.show .bucket-sheet { transform: translateY(0); }
+  .bucket-sheet-title { font-size: 13px; color: var(--text3); margin-bottom: 4px; }
+  .bucket-sheet-desc { font-size: 14px; color: var(--text); margin-bottom: 18px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bucket-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .bucket-btn {
+    height: 52px; border: 1px solid var(--border2); border-radius: 10px;
+    font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
+    background: var(--bg3); color: var(--text2);
+  }
+  .bucket-btn:active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .bucket-cancel { width: 100%; height: 44px; border: none; border-radius: 10px; background: transparent; color: var(--text3); font-size: 14px; font-family: inherit; cursor: pointer; }
+  .bucket-cancel:active { opacity: 0.6; }
 
   /* ARCHIVE CONFIRM OVERLAY */
   .archive-overlay {
@@ -266,6 +303,20 @@
 
 <div class="toast" id="toast"></div>
 
+<div class="bucket-overlay" id="bucketOverlay" onclick="cancelBucketPick(event)">
+  <div class="bucket-sheet">
+    <div class="bucket-sheet-title">Add to which bucket?</div>
+    <div class="bucket-sheet-desc" id="bucketDesc"></div>
+    <div class="bucket-btns">
+      <button class="bucket-btn" onclick="pickBucket('Nursery')">🌱 Nursery</button>
+      <button class="bucket-btn" onclick="pickBucket('Property')">🏡 Property</button>
+      <button class="bucket-btn" onclick="pickBucket('Biz-Infra')">⚙️ Biz-Infra</button>
+      <button class="bucket-btn" onclick="pickBucket('Personal')">👤 Personal</button>
+    </div>
+    <button class="bucket-cancel" onclick="cancelBucketPick()">Cancel</button>
+  </div>
+</div>
+
 <div class="archive-overlay" id="archiveOverlay" onclick="cancelArchive(event)">
   <div class="archive-sheet">
     <div class="archive-sheet-title">Archive task?</div>
@@ -327,10 +378,10 @@ function renderTasks() {
     t.status !== 'Done' && t.status !== 'Withdrawn' &&
     (activeFilter === 'All' || t.bucket === activeFilter)
   );
-  const done = allTasks.filter(t =>
-    t.status === 'Done' &&
-    (activeFilter === 'All' || t.bucket === activeFilter)
-  ).slice(-5);
+  const done = allTasks
+    .filter(t => t.status === 'Done' && (activeFilter === 'All' || t.bucket === activeFilter))
+    .sort((a, b) => (b.completed_date || '').localeCompare(a.completed_date || ''))
+    .slice(0, 5);
 
   document.getElementById('countBadge').textContent = open.length + ' open';
 
@@ -354,9 +405,10 @@ function card(t) {
   const isOpen = expandedId === id;
   const projectLabel = t.project_name || t.project_id || '';
   return `
+  <div class="task-card-wrap" id="wrap-${esc(id)}">
+    <div class="swipe-reveal">Archive</div>
   <div class="task-card${isDone?' done':''}" id="card-${esc(id)}"
-       onmousedown="lpStart(event,'${esc(id)}')" onmouseup="lpCancel()" onmouseleave="lpCancel()"
-       ontouchstart="lpStart(event,'${esc(id)}')" ontouchend="lpCancel()" ontouchmove="lpCancel()">
+       ontouchstart="swipeStart(event,'${esc(id)}')" ontouchmove="swipeMove(event,'${esc(id)}')" ontouchend="swipeEnd(event,'${esc(id)}')">
     <div class="task-main">
       <button class="check-btn" onclick="completeTask('${esc(id)}')" aria-label="Complete">
         <div class="check-circle">
@@ -382,6 +434,7 @@ function card(t) {
         <button class="note-save-btn" onclick="saveNote('${esc(id)}')">Save</button>
       </div>
     </div>
+  </div>
   </div>`;
 }
 
@@ -429,13 +482,41 @@ async function saveNote(taskId) {
   }
 }
 
+let _pendingAddDesc = null;
+
 async function quickAdd() {
   const inp = document.getElementById('quickAdd');
   const desc = inp.value.trim();
   if (!desc) return;
-  const bucket = activeFilter === 'All' ? 'Nursery' : activeFilter;
+
+  if (activeFilter === 'All') {
+    inp.blur();
+    _pendingAddDesc = desc;
+    document.getElementById('bucketDesc').textContent = desc;
+    document.getElementById('bucketOverlay').classList.add('show');
+    return;
+  }
+
   inp.value = '';
   inp.blur();
+  await _submitAdd(desc, activeFilter);
+}
+
+async function pickBucket(bucket) {
+  const desc = _pendingAddDesc;
+  _pendingAddDesc = null;
+  document.getElementById('bucketOverlay').classList.remove('show');
+  document.getElementById('quickAdd').value = '';
+  await _submitAdd(desc, bucket);
+}
+
+function cancelBucketPick(e) {
+  if (e && e.target !== document.getElementById('bucketOverlay')) return;
+  document.getElementById('bucketOverlay').classList.remove('show');
+  _pendingAddDesc = null;
+}
+
+async function _submitAdd(desc, bucket) {
   showToast('Adding…', '');
   try {
     const r = await post({ action: 'add_task', description: desc, bucket });
@@ -547,22 +628,70 @@ function hideTranscript() {
   document.getElementById('main').classList.remove('with-transcript');
 }
 
-// ── LONG-PRESS ARCHIVE ────────────────────────────────────
-let _lpTimer = null;
+// ── SWIPE-LEFT ARCHIVE ────────────────────────────────────
+const SWIPE_THRESHOLD = 72;  // px left to trigger
+let _swipeStartX = null;
+let _swipeStartY = null;
+let _swipeLocked = false;     // true once we've decided horizontal
 let _pendingArchiveId = null;
 
-function lpStart(e, taskId) {
+function swipeStart(e, taskId) {
   const card = document.getElementById('card-' + taskId);
   if (card && card.classList.contains('done')) return;
-  lpCancel();
-  _lpTimer = setTimeout(() => {
-    _lpTimer = null;
-    showArchiveConfirm(taskId);
-  }, 600);
+  const t = e.touches[0];
+  _swipeStartX = t.clientX;
+  _swipeStartY = t.clientY;
+  _swipeLocked = false;
 }
 
-function lpCancel() {
-  if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+function swipeMove(e, taskId) {
+  if (_swipeStartX === null) return;
+  const t = e.touches[0];
+  const dx = t.clientX - _swipeStartX;
+  const dy = t.clientY - _swipeStartY;
+
+  // Decide axis on first significant movement
+  if (!_swipeLocked) {
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    if (Math.abs(dy) > Math.abs(dx)) { _swipeStartX = null; return; } // vertical scroll wins
+    _swipeLocked = true;
+  }
+
+  if (dx >= 0) { _resetSwipe(taskId); return; }
+  e.preventDefault();
+
+  const shift = Math.max(dx, -SWIPE_THRESHOLD - 20);
+  const card  = document.getElementById('card-' + taskId);
+  const wrap  = document.getElementById('wrap-' + taskId);
+  if (card) card.style.transition = 'none';
+  if (card) card.style.transform  = `translateX(${shift}px)`;
+  if (wrap) wrap.classList.toggle('swiping', shift < -12);
+}
+
+function swipeEnd(e, taskId) {
+  if (_swipeStartX === null) return;
+  const t   = e.changedTouches[0];
+  const dx  = t.clientX - _swipeStartX;
+  _swipeStartX = null;
+  _swipeStartY = null;
+
+  const card = document.getElementById('card-' + taskId);
+  const wrap = document.getElementById('wrap-' + taskId);
+
+  if (dx < -SWIPE_THRESHOLD) {
+    // Snap out, then show confirm
+    if (card) { card.style.transition = 'transform 0.18s ease'; card.style.transform = `translateX(-${SWIPE_THRESHOLD + 20}px)`; }
+    setTimeout(() => { _resetSwipe(taskId); showArchiveConfirm(taskId); }, 180);
+  } else {
+    _resetSwipe(taskId);
+  }
+}
+
+function _resetSwipe(taskId) {
+  const card = document.getElementById('card-' + taskId);
+  const wrap = document.getElementById('wrap-' + taskId);
+  if (card) { card.style.transition = 'transform 0.2s ease'; card.style.transform = ''; }
+  if (wrap) wrap.classList.remove('swiping');
 }
 
 function showArchiveConfirm(taskId) {
