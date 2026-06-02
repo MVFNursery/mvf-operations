@@ -1,0 +1,21 @@
+{
+  "name": "MVFN Observe",
+  "short_name": "Observe",
+  "description": "MVFN field observation capture",
+  "start_url": "/mvf-operations/mvfn_observe.html",
+  "scope": "/mvf-operations/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1a08",
+  "theme_color": "#1a2e0f",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/mvf-operations/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "lifestyle"]
+}

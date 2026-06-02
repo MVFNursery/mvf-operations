@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Observe">
+<meta name="theme-color" content="#1a2e0f">
+<link rel="manifest" href="field-manifest.json">
+<title>MVFN Observe</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #0f1a08; --bg2: #1a2e0f; --bg3: #243d18; --surface: #1e3512;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.15);
+    --text: #e8f0e0; --text2: #9ab88a; --text3: #6a8a5a;
+    --green: #7ecf4f; --green-dim: #4a8a28;
+    --amber: #f0b840; --red: #e05050; --blue: #4a9fd4;
+    --radius: 14px;
+  }
+  html, body {
+    height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px; overscroll-behavior: none; user-select: none;
+  }
+
+  /* ── SCREENS ── */
+  .screen { display: none; flex-direction: column; height: 100%; padding: env(safe-area-inset-top,16px) 20px env(safe-area-inset-bottom,20px); }
+  .screen.active { display: flex; }
+
+  /* ── HEADER ── */
+  .hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0 20px;
+  }
+  .hdr-logo { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; color: var(--green); text-transform: uppercase; }
+  .hdr-nav { font-size: 13px; color: var(--text3); cursor: pointer; padding: 6px; }
+  .hdr-nav:active { opacity: 0.6; }
+
+  /* ── READY SCREEN ── */
+  #screenReady { justify-content: space-between; }
+
+  .type-selector {
+    display: flex; gap: 8px; justify-content: center; padding-bottom: 8px;
+  }
+  .type-btn {
+    flex: 1; padding: 10px 6px; border-radius: 10px;
+    border: 1px solid var(--border2); background: var(--bg3);
+    color: var(--text2); font-size: 12px; font-family: inherit;
+    cursor: pointer; text-align: center; transition: all 0.12s;
+  }
+  .type-btn.active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .type-btn .type-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+
+  .hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
+
+  .observe-btn {
+    width: 180px; height: 180px; border-radius: 50%;
+    background: var(--green-dim); border: 3px solid var(--green);
+    color: var(--green); font-size: 16px; font-weight: 700;
+    font-family: inherit; cursor: pointer; letter-spacing: 0.08em;
+    text-transform: uppercase; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+  }
+  .observe-btn .btn-icon { font-size: 44px; line-height: 1; }
+  .observe-btn:active { transform: scale(0.95); background: #3a7020; }
+
+  .gps-status { font-size: 12px; color: var(--text3); text-align: center; }
+  .gps-status.ok { color: var(--green); }
+  .gps-status.err { color: var(--red); }
+
+  .photo-row { display: flex; gap: 12px; width: 100%; }
+  .photo-btn {
+    flex: 1; height: 52px; border-radius: 10px;
+    border: 1px solid var(--border2); background: var(--bg3);
+    color: var(--text2); font-size: 14px; font-family: inherit; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .photo-btn:active { background: var(--bg2); }
+  #photoPreviewWrap { display: none; }
+  #photoPreview { width: 100%; max-height: 140px; object-fit: cover; border-radius: 10px; }
+  .photo-clear {
+    position: absolute; top: 6px; right: 6px; width: 28px; height: 28px;
+    border-radius: 50%; background: rgba(0,0,0,0.7); border: none;
+    color: white; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .photo-wrap-inner { position: relative; }
+
+  /* Species fields — only shown for plant_id */
+  .species-fields { display: none; width: 100%; }
+  .species-fields.show { display: block; }
+  .field-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .species-input {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 10px 14px; color: var(--text);
+    font-size: 14px; font-family: inherit; user-select: text;
+  }
+  .species-input:focus { outline: none; border-color: var(--green-dim); }
+  .conf-row { display: flex; gap: 8px; margin-top: 10px; }
+  .conf-btn {
+    flex: 1; height: 40px; border-radius: 8px;
+    border: 1px solid var(--border2); background: var(--bg3);
+    color: var(--text3); font-size: 13px; font-family: inherit; cursor: pointer;
+  }
+  .conf-btn.active.tentative { background: rgba(240,184,64,0.15); border-color: var(--amber); color: var(--amber); }
+  .conf-btn.active.confirmed { background: rgba(126,207,79,0.15); border-color: var(--green); color: var(--green); }
+
+  /* ── LISTENING SCREEN ── */
+  #screenListening { align-items: center; justify-content: space-between; }
+
+  .listen-top { display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 20px; }
+  .listen-indicator {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: rgba(224,80,80,0.15); border: 2px solid var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; animation: listenPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes listenPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(224,80,80,0.4); }
+    50% { box-shadow: 0 0 0 16px rgba(224,80,80,0); }
+  }
+  .listen-label { font-size: 13px; color: var(--text3); letter-spacing: 0.05em; }
+
+  .transcript-area {
+    flex: 1; width: 100%; margin: 20px 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+  }
+  .transcript-final { font-size: 15px; line-height: 1.6; color: var(--text); }
+  .transcript-interim { font-size: 15px; line-height: 1.6; color: var(--text3); font-style: italic; }
+
+  .stop-btn {
+    width: 100%; height: 56px; border-radius: 12px;
+    background: var(--red); border: none;
+    color: white; font-size: 16px; font-weight: 700;
+    font-family: inherit; cursor: pointer; letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+  .stop-btn:active { opacity: 0.85; }
+  .stop-hint { font-size: 12px; color: var(--text3); text-align: center; }
+
+  /* ── REVIEW SCREEN ── */
+  #screenReview { justify-content: space-between; }
+
+  .review-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .review-transcript {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; overflow-y: auto;
+    -webkit-overflow-scrolling: touch; font-size: 15px; line-height: 1.6;
+    margin-bottom: 16px; user-select: text;
+  }
+  .review-photo { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; margin-bottom: 16px; }
+  .review-species { margin-bottom: 16px; }
+
+  .review-actions { display: flex; flex-direction: column; gap: 10px; }
+  .submit-btn {
+    width: 100%; height: 56px; border-radius: 12px;
+    background: var(--green-dim); border: none;
+    color: var(--green); font-size: 16px; font-weight: 700;
+    font-family: inherit; cursor: pointer; position: relative; overflow: hidden;
+  }
+  .submit-btn:active { opacity: 0.85; }
+  .submit-countdown {
+    position: absolute; bottom: 0; left: 0; height: 3px;
+    background: var(--green); transition: width 0.1s linear;
+  }
+  .more-btn {
+    width: 100%; height: 48px; border-radius: 12px;
+    border: 1px solid var(--border2); background: transparent;
+    color: var(--text2); font-size: 15px; font-family: inherit; cursor: pointer;
+  }
+  .more-btn:active { background: var(--bg3); }
+  .discard-btn {
+    width: 100%; height: 40px; border: none; background: transparent;
+    color: var(--text3); font-size: 13px; font-family: inherit; cursor: pointer;
+  }
+
+  /* ── SUBMITTING ── */
+  #screenSubmitting { align-items: center; justify-content: center; gap: 20px; }
+  .spinner { width: 44px; height: 44px; border: 3px solid var(--border2); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .submit-msg { color: var(--text3); font-size: 15px; }
+
+  /* ── SUCCESS ── */
+  #screenSuccess { align-items: center; justify-content: center; gap: 16px; }
+  .success-icon { font-size: 64px; }
+  .success-msg { font-size: 20px; font-weight: 600; color: var(--green); }
+  .success-sub { font-size: 14px; color: var(--text3); }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 32px; left: 50%;
+    transform: translateX(-50%) translateY(6px);
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text); font-size: 13px; padding: 9px 18px;
+    border-radius: 99px; opacity: 0; transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none; white-space: nowrap; z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+
+  /* ── FIELD APP LINK ── */
+  .field-link {
+    text-align: center; padding-bottom: 4px;
+  }
+  .field-link a { font-size: 12px; color: var(--text3); text-decoration: none; }
+  .field-link a:active { opacity: 0.6; }
+</style>
+</head>
+<body>
+
+<!-- ── READY ─────────────────────────────────────────────── -->
+<div class="screen active" id="screenReady">
+  <div class="hdr">
+    <span class="hdr-logo">MVFN Observe</span>
+    <span class="hdr-nav" onclick="goToField()">Tasks →</span>
+  </div>
+
+  <div class="type-selector">
+    <button class="type-btn active" id="typeVoice" onclick="setType('voice',this)">
+      <span class="type-icon">🎙️</span>Voice Note
+    </button>
+    <button class="type-btn" id="typePlant" onclick="setType('plant_id',this)">
+      <span class="type-icon">🌿</span>Plant ID
+    </button>
+    <button class="type-btn" id="typePest" onclick="setType('pest_disease',this)">
+      <span class="type-icon">🔍</span>Pest / Disease
+    </button>
+  </div>
+
+  <div class="hero">
+    <div>
+      <button class="observe-btn" id="observeBtn" onclick="startObserving()">
+        <span class="btn-icon">🎤</span>
+        Observe
+      </button>
+    </div>
+    <div class="gps-status" id="gpsStatus">Acquiring GPS…</div>
+  </div>
+
+  <div style="width:100%;display:flex;flex-direction:column;gap:12px">
+    <div class="species-fields" id="speciesFields">
+      <div class="field-label">Tentative Species</div>
+      <input class="species-input" id="speciesInput" type="text" placeholder="e.g. Coreopsis lanceolata" autocorrect="off" autocapitalize="words">
+      <div class="conf-row">
+        <button class="conf-btn tentative active" id="confTentative" onclick="setConf('tentative')">Tentative</button>
+        <button class="conf-btn confirmed" id="confConfirmed" onclick="setConf('confirmed')">Confirmed</button>
+      </div>
+    </div>
+
+    <div id="photoPreviewWrap">
+      <div class="photo-wrap-inner">
+        <img id="photoPreview" src="" alt="Photo preview">
+        <button class="photo-clear" onclick="clearPhoto()">✕</button>
+      </div>
+    </div>
+
+    <div class="photo-row">
+      <button class="photo-btn" onclick="document.getElementById('photoInput').click()">
+        📷 Add Photo
+      </button>
+    </div>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
+
+    <div class="field-link">
+      <a href="mvfn_field.html">← Field Tasks</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── LISTENING ──────────────────────────────────────────── -->
+<div class="screen" id="screenListening">
+  <div class="hdr">
+    <span class="hdr-logo">MVFN Observe</span>
+  </div>
+  <div class="listen-top">
+    <div class="listen-indicator">🎤</div>
+    <div class="listen-label">Listening — say "done" to finish</div>
+  </div>
+
+  <div class="transcript-area" id="transcriptArea">
+    <span class="transcript-final" id="transcriptFinal"></span><span class="transcript-interim" id="transcriptInterim"></span>
+  </div>
+
+  <div>
+    <button class="stop-btn" onclick="stopListening()">Stop & Review</button>
+    <div class="stop-hint">or say "done" / "that's it" / "submit"</div>
+  </div>
+</div>
+
+<!-- ── REVIEW ─────────────────────────────────────────────── -->
+<div class="screen" id="screenReview">
+  <div class="hdr">
+    <span class="hdr-logo">Review Observation</span>
+    <span class="hdr-nav" onclick="discardObservation()">Discard</span>
+  </div>
+
+  <div class="review-label">Transcript</div>
+  <div class="review-transcript" id="reviewTranscript"></div>
+
+  <img class="review-photo" id="reviewPhoto" src="" alt="" style="display:none">
+
+  <div class="review-species" id="reviewSpeciesWrap" style="display:none">
+    <div class="field-label">Species</div>
+    <input class="species-input" id="reviewSpeciesInput" type="text" placeholder="e.g. Coreopsis lanceolata" autocorrect="off" autocapitalize="words">
+    <div class="conf-row">
+      <button class="conf-btn tentative active" id="reviewConfTentative" onclick="setReviewConf('tentative')">Tentative</button>
+      <button class="conf-btn confirmed" id="reviewConfConfirmed" onclick="setReviewConf('confirmed')">Confirmed</button>
+    </div>
+  </div>
+
+  <div class="review-actions">
+    <button class="submit-btn" id="submitBtn" onclick="submitObservation()">
+      Submit Observation
+      <div class="submit-countdown" id="submitCountdown" style="width:100%"></div>
+    </button>
+    <button class="more-btn" onclick="addMore()">+ Add More</button>
+    <button class="discard-btn" onclick="discardObservation()">Discard</button>
+  </div>
+</div>
+
+<!-- ── SUBMITTING ─────────────────────────────────────────── -->
+<div class="screen" id="screenSubmitting">
+  <div class="spinner"></div>
+  <div class="submit-msg">Saving observation…</div>
+</div>
+
+<!-- ── SUCCESS ────────────────────────────────────────────── -->
+<div class="screen" id="screenSuccess">
+  <div class="success-icon">✅</div>
+  <div class="success-msg">Observation saved</div>
+  <div class="success-sub" id="successSub"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────
+const N8N_BASE = 'https://megamachine.taile865b6.ts.net:5678/webhook';
+const OBSERVE_WEBHOOK = N8N_BASE + '/mvfn-observe';
+// ─────────────────────────────────────────────────────────
+
+// ── STATE ─────────────────────────────────────────────────
+let obsType = 'voice';
+let speciesConf = 'tentative';
+let reviewSpeciesConf = 'tentative';
+let gpsCoords = null;
+let photoDataUrl = null;
+let photoFile = null;
+let finalTranscript = '';
+let recognition = null;
+let isListening = false;
+let countdownTimer = null;
+let countdownInterval = null;
+const COUNTDOWN_MS = 10000;
+
+// ── GPS ───────────────────────────────────────────────────
+function initGPS() {
+  if (!navigator.geolocation) {
+    setGPSStatus('GPS not available', 'err');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+      const acc = Math.round(pos.coords.accuracy);
+      setGPSStatus(`GPS ±${acc}m`, 'ok');
+    },
+    err => {
+      setGPSStatus('GPS unavailable', 'err');
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function setGPSStatus(msg, cls) {
+  const el = document.getElementById('gpsStatus');
+  el.textContent = msg;
+  el.className = 'gps-status' + (cls ? ' ' + cls : '');
+}
+
+// ── OBS TYPE ──────────────────────────────────────────────
+function setType(type, el) {
+  obsType = type;
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('speciesFields').classList.toggle('show', type === 'plant_id');
+  document.getElementById('reviewSpeciesWrap').style.display = type === 'plant_id' ? '' : 'none';
+}
+
+// ── AUDIO ─────────────────────────────────────────────────
+function playTone(freq, duration, type = 'sine', gain = 0.3) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gainNode.gain.setValueAtTime(gain, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  } catch(e) {}
+}
+
+function playChirp()  { playTone(880, 0.12); }   // start: short high beep
+function playDing()   { playTone(660, 0.25); setTimeout(() => playTone(880, 0.2), 120); } // done: two-tone
+
+// ── PHOTO ─────────────────────────────────────────────────
+function handlePhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  photoFile = input.files[0];
+  const reader = new FileReader();
+  reader.onload = e => {
+    photoDataUrl = e.target.result;
+    document.getElementById('photoPreview').src = photoDataUrl;
+    document.getElementById('photoPreviewWrap').style.display = '';
+  };
+  reader.readAsDataURL(photoFile);
+}
+
+function clearPhoto() {
+  photoDataUrl = null;
+  photoFile = null;
+  document.getElementById('photoPreviewWrap').style.display = 'none';
+  document.getElementById('photoInput').value = '';
+}
+
+// ── VOICE ─────────────────────────────────────────────────
+function startObserving() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    showToast('Voice not supported in this browser', 'error');
+    return;
+  }
+  finalTranscript = '';
+  document.getElementById('transcriptFinal').textContent = '';
+  document.getElementById('transcriptInterim').textContent = '';
+  showScreen('screenListening');
+  playChirp();
+  startRecognition();
+}
+
+function startRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) {
+        finalTranscript += r[0].transcript + ' ';
+      } else {
+        interim += r[0].transcript;
+      }
+    }
+    document.getElementById('transcriptFinal').textContent = finalTranscript;
+    document.getElementById('transcriptInterim').textContent = interim;
+
+    // Auto-scroll transcript
+    const ta = document.getElementById('transcriptArea');
+    ta.scrollTop = ta.scrollHeight;
+
+    // Check for stop commands in final results
+    const lower = finalTranscript.toLowerCase();
+    const stopWords = ['done.', 'done', "that's it", 'submit', 'send it', 'finished', 'that is it'];
+    if (stopWords.some(w => lower.trimEnd().endsWith(w))) {
+      // Strip the stop command from the transcript
+      stopWords.forEach(w => {
+        finalTranscript = finalTranscript.replace(new RegExp('\\s*' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'i'), ' ').trimEnd();
+      });
+      stopListening();
+    }
+  };
+
+  recognition.onerror = e => {
+    if (e.error === 'no-speech') return; // normal, keep going
+    showToast('Mic error: ' + e.error, 'error');
+    stopListening();
+  };
+
+  // On mobile, continuous recognition sometimes ends on its own — restart it
+  recognition.onend = () => {
+    if (isListening) {
+      try { recognition.start(); } catch(e) {}
+    }
+  };
+
+  isListening = true;
+  recognition.start();
+}
+
+function stopListening() {
+  isListening = false;
+  if (recognition) { try { recognition.stop(); } catch(e) {} recognition = null; }
+  playDing();
+
+  finalTranscript = finalTranscript.trim();
+  if (!finalTranscript && !photoDataUrl) {
+    showToast('Nothing recorded', 'error');
+    showScreen('screenReady');
+    return;
+  }
+
+  // Pre-fill species from voice if plant_id mode
+  if (obsType === 'plant_id') {
+    const guessed = extractSpeciesFromTranscript(finalTranscript);
+    if (guessed) {
+      document.getElementById('speciesInput').value = guessed;
+      document.getElementById('reviewSpeciesInput').value = guessed;
+    } else {
+      document.getElementById('reviewSpeciesInput').value = document.getElementById('speciesInput').value;
+    }
+    document.getElementById('reviewSpeciesWrap').style.display = '';
+  } else {
+    document.getElementById('reviewSpeciesWrap').style.display = 'none';
+  }
+
+  document.getElementById('reviewTranscript').textContent = finalTranscript || '(no transcript — photo only)';
+
+  const rp = document.getElementById('reviewPhoto');
+  if (photoDataUrl) { rp.src = photoDataUrl; rp.style.display = ''; }
+  else { rp.style.display = 'none'; }
+
+  showScreen('screenReview');
+  startCountdown();
+}
+
+function extractSpeciesFromTranscript(text) {
+  // Look for "it's a [X]", "might be [X]", "looks like [X]", "probably [X]", "possibly [X]", "coreopsis", etc.
+  const patterns = [
+    /(?:might be|could be|looks like|probably|possibly|it's a|its a|think it's|think its|i think|i see)\s+([A-Z][a-z]+(?:\s+[a-z]+)?)/i,
+    /\b([A-Z][a-z]+ [a-z]+)\b/,  // bare binomial
+  ];
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+// ── COUNTDOWN ─────────────────────────────────────────────
+function startCountdown() {
+  clearCountdown();
+  const bar = document.getElementById('submitCountdown');
+  const btn = document.getElementById('submitBtn');
+  let remaining = COUNTDOWN_MS;
+  bar.style.width = '100%';
+  bar.style.transition = 'none';
+
+  countdownInterval = setInterval(() => {
+    remaining -= 100;
+    bar.style.width = Math.max(0, (remaining / COUNTDOWN_MS) * 100) + '%';
+    if (remaining <= 0) { clearCountdown(); submitObservation(); }
+  }, 100);
+}
+
+function clearCountdown() {
+  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  const bar = document.getElementById('submitCountdown');
+  if (bar) bar.style.width = '100%';
+}
+
+// ── REVIEW ACTIONS ────────────────────────────────────────
+function addMore() {
+  clearCountdown();
+  document.getElementById('transcriptFinal').textContent = finalTranscript + ' ';
+  document.getElementById('transcriptInterim').textContent = '';
+  showScreen('screenListening');
+  playChirp();
+  startRecognition();
+}
+
+function discardObservation() {
+  clearCountdown();
+  finalTranscript = '';
+  clearPhoto();
+  document.getElementById('speciesInput').value = '';
+  showScreen('screenReady');
+}
+
+function setConf(val) {
+  speciesConf = val;
+  document.getElementById('confTentative').classList.toggle('active', val === 'tentative');
+  document.getElementById('confConfirmed').classList.toggle('active', val === 'confirmed');
+}
+
+function setReviewConf(val) {
+  reviewSpeciesConf = val;
+  document.getElementById('reviewConfTentative').classList.toggle('active', val === 'tentative');
+  document.getElementById('reviewConfConfirmed').classList.toggle('active', val === 'confirmed');
+}
+
+// ── SUBMIT ────────────────────────────────────────────────
+async function submitObservation() {
+  clearCountdown();
+  showScreen('screenSubmitting');
+
+  const speciesName = obsType === 'plant_id'
+    ? (document.getElementById('reviewSpeciesInput').value.trim() || document.getElementById('speciesInput').value.trim())
+    : null;
+
+  const payload = {
+    obs_type:     obsType,
+    transcript:   finalTranscript || null,
+    species_name: speciesName || null,
+    species_conf: speciesName ? reviewSpeciesConf : 'tentative',
+    photo_b64:    photoDataUrl ? photoDataUrl.split(',')[1] : null,
+    photo_mime:   photoFile ? photoFile.type : null,
+    photo_name:   photoFile ? photoFile.name : null,
+    lat:          gpsCoords ? gpsCoords.lat : null,
+    lng:          gpsCoords ? gpsCoords.lng : null,
+    gps_accuracy: gpsCoords ? gpsCoords.acc : null,
+  };
+
+  try {
+    const r = await fetch(OBSERVE_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok && data.status === 'ok') {
+      const parts = [];
+      if (finalTranscript) parts.push('Voice note saved');
+      if (photoDataUrl) parts.push('Photo queued for analysis');
+      if (gpsCoords) parts.push(`GPS ±${Math.round(gpsCoords.acc)}m`);
+      document.getElementById('successSub').textContent = parts.join(' · ');
+      showScreen('screenSuccess');
+
+      // Reset and return to ready after 2.5s
+      setTimeout(() => {
+        finalTranscript = '';
+        clearPhoto();
+        document.getElementById('speciesInput').value = '';
+        document.getElementById('reviewSpeciesInput').value = '';
+        showScreen('screenReady');
+        initGPS(); // refresh GPS for next observation
+      }, 2500);
+    } else {
+      showScreen('screenReview');
+      startCountdown();
+      showToast('Save failed — check Tailscale', 'error');
+    }
+  } catch(e) {
+    showScreen('screenReview');
+    startCountdown();
+    showToast('Save failed — check Tailscale', 'error');
+  }
+}
+
+// ── UTILS ─────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => { t.className = 'toast'; }, 2800);
+}
+
+function goToField() {
+  window.location.href = 'mvfn_field.html';
+}
+
+// ── INIT ──────────────────────────────────────────────────
+initGPS();
+</script>
+</body>
+</html>

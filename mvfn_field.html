@@ -77,7 +77,24 @@
     color: var(--text2); font-size: 12px; font-family: inherit; cursor: pointer;
   }
   .filter-chip.active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .filter-chip.active.proposed-chip { background: rgba(240,184,64,0.15); border-color: var(--amber); color: var(--amber); }
   .filter-chip:active { opacity: 0.7; }
+
+  /* PROPOSED CARD */
+  .task-card.proposed { border-color: rgba(240,184,64,0.3); background: rgba(240,184,64,0.04); }
+  .proposed-actions { display: flex; gap: 8px; padding: 0 12px 12px 56px; }
+  .accept-btn {
+    flex: 1; height: 36px; border-radius: 8px; border: none;
+    background: var(--green-dim); color: var(--green);
+    font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+  }
+  .accept-btn:active { opacity: 0.8; }
+  .dismiss-btn {
+    flex: 1; height: 36px; border-radius: 8px;
+    border: 1px solid var(--border2); background: transparent;
+    color: var(--text3); font-size: 13px; font-family: inherit; cursor: pointer;
+  }
+  .dismiss-btn:active { opacity: 0.7; }
 
   /* VOICE TRANSCRIPT BAR */
   .transcript-bar {
@@ -286,6 +303,7 @@
   <button class="filter-chip" onclick="setFilter('Property',this)">Property</button>
   <button class="filter-chip" onclick="setFilter('Biz-Infra',this)">Biz-Infra</button>
   <button class="filter-chip" onclick="setFilter('Personal',this)">Personal</button>
+  <button class="filter-chip" id="proposedChip" onclick="setFilter('Proposed',this)">Proposed</button>
 </div>
 
 <div class="transcript-bar" id="transcriptBar"></div>
@@ -368,14 +386,34 @@ function setFilter(bucket, el) {
   activeFilter = bucket;
   document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
+  if (bucket === 'Proposed') el.classList.add('proposed-chip');
   renderTasks();
 }
 
 // ── RENDER ────────────────────────────────────────────────
 function renderTasks() {
   const list = document.getElementById('taskList');
+
+  if (activeFilter === 'Proposed') {
+    const proposed = allTasks.filter(t => t.status === 'Proposed');
+    const chip = document.getElementById('proposedChip');
+    if (chip) chip.textContent = proposed.length ? `Proposed (${proposed.length})` : 'Proposed';
+    document.getElementById('countBadge').textContent = proposed.length + ' proposed';
+    if (!proposed.length) {
+      list.innerHTML = '<div class="empty">No proposed tasks.<br><small>Observations are processed overnight.</small></div>';
+      return;
+    }
+    list.innerHTML = proposed.map(t => proposedCard(t)).join('');
+    return;
+  }
+
+  // Update proposed chip count badge
+  const proposedCount = allTasks.filter(t => t.status === 'Proposed').length;
+  const chip = document.getElementById('proposedChip');
+  if (chip) chip.textContent = proposedCount ? `Proposed (${proposedCount})` : 'Proposed';
+
   const open = allTasks.filter(t =>
-    t.status !== 'Done' && t.status !== 'Withdrawn' &&
+    t.status !== 'Done' && t.status !== 'Withdrawn' && t.status !== 'Proposed' &&
     (activeFilter === 'All' || t.bucket === activeFilter)
   );
   const done = allTasks
@@ -397,6 +435,31 @@ function renderTasks() {
     done.forEach(t => { html += card(t); });
   }
   list.innerHTML = html;
+}
+
+function proposedCard(t) {
+  const id = t.task_id || '';
+  const projectLabel = t.project_name || t.project_id || '';
+  return `
+  <div class="task-card-wrap" id="wrap-${esc(id)}">
+    <div class="task-card proposed" id="card-${esc(id)}">
+      <div class="task-main">
+        <div style="width:56px;min-height:64px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💡</div>
+        <div class="task-content" onclick="toggleExpand('${esc(id)}')">
+          <div class="task-desc">${escH(t.description||'(no description)')}</div>
+          <div class="task-meta">
+            ${t.bucket?`<span class="badge badge-bucket">${escH(t.bucket)}</span>`:''}
+            ${t.effort?`<span class="badge badge-effort">${escH(t.effort)}</span>`:''}
+            ${projectLabel?`<span class="badge badge-project">${escH(projectLabel)}</span>`:''}
+          </div>
+        </div>
+      </div>
+      <div class="proposed-actions">
+        <button class="accept-btn" onclick="acceptTask('${esc(id)}')">✓ Accept</button>
+        <button class="dismiss-btn" onclick="dismissTask('${esc(id)}')">Dismiss</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 function card(t) {
@@ -743,6 +806,48 @@ async function confirmArchive() {
   } catch(e) {
     if (card) card.style.opacity = '';
     showToast('Archive failed — check connection', 'error');
+  }
+}
+
+// ── PROPOSED ACTIONS ─────────────────────────────────────
+async function acceptTask(taskId) {
+  const card = document.getElementById('card-' + taskId);
+  if (card) card.style.opacity = '0.4';
+  showToast('Accepting…', '');
+  try {
+    const r = await post({ action: 'accept_task', task_id: taskId });
+    if (r.status === 'ok') {
+      const t = allTasks.find(x => x.task_id === taskId);
+      if (t) t.status = 'Todo';
+      showToast('Added to tasks ✓', 'success');
+      renderTasks();
+    } else {
+      if (card) card.style.opacity = '';
+      showToast('Failed', 'error');
+    }
+  } catch(e) {
+    if (card) card.style.opacity = '';
+    showToast('Failed — check connection', 'error');
+  }
+}
+
+async function dismissTask(taskId) {
+  const card = document.getElementById('card-' + taskId);
+  if (card) card.style.opacity = '0.4';
+  showToast('Dismissing…', '');
+  try {
+    const r = await post({ action: 'dismiss_task', task_id: taskId });
+    if (r.status === 'ok') {
+      allTasks = allTasks.filter(x => x.task_id !== taskId);
+      showToast('Dismissed', '');
+      renderTasks();
+    } else {
+      if (card) card.style.opacity = '';
+      showToast('Failed', 'error');
+    }
+  } catch(e) {
+    if (card) card.style.opacity = '';
+    showToast('Failed — check connection', 'error');
   }
 }
 
