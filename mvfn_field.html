@@ -545,6 +545,7 @@ function toggleExpand(id) {
 // ── VOICE ─────────────────────────────────────────────────
 let recognition = null;
 let isListening = false;
+let _voiceTargetEl = null;  // element focused when mic was tapped
 
 function toggleVoice() {
   if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -555,6 +556,10 @@ function toggleVoice() {
     recognition.stop();
     return;
   }
+  // Capture focused element before mic steals focus
+  const focused = document.activeElement;
+  _voiceTargetEl = (focused && focused.classList.contains('note-input')) ? focused : null;
+
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SR();
   recognition.continuous = false;
@@ -588,6 +593,15 @@ function stopListening() {
 }
 
 function handleVoiceCommand(text) {
+  // If mic was tapped while a note field was focused, pipe transcript there
+  if (_voiceTargetEl) {
+    _voiceTargetEl.value = text;
+    _voiceTargetEl.focus();
+    showTranscript('Note: ' + text);
+    _voiceTargetEl = null;
+    return;
+  }
+
   const lower = text.toLowerCase();
   // "add task [description]" or "new task [description]"
   if (lower.startsWith('add task ') || lower.startsWith('new task ')) {
@@ -612,7 +626,7 @@ function handleVoiceCommand(text) {
     }
     return;
   }
-  // Default — put in the add field
+  // Default — put in the quick-add field
   document.getElementById('quickAdd').value = text;
   showTranscript('Tap + to add: ' + text);
 }
@@ -733,11 +747,19 @@ async function confirmArchive() {
 }
 
 // ── UTILS ─────────────────────────────────────────────────
+// Escape single quotes for n8n's raw SQL interpolation
+function sqlEsc(s) { return (s || '').replace(/'/g, "''"); }
+
 async function post(body) {
+  // Sanitize string fields that land in n8n SQL templates
+  const safe = { ...body };
+  ['description', 'notes', 'task_id'].forEach(k => {
+    if (typeof safe[k] === 'string') safe[k] = sqlEsc(safe[k]);
+  });
   const r = await fetch(WEBHOOK_POST, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify(safe)
   });
   return r.json();
 }
