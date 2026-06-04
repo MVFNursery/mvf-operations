@@ -62,6 +62,14 @@
   .mic-btn.listening { background: var(--red); color: white; animation: pulse 1s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
+  .observe-link {
+    width: 34px; height: 34px; background: var(--bg3);
+    border-radius: 8px; color: var(--text2); font-size: 17px;
+    display: flex; align-items: center; justify-content: center;
+    text-decoration: none;
+  }
+  .observe-link:active { opacity: 0.6; }
+
   /* FILTER BAR */
   .filter-bar {
     position: fixed; top: var(--header); left: 0; right: 0; height: var(--filter);
@@ -295,6 +303,7 @@
   <span class="header-count" id="countBadge">—</span>
   <button class="mic-btn" id="micBtn" onclick="toggleVoice()" title="Voice input">🎤</button>
   <button class="refresh-btn" onclick="loadTasks()" title="Refresh">↻</button>
+  <a class="observe-link" href="mvfn_observe.html" title="Observe">🌿</a>
 </div>
 
 <div class="filter-bar">
