@@ -380,6 +380,24 @@ const N8N_BASE = 'https://megamachine.taile865b6.ts.net:5678/webhook';
 const OBSERVE_WEBHOOK = N8N_BASE + '/mvfn-observe';
 // ─────────────────────────────────────────────────────────
 
+// ── DEVICE TOKEN ─────────────────────────────────────────
+function getDeviceToken() {
+  // ?token=<uuid> in the URL seeds this device (one-time provisioning)
+  const urlToken = new URLSearchParams(location.search).get('token');
+  if (urlToken) {
+    localStorage.setItem('mvfn_device_token', urlToken);
+    history.replaceState(null, '', location.pathname);
+  }
+  let t = localStorage.getItem('mvfn_device_token');
+  if (!t) {
+    t = crypto.randomUUID();
+    localStorage.setItem('mvfn_device_token', t);
+  }
+  return t;
+}
+const DEVICE_TOKEN = getDeviceToken();
+// ─────────────────────────────────────────────────────────
+
 // ── STATE ─────────────────────────────────────────────────
 let obsType = 'voice';
 let speciesConf = 'tentative';
@@ -732,6 +750,7 @@ async function submitObservation() {
     lat:          gpsCoords ? gpsCoords.lat : null,
     lng:          gpsCoords ? gpsCoords.lng : null,
     gps_accuracy: gpsCoords ? gpsCoords.acc : null,
+    device_token: DEVICE_TOKEN,
   };
 
   try {
