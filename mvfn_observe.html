@@ -316,7 +316,16 @@
   <textarea class="review-transcript" id="reviewTranscript"
             onfocus="clearCountdown()" onblur="startCountdown()"></textarea>
 
-  <img class="review-photo" id="reviewPhoto" src="" alt="" style="display:none">
+  <div id="reviewPhotoWrap">
+    <img class="review-photo" id="reviewPhoto" src="" alt="" style="display:none">
+    <div class="photo-row" style="margin-bottom:12px">
+      <button class="photo-btn" onclick="document.getElementById('reviewCameraInput').click()">📷 Camera</button>
+      <button class="photo-btn" onclick="document.getElementById('reviewLibraryInput').click()">🖼️ Library</button>
+      <button class="photo-btn" id="reviewPhotoClearBtn" onclick="clearReviewPhoto()" style="display:none;flex:0 0 44px;padding:0">✕</button>
+    </div>
+    <input type="file" id="reviewCameraInput"  accept="image/*" capture="environment" style="display:none" onchange="handleReviewPhoto(this)">
+    <input type="file" id="reviewLibraryInput" accept="image/*" style="display:none" onchange="handleReviewPhoto(this)">
+  </div>
 
   <div class="review-species" id="reviewSpeciesWrap" style="display:none">
     <div class="field-label">Species</div>
@@ -459,6 +468,29 @@ function compressImage(file, maxPx, quality) {
   });
 }
 
+function handleReviewPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  photoFile = input.files[0];
+  compressImage(photoFile, 1920, 0.82).then(dataUrl => {
+    photoDataUrl = dataUrl;
+    const img = document.getElementById('reviewPhoto');
+    img.src = photoDataUrl;
+    img.style.display = '';
+    document.getElementById('reviewPhotoClearBtn').style.display = '';
+  });
+}
+
+function clearReviewPhoto() {
+  photoDataUrl = null;
+  photoFile = null;
+  const img = document.getElementById('reviewPhoto');
+  img.src = '';
+  img.style.display = 'none';
+  document.getElementById('reviewPhotoClearBtn').style.display = 'none';
+  try { document.getElementById('reviewCameraInput').value = ''; } catch(e) {}
+  try { document.getElementById('reviewLibraryInput').value = ''; } catch(e) {}
+}
+
 function clearPhoto() {
   photoDataUrl = null;
   photoFile = null;
@@ -557,8 +589,8 @@ function stopListening() {
   document.getElementById('reviewTranscript').value = finalTranscript || '(no transcript — photo only)';
 
   const rp = document.getElementById('reviewPhoto');
-  if (photoDataUrl) { rp.src = photoDataUrl; rp.style.display = ''; }
-  else { rp.style.display = 'none'; }
+  if (photoDataUrl) { rp.src = photoDataUrl; rp.style.display = ''; document.getElementById('reviewPhotoClearBtn').style.display = ''; }
+  else { rp.style.display = 'none'; document.getElementById('reviewPhotoClearBtn').style.display = 'none'; }
 
   showScreen('screenReview');
   startCountdown();
