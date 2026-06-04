@@ -189,6 +189,13 @@
   .success-icon { font-size: 64px; }
   .success-msg { font-size: 20px; font-weight: 600; color: var(--green); }
   .success-sub { font-size: 14px; color: var(--text3); }
+  .success-back {
+    margin-top: 8px; padding: 12px 32px; border-radius: 12px;
+    border: 1px solid var(--border2); background: transparent;
+    color: var(--text2); font-size: 15px; font-family: inherit; cursor: pointer;
+  }
+  .success-back:active { background: var(--bg3); }
+  .success-timer { font-size: 12px; color: var(--text3); }
 
   /* ── TOAST ── */
   .toast {
@@ -337,6 +344,8 @@
   <div class="success-icon">✅</div>
   <div class="success-msg">Observation saved</div>
   <div class="success-sub" id="successSub"></div>
+  <button class="success-back" onclick="returnToReady()">New Observation</button>
+  <div class="success-timer" id="successTimer"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -359,6 +368,7 @@ let recognition = null;
 let isListening = false;
 let countdownTimer = null;
 let countdownInterval = null;
+let successTimer = null;
 const COUNTDOWN_MS = 10000;
 
 // ── GPS ───────────────────────────────────────────────────
@@ -419,13 +429,30 @@ function playDing()   { playTone(660, 0.25); setTimeout(() => playTone(880, 0.2)
 function handlePhoto(input) {
   if (!input.files || !input.files[0]) return;
   photoFile = input.files[0];
-  const reader = new FileReader();
-  reader.onload = e => {
-    photoDataUrl = e.target.result;
+  compressImage(photoFile, 1920, 0.82).then(dataUrl => {
+    photoDataUrl = dataUrl;
     document.getElementById('photoPreview').src = photoDataUrl;
     document.getElementById('photoPreviewWrap').style.display = '';
-  };
-  reader.readAsDataURL(photoFile);
+  });
+}
+
+function compressImage(file, maxPx, quality) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function clearPhoto() {
@@ -633,16 +660,7 @@ async function submitObservation() {
       if (gpsCoords) parts.push(`GPS ±${Math.round(gpsCoords.acc)}m`);
       document.getElementById('successSub').textContent = parts.join(' · ');
       showScreen('screenSuccess');
-
-      // Reset and return to ready after 2.5s
-      setTimeout(() => {
-        finalTranscript = '';
-        clearPhoto();
-        document.getElementById('speciesInput').value = '';
-        document.getElementById('reviewSpeciesInput').value = '';
-        showScreen('screenReady');
-        initGPS(); // refresh GPS for next observation
-      }, 2500);
+      startSuccessCountdown();
     } else {
       showScreen('screenReview');
       startCountdown();
@@ -664,6 +682,31 @@ async function submitObservation() {
     }
     showToast(msg, 'error');
   }
+}
+
+// ── SUCCESS SCREEN ────────────────────────────────────────
+function startSuccessCountdown() {
+  if (successTimer) clearTimeout(successTimer);
+  let secs = 3;
+  const timerEl = document.getElementById('successTimer');
+  timerEl.textContent = `Returning in ${secs}s…`;
+  const tick = setInterval(() => {
+    secs--;
+    if (secs <= 0) { clearInterval(tick); returnToReady(); }
+    else { timerEl.textContent = `Returning in ${secs}s…`; }
+  }, 1000);
+  successTimer = tick;
+}
+
+function returnToReady() {
+  if (successTimer) { clearInterval(successTimer); successTimer = null; }
+  finalTranscript = '';
+  clearPhoto();
+  document.getElementById('speciesInput').value = '';
+  document.getElementById('reviewSpeciesInput').value = '';
+  document.getElementById('successTimer').textContent = '';
+  showScreen('screenReady');
+  initGPS();
 }
 
 // ── UTILS ─────────────────────────────────────────────────
