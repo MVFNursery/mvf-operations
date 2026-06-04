@@ -77,8 +77,21 @@
     border: 1px solid var(--border2); background: var(--bg3);
     color: var(--text2); font-size: 14px; font-family: inherit; cursor: pointer;
     display: flex; align-items: center; justify-content: center; gap: 8px;
+    position: relative; transition: border-color 0.15s, color 0.15s;
   }
   .photo-btn:active { background: var(--bg2); }
+  .photo-btn.chosen { border-color: var(--green); color: var(--green); }
+  .photo-btn.chosen::after {
+    content: '✓'; position: absolute; top: 4px; right: 6px;
+    font-size: 10px; color: var(--green); font-weight: 700;
+  }
+  .photo-submit-btn {
+    width: 100%; height: 48px; border-radius: 12px;
+    border: 1px solid var(--green); background: transparent;
+    color: var(--green); font-size: 15px; font-weight: 600;
+    font-family: inherit; cursor: pointer; display: none;
+  }
+  .photo-submit-btn:active { background: rgba(126,207,79,0.1); }
   #photoPreviewWrap { display: none; }
   #photoPreview { width: 100%; max-height: 140px; object-fit: cover; border-radius: 10px; }
   .photo-clear {
@@ -269,15 +282,16 @@
     </div>
 
     <div class="photo-row">
-      <button class="photo-btn" onclick="document.getElementById('photoCameraInput').click()">
+      <button class="photo-btn" id="photoBtnCamera" onclick="document.getElementById('photoCameraInput').click()">
         📷 Camera
       </button>
-      <button class="photo-btn" onclick="document.getElementById('photoLibraryInput').click()">
+      <button class="photo-btn" id="photoBtnLibrary" onclick="document.getElementById('photoLibraryInput').click()">
         🖼️ Library
       </button>
     </div>
     <input type="file" id="photoCameraInput" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
     <input type="file" id="photoLibraryInput" accept="image/*" style="display:none" onchange="handlePhoto(this)">
+    <button class="photo-submit-btn" id="photoSubmitBtn" onclick="submitPhotoOnly()">Submit Photo →</button>
 
     <div class="field-link">
       <a href="mvfn_field.html">← Field Tasks</a>
@@ -442,11 +456,33 @@ function playDing()   { playTone(660, 0.25); setTimeout(() => playTone(880, 0.2)
 function handlePhoto(input) {
   if (!input.files || !input.files[0]) return;
   photoFile = input.files[0];
+  const sourceBtn = input.id === 'photoCameraInput' ? 'photoBtnCamera' : 'photoBtnLibrary';
   compressImage(photoFile, 1920, 0.82).then(dataUrl => {
     photoDataUrl = dataUrl;
     document.getElementById('photoPreview').src = photoDataUrl;
     document.getElementById('photoPreviewWrap').style.display = '';
+    // Mark whichever button was used
+    document.getElementById('photoBtnCamera').classList.remove('chosen');
+    document.getElementById('photoBtnLibrary').classList.remove('chosen');
+    document.getElementById(sourceBtn).classList.add('chosen');
+    document.getElementById('photoSubmitBtn').style.display = '';
   });
+}
+
+function submitPhotoOnly() {
+  finalTranscript = '';
+  document.getElementById('reviewTranscript').value = '(no transcript — photo only)';
+  const rp = document.getElementById('reviewPhoto');
+  rp.src = photoDataUrl; rp.style.display = '';
+  document.getElementById('reviewPhotoClearBtn').style.display = '';
+  if (obsType === 'plant_id') {
+    document.getElementById('reviewSpeciesInput').value = document.getElementById('speciesInput').value;
+    document.getElementById('reviewSpeciesWrap').style.display = '';
+  } else {
+    document.getElementById('reviewSpeciesWrap').style.display = 'none';
+  }
+  showScreen('screenReview');
+  startCountdown();
 }
 
 function compressImage(file, maxPx, quality) {
@@ -508,6 +544,9 @@ function clearPhoto() {
   photoDataUrl = null;
   photoFile = null;
   document.getElementById('photoPreviewWrap').style.display = 'none';
+  document.getElementById('photoBtnCamera').classList.remove('chosen');
+  document.getElementById('photoBtnLibrary').classList.remove('chosen');
+  document.getElementById('photoSubmitBtn').style.display = 'none';
   try { document.getElementById('photoCameraInput').value = ''; } catch(e) {}
   try { document.getElementById('photoLibraryInput').value = ''; } catch(e) {}
 }
