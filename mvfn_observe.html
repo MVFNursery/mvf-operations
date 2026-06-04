@@ -293,9 +293,6 @@
     <input type="file" id="photoLibraryInput" accept="image/*" style="display:none" onchange="handlePhoto(this)">
     <button class="photo-submit-btn" id="photoSubmitBtn" onclick="submitPhotoOnly()">Submit Photo →</button>
 
-    <div class="field-link">
-      <a href="mvfn_field.html">← Field Tasks</a>
-    </div>
   </div>
 </div>
 
@@ -465,7 +462,7 @@ function handlePhoto(input) {
     document.getElementById('photoBtnCamera').classList.remove('chosen');
     document.getElementById('photoBtnLibrary').classList.remove('chosen');
     document.getElementById(sourceBtn).classList.add('chosen');
-    document.getElementById('photoSubmitBtn').style.display = '';
+    document.getElementById('photoSubmitBtn').style.display = 'block';
   });
 }
 
