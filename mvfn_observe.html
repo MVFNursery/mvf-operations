@@ -319,8 +319,8 @@
   <div id="reviewPhotoWrap">
     <img class="review-photo" id="reviewPhoto" src="" alt="" style="display:none">
     <div class="photo-row" style="margin-bottom:12px">
-      <button class="photo-btn" onclick="document.getElementById('reviewCameraInput').click()">📷 Camera</button>
-      <button class="photo-btn" onclick="document.getElementById('reviewLibraryInput').click()">🖼️ Library</button>
+      <button class="photo-btn" onclick="pauseForPhoto('reviewCameraInput')">📷 Camera</button>
+      <button class="photo-btn" onclick="pauseForPhoto('reviewLibraryInput')">🖼️ Library</button>
       <button class="photo-btn" id="reviewPhotoClearBtn" onclick="clearReviewPhoto()" style="display:none;flex:0 0 44px;padding:0">✕</button>
     </div>
     <input type="file" id="reviewCameraInput"  accept="image/*" capture="environment" style="display:none" onchange="handleReviewPhoto(this)">
@@ -468,6 +468,18 @@ function compressImage(file, maxPx, quality) {
   });
 }
 
+function pauseForPhoto(inputId) {
+  clearCountdown();
+  document.getElementById(inputId).click();
+  // Resume countdown when window regains focus (picker closed, with or without selection)
+  const onFocus = () => {
+    window.removeEventListener('focus', onFocus);
+    // Delay slightly — onchange fires after focus if a file was chosen
+    setTimeout(() => { if (!photoDataUrl) startCountdown(); }, 300);
+  };
+  window.addEventListener('focus', onFocus);
+}
+
 function handleReviewPhoto(input) {
   if (!input.files || !input.files[0]) return;
   photoFile = input.files[0];
@@ -477,6 +489,7 @@ function handleReviewPhoto(input) {
     img.src = photoDataUrl;
     img.style.display = '';
     document.getElementById('reviewPhotoClearBtn').style.display = '';
+    startCountdown();
   });
 }
 
