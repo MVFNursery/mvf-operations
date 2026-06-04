@@ -514,15 +514,9 @@ function stopListening() {
     return;
   }
 
-  // Pre-fill species from voice if plant_id mode
+  // Pre-fill species from whatever was typed in the ready screen field
   if (obsType === 'plant_id') {
-    const guessed = extractSpeciesFromTranscript(finalTranscript);
-    if (guessed) {
-      document.getElementById('speciesInput').value = guessed;
-      document.getElementById('reviewSpeciesInput').value = guessed;
-    } else {
-      document.getElementById('reviewSpeciesInput').value = document.getElementById('speciesInput').value;
-    }
+    document.getElementById('reviewSpeciesInput').value = document.getElementById('speciesInput').value;
     document.getElementById('reviewSpeciesWrap').style.display = '';
   } else {
     document.getElementById('reviewSpeciesWrap').style.display = 'none';
@@ -676,17 +670,34 @@ async function submitObservation() {
 function dedupeAppend(existing, newText) {
   newText = newText.trim();
   if (!newText) return existing;
-  const eWords = existing.trim().split(/\s+/);
-  const nWords = newText.split(/\s+/);
-  // Find longest suffix of existing that matches prefix of newText (up to 10 words)
-  for (let len = Math.min(nWords.length, 10); len > 0; len--) {
-    const eSuffix = eWords.slice(-len).join(' ').toLowerCase();
-    const nPrefix = nWords.slice(0, len).join(' ').toLowerCase();
-    if (eSuffix === nPrefix) {
+
+  const eWords = existing.trim().split(/\s+/).filter(Boolean);
+  const nWords = newText.split(/\s+/).filter(Boolean);
+  const existingLower = existing.trim().toLowerCase();
+  const newLower = newText.toLowerCase();
+
+  // Entire new text already present
+  if (existingLower.includes(newLower)) return existing;
+
+  // Case A: restart overlap — suffix of existing matches prefix of new
+  // e.g. existing="…D E", new="D E F G" → append "F G"
+  for (let len = Math.min(nWords.length - 1, 20); len > 0; len--) {
+    if (eWords.slice(-len).join(' ').toLowerCase() === nWords.slice(0, len).join(' ').toLowerCase()) {
       const remainder = nWords.slice(len).join(' ');
       return existing.trimEnd() + (remainder ? ' ' + remainder + ' ' : ' ');
     }
   }
+
+  // Case B: rebuild — new text starts with all (or most) of existing then continues
+  // e.g. existing="A B C", new="A B C D E" → append "D E"
+  for (let len = Math.min(eWords.length, nWords.length); len > 2; len--) {
+    if (eWords.slice(0, len).join(' ').toLowerCase() === nWords.slice(0, len).join(' ').toLowerCase()) {
+      const remainder = nWords.slice(len).join(' ');
+      if (remainder) return existing.trimEnd() + ' ' + remainder + ' ';
+      return existing;
+    }
+  }
+
   return existing + newText + ' ';
 }
 
