@@ -150,8 +150,9 @@
     flex: 1; background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 16px; overflow-y: auto;
     -webkit-overflow-scrolling: touch; font-size: 15px; line-height: 1.6;
-    margin-bottom: 16px; user-select: text;
+    margin-bottom: 16px; user-select: text; outline: none;
   }
+  .review-transcript:focus { border-color: var(--green-dim); }
   .review-photo { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; margin-bottom: 16px; }
   .review-species { margin-bottom: 16px; }
 
@@ -310,7 +311,8 @@
   </div>
 
   <div class="review-label">Transcript</div>
-  <div class="review-transcript" id="reviewTranscript"></div>
+  <div class="review-transcript" id="reviewTranscript" contenteditable="true"
+       onfocus="clearCountdown()" onblur="startCountdown()"></div>
 
   <img class="review-photo" id="reviewPhoto" src="" alt="" style="display:none">
 
@@ -459,7 +461,8 @@ function clearPhoto() {
   photoDataUrl = null;
   photoFile = null;
   document.getElementById('photoPreviewWrap').style.display = 'none';
-  document.getElementById('photoInput').value = '';
+  document.getElementById('photoCameraInput').value = '';
+  document.getElementById('photoLibraryInput').value = '';
 }
 
 // ── VOICE ─────────────────────────────────────────────────
@@ -627,6 +630,8 @@ function setReviewConf(val) {
 // ── SUBMIT ────────────────────────────────────────────────
 async function submitObservation() {
   clearCountdown();
+  // Read edited transcript from the contenteditable div
+  finalTranscript = (document.getElementById('reviewTranscript').innerText || '').trim();
   showScreen('screenSubmitting');
 
   const speciesName = obsType === 'plant_id'
