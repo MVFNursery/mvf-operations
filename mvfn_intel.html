@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#2d5016">
+<title>MVFN · Capture Mention</title>
+<style>
+  :root { --green:#2d5016; --green-soft:#3a6b1c; --cream:#f5f0e8; --line:#d8cdb8; --ink:#2a2417; --err:#9b2c1f; }
+  * { box-sizing: border-box; }
+  body { background: var(--cream); color: var(--ink); font-family: Georgia, serif;
+         margin: 0; min-height: 100vh; }
+  header { background: var(--green); color: var(--cream); padding: 18px 16px; }
+  header h1 { margin: 0; font-size: 1.25rem; }
+  header p { margin: 4px 0 0; font-size: .8rem; opacity: .85; }
+  main { max-width: 560px; margin: 0 auto; padding: 18px 16px 40px; }
+  label { display: block; margin: 14px 0 4px; font-size: .9rem; font-weight: bold; color: var(--green); }
+  .req::after { content: " *"; color: var(--err); }
+  input, select, textarea {
+    width: 100%; padding: 11px 12px; font-size: 1rem; font-family: inherit;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+  textarea { min-height: 130px; resize: vertical; }
+  .hint { font-size: .78rem; color: #6b6150; margin-top: 4px; }
+  button { margin-top: 22px; width: 100%; padding: 14px; font-size: 1.05rem; font-family: inherit;
+    background: var(--green); color: var(--cream); border: none; border-radius: 10px; cursor: pointer; }
+  button:disabled { opacity: .55; cursor: default; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: var(--green); color: var(--cream); padding: 12px 18px; border-radius: 10px;
+    font-size: .9rem; box-shadow: 0 4px 14px rgba(0,0,0,.25); opacity: 0; transition: opacity .25s;
+    pointer-events: none; max-width: 90%; }
+  .toast.show { opacity: 1; }
+  .toast.error { background: var(--err); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Capture a Mention</h1>
+  <p>For sources with no automated feed — Nextdoor, FB groups, forums, Yelp/TripAdvisor.
+     Lands in PostGIS as one raw mention.</p>
+</header>
+
+<main>
+  <form id="form" autocomplete="off">
+    <label class="req" for="source">Source</label>
+    <select id="source" required>
+      <option value="" disabled selected>Where did you see it?</option>
+      <option>Nextdoor</option>
+      <option>Facebook group</option>
+      <option>Online forum</option>
+      <option>Yelp</option>
+      <option>TripAdvisor</option>
+      <option>Google review (manual)</option>
+      <option>Other</option>
+    </select>
+
+    <label for="author">Author handle</label>
+    <input id="author" type="text" placeholder="e.g. @jane_d or a first name">
+
+    <label class="req" for="body">What they said</label>
+    <textarea id="body" required placeholder="Paste or type the full text of the mention…"></textarea>
+
+    <label for="rating">Rating (if any)</label>
+    <input id="rating" type="number" min="1" max="5" step="0.5" placeholder="1–5, leave blank if none">
+
+    <label for="url">Link</label>
+    <input id="url" type="url" placeholder="https://…">
+
+    <label for="posted">When it was posted</label>
+    <input id="posted" type="datetime-local">
+    <div class="hint">Leave blank if unknown — we'll record the capture time.</div>
+
+    <button id="submit" type="submit">Save mention</button>
+  </form>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────
+const N8N_BASE = 'https://megamachine.taile865b6.ts.net:5678/webhook';
+const MANUAL_WEBHOOK = N8N_BASE + '/sentiment-manual';
+// ─────────────────────────────────────────────────────────
+
+const form = document.getElementById('form');
+const submitBtn = document.getElementById('submit');
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type === 'error' ? ' error' : '');
+  setTimeout(() => { t.className = 'toast'; }, 3200);
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = document.getElementById('body').value.trim();
+  const source = document.getElementById('source').value;
+  if (!source || !body) { showToast('Source and text are required', 'error'); return; }
+
+  const ratingRaw = document.getElementById('rating').value;
+  const postedRaw = document.getElementById('posted').value;
+  const payload = {
+    source: source,
+    author_handle: document.getElementById('author').value.trim() || null,
+    body: body,
+    rating: ratingRaw ? parseFloat(ratingRaw) : null,
+    url: document.getElementById('url').value.trim() || null,
+    // datetime-local has no timezone — send as-is; n8n casts to timestamptz.
+    posted_at: postedRaw || null,
+  };
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving…';
+  try {
+    const r = await fetch(MANUAL_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok && data.status === 'ok') {
+      form.reset();
+      showToast('Mention saved ✓');
+    } else {
+      showToast(data.message || data.error || ('Server error ' + r.status), 'error');
+    }
+  } catch (err) {
+    showToast(err instanceof TypeError ? "Can't reach server — Tailscale on?" : 'Save failed', 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Save mention';
+  }
+});
+</script>
+</body>
+</html>
