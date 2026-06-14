@@ -63,7 +63,7 @@
     <input id="rating" type="number" min="1" max="5" step="0.5" placeholder="1–5, leave blank if none">
 
     <label for="url">Link</label>
-    <input id="url" type="url" placeholder="https://…">
+    <input id="url" type="text" inputmode="url" placeholder="paste any link — https:// optional">
 
     <label for="posted">When it was posted</label>
     <input id="posted" type="datetime-local">
@@ -99,12 +99,15 @@ form.addEventListener('submit', async (e) => {
 
   const ratingRaw = document.getElementById('rating').value;
   const postedRaw = document.getElementById('posted').value;
+  // Accept bare domains (www.youtube.com); prepend https:// so the stored link is clickable.
+  let urlVal = document.getElementById('url').value.trim();
+  if (urlVal && !/^https?:\/\//i.test(urlVal)) urlVal = 'https://' + urlVal;
   const payload = {
     source: source,
     author_handle: document.getElementById('author').value.trim() || null,
     body: body,
     rating: ratingRaw ? parseFloat(ratingRaw) : null,
-    url: document.getElementById('url').value.trim() || null,
+    url: urlVal || null,
     // datetime-local has no timezone — send as-is; n8n casts to timestamptz.
     posted_at: postedRaw || null,
   };
