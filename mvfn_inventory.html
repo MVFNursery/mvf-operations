@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Inventory">
+<meta name="theme-color" content="#2d3319">
+<link rel="manifest" href="inventory-manifest.json">
+<title>MVFN Inventory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Mono', monospace;
+    background: #f5f5f0;
+    color: #2d3319;
+    min-height: 100vh;
+  }
+  h1, h2 { font-family: 'Fraunces', serif; }
+
+  .container { max-width: 640px; margin: 0 auto; padding: 20px; }
+
+  header { text-align: center; padding: 20px 0 12px; }
+  header h1 { font-size: 2rem; font-weight: 700; }
+  header .subtitle { font-size: 0.85rem; color: #5a6b2d; margin-top: 4px; }
+  header .readonly { font-size: 0.7rem; color: #8a8a7a; margin-top: 8px; letter-spacing: 0.03em; }
+
+  /* Controls */
+  .controls { display: flex; gap: 10px; margin: 8px 0 16px; flex-wrap: wrap; }
+  .controls input[type="search"] {
+    flex: 1 1 180px; padding: 12px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 1rem; background: white;
+  }
+  .controls input[type="search"]:focus { outline: none; border-color: #5a6b2d; }
+  .controls select {
+    flex: 0 0 auto; padding: 12px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 0.95rem; background: white;
+  }
+
+  .summary { font-size: 0.8rem; color: #5a6b2d; margin-bottom: 14px; }
+
+  /* Stock cards */
+  .stock-list { display: grid; gap: 10px; }
+  .stock-card {
+    background: white; border: 2px solid #2d3319; border-radius: 8px; padding: 14px 16px;
+  }
+  .stock-card .name { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600; }
+  .stock-card .sci { font-style: italic; font-size: 0.8rem; color: #5a6b2d; margin-top: 2px; }
+  .stock-card .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+    margin-top: 10px; font-size: 0.8rem; color: #2d3319;
+  }
+  .stock-card .meta .qty { font-weight: 500; }
+  .stock-card .meta .price { margin-left: auto; font-weight: 500; }
+  .stock-card .loc { font-size: 0.72rem; color: #8a8a7a; margin-top: 6px; }
+
+  .badge {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; font-weight: 500;
+  }
+  .badge.for-sale { color: #047857; }
+  .badge.growing { color: #b45309; }
+  .badge.other   { color: #6b7280; }
+  .native-dot { color: #047857; font-size: 0.72rem; }
+
+  /* States */
+  .state { text-align: center; padding: 48px 20px; color: #5a6b2d; }
+  .state.error { color: #7f1d1d; }
+  .state button {
+    margin-top: 16px; padding: 12px 24px; border: 2px solid #2d3319; background: #2d3319;
+    color: white; border-radius: 8px; font-family: 'Fraunces', serif; font-size: 1rem;
+    font-weight: 600; cursor: pointer;
+  }
+  .updated { text-align: center; font-size: 0.7rem; color: #aaa; padding: 24px 0 12px; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>MVFN Inventory</h1>
+      <div class="subtitle">Mountain View Farm Nursery</div>
+      <div class="readonly">Live stock view · read-only</div>
+    </header>
+
+    <div class="controls" id="controls" style="display:none;">
+      <input type="search" id="search" placeholder="Search species…" autocomplete="off">
+      <select id="statusFilter">
+        <option value="all">All statuses</option>
+        <option value="for-sale">For sale</option>
+        <option value="growing">Growing</option>
+      </select>
+    </div>
+    <div class="summary" id="summary"></div>
+
+    <div id="list" class="stock-list"></div>
+
+    <div id="state" class="state">Loading stock…</div>
+    <div class="updated" id="updated"></div>
+  </div>
+
+<script>
+  // n8n webhook base — same tailnet host the other field PWAs use.
+  const N8N_BASE = 'https://megamachine.taile865b6.ts.net:5678/webhook';
+
+  let stock = [];
+  let speciesById = {};
+
+  const $ = id => document.getElementById(id);
+
+  function speciesKey(v) { return v == null ? '' : String(v); }
+
+  async function load() {
+    setState('Loading stock…', false);
+    try {
+      const res = await fetch(`${N8N_BASE}/mvfn-get-stock`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      stock = Array.isArray(data.stock) ? data.stock : [];
+      speciesById = {};
+      (data.species || []).forEach(sp => { speciesById[speciesKey(sp.species_id)] = sp; });
+      $('controls').style.display = 'flex';
+      $('updated').textContent = 'Updated ' + new Date().toLocaleString();
+      render();
+    } catch (err) {
+      $('controls').style.display = 'none';
+      $('summary').textContent = '';
+      $('list').innerHTML = '';
+      setState(`Couldn't reach inventory (${err.message}). Check your Tailscale connection.`, true);
+    }
+  }
+
+  function setState(msg, isError) {
+    const el = $('state');
+    el.className = 'state' + (isError ? ' error' : '');
+    el.innerHTML = '';
+    el.appendChild(document.createTextNode(msg));
+    if (isError) {
+      const b = document.createElement('button');
+      b.textContent = 'Retry';
+      b.onclick = load;
+      el.appendChild(document.createElement('br'));
+      el.appendChild(b);
+    }
+    el.style.display = msg ? 'block' : 'none';
+  }
+
+  function fmtPrice(p) {
+    if (p == null || p === '') return '';
+    const n = Number(p);
+    return isNaN(n) ? '' : '$' + n.toFixed(2).replace(/\.00$/, '');
+  }
+
+  function statusClass(s) {
+    if (s === 'for-sale') return 'for-sale';
+    if (s === 'growing') return 'growing';
+    return 'other';
+  }
+
+  function render() {
+    const q = $('search').value.trim().toLowerCase();
+    const statusF = $('statusFilter').value;
+
+    const rows = stock
+      .map(s => ({ s, sp: speciesById[speciesKey(s.species_id)] || {} }))
+      .filter(({ s, sp }) => {
+        if (statusF !== 'all' && s.status !== statusF) return false;
+        if (!q) return true;
+        const hay = `${sp.common_name || ''} ${sp.scientific_name || ''} ${s.species_id || ''}`.toLowerCase();
+        return hay.includes(q);
+      })
+      .sort((a, b) =>
+        (a.sp.common_name || a.s.species_id || '').localeCompare(b.sp.common_name || b.s.species_id || ''));
+
+    const forSale = stock.filter(s => s.status === 'for-sale' && Number(s.quantity) > 0).length;
+    const species = new Set(stock.map(s => speciesKey(s.species_id))).size;
+    $('summary').textContent =
+      `${stock.length} stock items · ${forSale} for sale · ${species} species`;
+
+    if (!rows.length) { setState('No matching stock.', false); $('list').innerHTML = ''; return; }
+    setState('', false);
+
+    $('list').innerHTML = rows.map(({ s, sp }) => {
+      const name = sp.common_name || s.species_id || 'Unknown';
+      const sci = sp.scientific_name ? `<div class="sci">${esc(sp.scientific_name)}</div>` : '';
+      const native = sp.is_true_native ? '<span class="native-dot" title="True native">● native</span>' : '';
+      const price = fmtPrice(s.price_per_unit);
+      const loc = s.location ? `<div class="loc">${esc(s.location)}</div>` : '';
+      return `<div class="stock-card">
+        <div class="name">${esc(name)} ${native}</div>
+        ${sci}
+        <div class="meta">
+          <span>${esc(s.container_size || '—')}</span>
+          <span class="qty">${s.quantity ?? 0} avail</span>
+          <span class="badge ${statusClass(s.status)}">${esc(s.status || '—')}</span>
+          ${price ? `<span class="price">${price}</span>` : ''}
+        </div>
+        ${loc}
+      </div>`;
+    }).join('');
+  }
+
+  function esc(str) {
+    return String(str).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  $('search').addEventListener('input', render);
+  $('statusFilter').addEventListener('change', render);
+  load();
+</script>
+</body>
+</html>

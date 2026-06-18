@@ -1,0 +1,21 @@
+{
+  "name": "MVFN Inventory",
+  "short_name": "Inventory",
+  "description": "MVFN live nursery stock view",
+  "start_url": "/mvf-operations/mvfn_inventory.html",
+  "scope": "/mvf-operations/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f5f0",
+  "theme_color": "#2d3319",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/mvf-operations/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"]
+}
