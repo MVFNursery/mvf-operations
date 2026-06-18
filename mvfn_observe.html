@@ -770,14 +770,15 @@ async function submitObservation() {
       startSuccessCountdown();
     } else {
       showScreen('screenReview');
-      startCountdown();
-      const msg = data.message || data.error || `Server error ${r.status}`;
+      clearCountdown();  // failure: don't auto-resubmit — wait for a manual retry
+      let msg = data.message || data.error;
+      if (!msg) msg = r.ok ? 'Save failed — server couldn\'t process it' : `Server error ${r.status}`;
       console.error('Observe submit — server error:', r.status, data);
       showToast(msg, 'error');
     }
   } catch(e) {
     showScreen('screenReview');
-    startCountdown();
+    clearCountdown();  // failure: don't auto-resubmit — wait for a manual retry
     console.error('Observe submit — network error:', e);
     let msg = 'Save failed';
     if (e instanceof TypeError) {
