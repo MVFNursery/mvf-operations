@@ -78,6 +78,8 @@
     flex: 1 1 120px; padding: 10px; border: 2px solid #d1d5db; border-radius: 6px;
     font-family: 'DM Mono', monospace; font-size: 0.9rem; background: white;
   }
+  .addform .flabel { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: #8a8a7a; margin: 4px 0 4px; }
   .addform .speciesnote { font-size: 0.72rem; min-height: 1em; margin: 0 0 8px; }
   .addform .speciesnote.match { color: #047857; }
   .addform .speciesnote.new { color: #b45309; }
@@ -224,10 +226,12 @@
         </div>
         <label class="nativechk"><input type="checkbox" id="addNative"> True PA native</label>
       </div>
+      <div class="flabel">Container size &amp; quantity</div>
       <div class="row">
-        <input id="addContainer" placeholder="Container size">
+        <input id="addContainer" placeholder="Container size (e.g. 3.5&quot;, 2-quart)">
         <input id="addQty" type="number" inputmode="numeric" min="0" placeholder="Qty">
       </div>
+      <div class="flabel">Location · status · price</div>
       <div class="row">
         <input id="addLocation" placeholder="Location">
         <select id="addStatus">
@@ -293,15 +297,21 @@
     }
   }
 
-  // POST a write action to the inventory workflow. Returns parsed JSON or throws.
+  // POST a write action to the inventory workflow. Tolerant of empty/non-JSON
+  // bodies so a server-side error surfaces as a clear message, not a raw
+  // "Unexpected end of JSON input" from res.json().
   async function postAction(payload) {
     const res = await fetch(`${N8N_BASE}/mvfn-inventory`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+    if (!res.ok) throw new Error((data && data.message) ? data.message : `server error ${res.status}`);
+    if (data === null) throw new Error('empty response — the save may have failed; check and retry');
+    return data;
   }
 
   function buildSpeciesDatalist() {
@@ -409,6 +419,10 @@
         <span class="msg" data-msg></span>
       </div>
       <div class="line">
+        <label>Cont.</label>
+        <input class="continput" type="text" value="${esc(s.container_size || '')}" placeholder="container size">
+      </div>
+      <div class="line">
         <label>Status</label>
         <select class="statussel">
           ${['growing', 'for-sale'].concat(
@@ -456,10 +470,18 @@
       } finally { btn.disabled = false; }
     });
 
-    // Save status + location -> set_status / set_location (only what changed)
+    // Auto-fill location 'retail' when status flips to for-sale and loc is empty.
+    const statusSel = card.querySelector('select.statussel');
+    const locInput = card.querySelector('input.locinput');
+    statusSel.addEventListener('change', () => {
+      if (statusSel.value === 'for-sale' && !locInput.value.trim()) locInput.value = 'retail';
+    });
+
+    // Save status / location / container -> set_* (only what changed)
     card.querySelector('[data-act="meta"]').addEventListener('click', async () => {
-      const newStatus = card.querySelector('select.statussel').value;
-      const newLoc = card.querySelector('input.locinput').value.trim();
+      const newStatus = statusSel.value;
+      const newLoc = locInput.value.trim();
+      const newCont = card.querySelector('input.continput').value.trim();
       const btn = card.querySelector('[data-act="meta"]');
       btn.disabled = true; setMsg('Saving…', 'saving');
       try {
@@ -474,6 +496,12 @@
         if (newLoc !== (s.location || '')) {
           await postAction({ action: 'set_location', stock_id: stockId, location: newLoc });
           s.location = newLoc;
+          changed = true;
+        }
+        if (newCont !== (s.container_size || '')) {
+          await postAction({ action: 'set_container', stock_id: stockId, container_size: newCont });
+          s.container_size = newCont;
+          card.querySelector('.meta span').textContent = newCont || '—';
           changed = true;
         }
         setMsg(changed ? '✓ saved' : 'no changes', 'ok');
@@ -607,6 +635,9 @@
   $('addBtn').addEventListener('click', () => $('addForm').classList.toggle('open'));
   $('addCancel').addEventListener('click', () => { $('addForm').classList.remove('open'); resetAddForm(); });
   $('addSpecies').addEventListener('input', onSpeciesInput);
+  $('addStatus').addEventListener('change', () => {
+    if ($('addStatus').value === 'for-sale' && !$('addLocation').value.trim()) $('addLocation').value = 'retail';
+  });
   $('addSave').addEventListener('click', submitAddStock);
   $('toastOk').addEventListener('click', hideToast);
   $('toast').addEventListener('click', e => { if (e.target.id === 'toast') hideToast(); });
