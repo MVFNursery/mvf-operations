@@ -155,6 +155,31 @@
     font-weight: 600; cursor: pointer;
   }
   .updated { text-align: center; font-size: 0.7rem; color: #aaa; padding: 24px 0 12px; }
+
+  /* Save confirmation toast (centered splash, auto-dismisses in 3s) */
+  .toast {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    align-items: center; justify-content: center;
+    background: rgba(45, 51, 25, 0.28);
+  }
+  .toast.show { display: flex; }
+  .toast-card {
+    background: white; border: 2px solid #047857; border-radius: 14px;
+    padding: 26px 30px; text-align: center; min-width: 200px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    animation: toastpop .18s ease-out;
+  }
+  @keyframes toastpop { from { transform: scale(.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .toast-check {
+    width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%;
+    background: #047857; color: white; font-size: 2rem; line-height: 56px;
+  }
+  .toast-msg { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 600; color: #2d3319; }
+  .toast-ok {
+    margin-top: 16px; padding: 9px 28px; border: 2px solid #2d3319; background: white;
+    color: #2d3319; border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.95rem;
+    font-weight: 600; cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -222,6 +247,14 @@
 
     <div id="state" class="state">Loading stock…</div>
     <div class="updated" id="updated"></div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">
+    <div class="toast-card">
+      <div class="toast-check">✓</div>
+      <div class="toast-msg" id="toastMsg">Saved</div>
+      <button class="toast-ok" id="toastOk" type="button">OK</button>
+    </div>
   </div>
 
 <script>
@@ -409,6 +442,7 @@
         s.quantity = n;
         counted.add(stockId);
         setMsg('✓ saved', 'ok');
+        showToast(`Count saved · ${n}`);
         card.classList.add('counted');
         if (!card.querySelector('.counted-tick')) {
           const t = document.createElement('span');
@@ -429,17 +463,21 @@
       const btn = card.querySelector('[data-act="meta"]');
       btn.disabled = true; setMsg('Saving…', 'saving');
       try {
+        let changed = false;
         if (newStatus !== s.status) {
           await postAction({ action: 'set_status', stock_id: stockId, status: newStatus });
           s.status = newStatus;
           const badge = card.querySelector('.badge');
           badge.textContent = newStatus; badge.className = 'badge ' + statusClass(newStatus);
+          changed = true;
         }
         if (newLoc !== (s.location || '')) {
           await postAction({ action: 'set_location', stock_id: stockId, location: newLoc });
           s.location = newLoc;
+          changed = true;
         }
-        setMsg('✓ saved', 'ok');
+        setMsg(changed ? '✓ saved' : 'no changes', 'ok');
+        if (changed) showToast('Saved');
       } catch (err) {
         setMsg(`✗ ${err.message} — tap to retry`, 'err');
       } finally { btn.disabled = false; }
@@ -530,6 +568,7 @@
       const newId = out && out.result && out.result.stock_id;
       resetAddForm();
       $('addForm').classList.remove('open');
+      showToast(isNew ? 'Species + stock added' : 'Stock added');
       await load();
       if (newId != null) { counted.add(newId); render(); }
     } catch (err) {
@@ -552,6 +591,16 @@
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
+  // Centered checkmark confirmation; auto-dismisses after 3s, OK/backdrop dismiss early.
+  let toastTimer = null;
+  function showToast(msg) {
+    $('toastMsg').textContent = msg || 'Saved';
+    $('toast').classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 3000);
+  }
+  function hideToast() { clearTimeout(toastTimer); $('toast').classList.remove('show'); }
+
   $('search').addEventListener('input', render);
   $('statusFilter').addEventListener('change', render);
   $('modeToggle').addEventListener('click', () => setCountMode(!countMode));
@@ -559,6 +608,8 @@
   $('addCancel').addEventListener('click', () => { $('addForm').classList.remove('open'); resetAddForm(); });
   $('addSpecies').addEventListener('input', onSpeciesInput);
   $('addSave').addEventListener('click', submitAddStock);
+  $('toastOk').addEventListener('click', hideToast);
+  $('toast').addEventListener('click', e => { if (e.target.id === 'toast') hideToast(); });
   load();
 </script>
 </body>
