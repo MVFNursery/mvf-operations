@@ -29,6 +29,23 @@
   header .subtitle { font-size: 0.85rem; color: #5a6b2d; margin-top: 4px; }
   header .readonly { font-size: 0.7rem; color: #8a8a7a; margin-top: 8px; letter-spacing: 0.03em; }
 
+  /* Mode toggle */
+  .modebar { display: flex; justify-content: center; margin: 10px 0 2px; }
+  .modebar button {
+    padding: 9px 18px; border: 2px solid #2d3319; background: white; color: #2d3319;
+    border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.92rem;
+    font-weight: 600; cursor: pointer;
+  }
+  .modebar button.active { background: #2d3319; color: white; }
+  body.count-mode header .readonly { color: #b45309; }
+
+  /* Count progress */
+  .progress { display: none; margin: 10px 0 2px; }
+  body.count-mode .progress { display: block; }
+  .progress .bar { height: 8px; background: #e3e3d8; border-radius: 999px; overflow: hidden; }
+  .progress .bar > span { display: block; height: 100%; background: #5a6b2d; width: 0; transition: width .2s; }
+  .progress .label { font-size: 0.75rem; color: #5a6b2d; margin-top: 5px; text-align: center; }
+
   /* Controls */
   .controls { display: flex; gap: 10px; margin: 8px 0 16px; flex-wrap: wrap; }
   .controls input[type="search"] {
@@ -43,11 +60,36 @@
 
   .summary { font-size: 0.8rem; color: #5a6b2d; margin-bottom: 14px; }
 
+  /* Add-stock */
+  .addbtn {
+    display: none; width: 100%; margin: 0 0 14px; padding: 12px; border: 2px dashed #5a6b2d;
+    background: #fbfbf6; color: #5a6b2d; border-radius: 8px; font-family: 'Fraunces', serif;
+    font-size: 0.95rem; font-weight: 600; cursor: pointer;
+  }
+  body.count-mode .addbtn { display: block; }
+  .addform {
+    display: none; background: #fbfbf6; border: 2px solid #5a6b2d; border-radius: 8px;
+    padding: 14px 16px; margin: 0 0 14px;
+  }
+  .addform.open { display: block; }
+  .addform h2 { font-size: 1rem; margin-bottom: 10px; }
+  .addform .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .addform input, .addform select {
+    flex: 1 1 120px; padding: 10px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 0.9rem; background: white;
+  }
+  .addform .actions { display: flex; gap: 8px; margin-top: 4px; }
+  .addform .actions button { flex: 1; padding: 11px; border-radius: 6px; font-weight: 600;
+    font-family: 'Fraunces', serif; font-size: 0.92rem; cursor: pointer; }
+  .addform .save { border: 2px solid #2d3319; background: #2d3319; color: white; }
+  .addform .cancel { border: 2px solid #d1d5db; background: white; color: #2d3319; }
+
   /* Stock cards */
   .stock-list { display: grid; gap: 10px; }
   .stock-card {
     background: white; border: 2px solid #2d3319; border-radius: 8px; padding: 14px 16px;
   }
+  .stock-card.counted { border-color: #047857; background: #f3fbf6; }
   .stock-card .name { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600; }
   .stock-card .sci { font-style: italic; font-size: 0.8rem; color: #5a6b2d; margin-top: 2px; }
   .stock-card .meta {
@@ -66,6 +108,35 @@
   .badge.growing { color: #b45309; }
   .badge.other   { color: #6b7280; }
   .native-dot { color: #047857; font-size: 0.72rem; }
+  .counted-tick { color: #047857; font-size: 0.75rem; margin-left: auto; }
+
+  /* Count editor (inside card, count mode) */
+  .editor { display: none; margin-top: 12px; border-top: 1px dashed #d1d5db; padding-top: 12px; }
+  body.count-mode .editor { display: block; }
+  .editor .line { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .editor label { font-size: 0.72rem; color: #5a6b2d; min-width: 64px; }
+  .editor input.count {
+    width: 84px; padding: 10px; border: 2px solid #2d3319; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 1.05rem; text-align: center; background: white;
+  }
+  .editor input.locinput {
+    flex: 1 1 120px; padding: 9px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 0.85rem; background: white;
+  }
+  .editor select.statussel {
+    padding: 9px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 0.85rem; background: white;
+  }
+  .editor button.save {
+    padding: 10px 16px; border: 2px solid #2d3319; background: #2d3319; color: white;
+    border-radius: 6px; font-family: 'Fraunces', serif; font-size: 0.88rem; font-weight: 600;
+    cursor: pointer;
+  }
+  .editor button.save:disabled { opacity: 0.5; }
+  .editor .msg { font-size: 0.72rem; min-height: 1em; }
+  .editor .msg.ok { color: #047857; }
+  .editor .msg.err { color: #7f1d1d; }
+  .editor .msg.saving { color: #8a8a7a; }
 
   /* States */
   .state { text-align: center; padding: 48px 20px; color: #5a6b2d; }
@@ -83,8 +154,17 @@
     <header>
       <h1>MVFN Inventory</h1>
       <div class="subtitle">Mountain View Farm Nursery</div>
-      <div class="readonly">Live stock view · read-only</div>
+      <div class="readonly" id="modeLabel">Live stock view · read-only</div>
     </header>
+
+    <div class="modebar">
+      <button id="modeToggle" type="button">Start count</button>
+    </div>
+
+    <div class="progress" id="progress">
+      <div class="bar"><span id="progBar"></span></div>
+      <div class="label" id="progLabel"></div>
+    </div>
 
     <div class="controls" id="controls" style="display:none;">
       <input type="search" id="search" placeholder="Search species…" autocomplete="off">
@@ -92,9 +172,36 @@
         <option value="all">All statuses</option>
         <option value="for-sale">For sale</option>
         <option value="growing">Growing</option>
+        <option value="uncounted">Uncounted (this session)</option>
       </select>
     </div>
     <div class="summary" id="summary"></div>
+
+    <button class="addbtn" id="addBtn" type="button">+ Add stock found</button>
+    <div class="addform" id="addForm">
+      <h2>Add stock found</h2>
+      <div class="row">
+        <input list="speciesList" id="addSpecies" placeholder="Species (type to search)" autocomplete="off">
+        <datalist id="speciesList"></datalist>
+      </div>
+      <div class="row">
+        <input id="addContainer" placeholder="Container size">
+        <input id="addQty" type="number" inputmode="numeric" min="0" placeholder="Qty">
+      </div>
+      <div class="row">
+        <input id="addLocation" placeholder="Location">
+        <select id="addStatus">
+          <option value="growing">growing</option>
+          <option value="for-sale">for-sale</option>
+        </select>
+        <input id="addPrice" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Price">
+      </div>
+      <div class="msg err" id="addMsg" style="font-size:0.72rem;min-height:1em;"></div>
+      <div class="actions">
+        <button class="cancel" id="addCancel" type="button">Cancel</button>
+        <button class="save" id="addSave" type="button">Add stock</button>
+      </div>
+    </div>
 
     <div id="list" class="stock-list"></div>
 
@@ -108,6 +215,9 @@
 
   let stock = [];
   let speciesById = {};
+  let speciesList = [];
+  let countMode = false;
+  const counted = new Set();        // stock_ids saved this session
 
   const $ = id => document.getElementById(id);
 
@@ -121,7 +231,9 @@
       const data = await res.json();
       stock = Array.isArray(data.stock) ? data.stock : [];
       speciesById = {};
-      (data.species || []).forEach(sp => { speciesById[speciesKey(sp.species_id)] = sp; });
+      speciesList = (data.species || []).slice();
+      speciesList.forEach(sp => { speciesById[speciesKey(sp.species_id)] = sp; });
+      buildSpeciesDatalist();
       $('controls').style.display = 'flex';
       $('updated').textContent = 'Updated ' + new Date().toLocaleString();
       render();
@@ -131,6 +243,27 @@
       $('list').innerHTML = '';
       setState(`Couldn't reach inventory (${err.message}). Check your Tailscale connection.`, true);
     }
+  }
+
+  // POST a write action to the inventory workflow. Returns parsed JSON or throws.
+  async function postAction(payload) {
+    const res = await fetch(`${N8N_BASE}/mvfn-inventory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  function buildSpeciesDatalist() {
+    $('speciesList').innerHTML = speciesList
+      .slice()
+      .sort((a, b) => (a.common_name || '').localeCompare(b.common_name || ''))
+      .map(sp => {
+        const label = `${sp.common_name || sp.species_id}${sp.scientific_name ? ' — ' + sp.scientific_name : ''}`;
+        return `<option value="${esc(label)}" data-id="${esc(sp.species_id)}"></option>`;
+      }).join('');
   }
 
   function setState(msg, isError) {
@@ -160,6 +293,13 @@
     return 'other';
   }
 
+  function updateProgress() {
+    const total = stock.length;
+    const done = counted.size;
+    $('progBar').style.width = total ? (100 * done / total) + '%' : '0%';
+    $('progLabel').textContent = `${done} / ${total} counted this session`;
+  }
+
   function render() {
     const q = $('search').value.trim().toLowerCase();
     const statusF = $('statusFilter').value;
@@ -167,7 +307,8 @@
     const rows = stock
       .map(s => ({ s, sp: speciesById[speciesKey(s.species_id)] || {} }))
       .filter(({ s, sp }) => {
-        if (statusF !== 'all' && s.status !== statusF) return false;
+        if (statusF === 'uncounted') { if (counted.has(s.stock_id)) return false; }
+        else if (statusF !== 'all' && s.status !== statusF) return false;
         if (!q) return true;
         const hay = `${sp.common_name || ''} ${sp.scientific_name || ''} ${s.species_id || ''}`.toLowerCase();
         return hay.includes(q);
@@ -183,24 +324,167 @@
     if (!rows.length) { setState('No matching stock.', false); $('list').innerHTML = ''; return; }
     setState('', false);
 
-    $('list').innerHTML = rows.map(({ s, sp }) => {
-      const name = sp.common_name || s.species_id || 'Unknown';
-      const sci = sp.scientific_name ? `<div class="sci">${esc(sp.scientific_name)}</div>` : '';
-      const native = sp.is_true_native ? '<span class="native-dot" title="True native">● native</span>' : '';
-      const price = fmtPrice(s.price_per_unit);
-      const loc = s.location ? `<div class="loc">${esc(s.location)}</div>` : '';
-      return `<div class="stock-card">
-        <div class="name">${esc(name)} ${native}</div>
-        ${sci}
-        <div class="meta">
-          <span>${esc(s.container_size || '—')}</span>
-          <span class="qty">${s.quantity ?? 0} avail</span>
-          <span class="badge ${statusClass(s.status)}">${esc(s.status || '—')}</span>
-          ${price ? `<span class="price">${price}</span>` : ''}
-        </div>
-        ${loc}
-      </div>`;
-    }).join('');
+    $('list').innerHTML = rows.map(({ s, sp }) => cardHTML(s, sp)).join('');
+    if (countMode) rows.forEach(({ s }) => wireCard(s.stock_id));
+    updateProgress();
+  }
+
+  function cardHTML(s, sp) {
+    const name = sp.common_name || s.species_id || 'Unknown';
+    const sci = sp.scientific_name ? `<div class="sci">${esc(sp.scientific_name)}</div>` : '';
+    const native = sp.is_true_native ? '<span class="native-dot" title="True native">● native</span>' : '';
+    const price = fmtPrice(s.price_per_unit);
+    const loc = s.location ? `<div class="loc">${esc(s.location)}</div>` : '';
+    const isCounted = counted.has(s.stock_id);
+    const tick = isCounted ? '<span class="counted-tick">✓ counted</span>' : '';
+    return `<div class="stock-card${isCounted ? ' counted' : ''}" data-card="${s.stock_id}">
+      <div class="name">${esc(name)} ${native}</div>
+      ${sci}
+      <div class="meta">
+        <span>${esc(s.container_size || '—')}</span>
+        <span class="qty">${s.quantity ?? 0} avail</span>
+        <span class="badge ${statusClass(s.status)}">${esc(s.status || '—')}</span>
+        ${price ? `<span class="price">${price}</span>` : ''}
+        ${tick}
+      </div>
+      ${loc}
+      ${countMode ? editorHTML(s) : ''}
+    </div>`;
+  }
+
+  function editorHTML(s) {
+    return `<div class="editor">
+      <div class="line">
+        <label>Count</label>
+        <input class="count" type="number" inputmode="numeric" min="0" value="${s.quantity ?? 0}">
+        <button class="save" type="button" data-act="count">Save count</button>
+        <span class="msg" data-msg></span>
+      </div>
+      <div class="line">
+        <label>Status</label>
+        <select class="statussel">
+          ${['growing', 'for-sale'].concat(
+            (s.status && s.status !== 'growing' && s.status !== 'for-sale') ? [s.status] : []
+          ).map(o => `<option value="${esc(o)}"${o === s.status ? ' selected' : ''}>${esc(o)}</option>`).join('')}
+        </select>
+        <label>Loc</label>
+        <input class="locinput" type="text" value="${esc(s.location || '')}" placeholder="location">
+        <button class="save" type="button" data-act="meta">Save</button>
+      </div>
+    </div>`;
+  }
+
+  function wireCard(stockId) {
+    const card = document.querySelector(`[data-card="${stockId}"]`);
+    if (!card) return;
+    const s = stock.find(x => x.stock_id === stockId);
+    const msg = card.querySelector('[data-msg]');
+
+    function setMsg(text, cls) { msg.textContent = text; msg.className = 'msg ' + (cls || ''); }
+
+    // Save count -> set_qty
+    card.querySelector('[data-act="count"]').addEventListener('click', async () => {
+      const val = card.querySelector('input.count').value.trim();
+      const n = parseInt(val, 10);
+      if (val === '' || isNaN(n) || n < 0) { setMsg('Enter a number ≥ 0', 'err'); return; }
+      const btn = card.querySelector('[data-act="count"]');
+      btn.disabled = true; setMsg('Saving…', 'saving');
+      try {
+        await postAction({ action: 'set_qty', stock_id: stockId, quantity: n });
+        s.quantity = n;
+        counted.add(stockId);
+        setMsg('✓ saved', 'ok');
+        card.classList.add('counted');
+        if (!card.querySelector('.counted-tick')) {
+          const t = document.createElement('span');
+          t.className = 'counted-tick'; t.textContent = '✓ counted';
+          card.querySelector('.meta').appendChild(t);
+        }
+        card.querySelector('.meta .qty').textContent = `${n} avail`;
+        updateProgress();
+      } catch (err) {
+        setMsg(`✗ ${err.message} — tap to retry`, 'err');
+      } finally { btn.disabled = false; }
+    });
+
+    // Save status + location -> set_status / set_location (only what changed)
+    card.querySelector('[data-act="meta"]').addEventListener('click', async () => {
+      const newStatus = card.querySelector('select.statussel').value;
+      const newLoc = card.querySelector('input.locinput').value.trim();
+      const btn = card.querySelector('[data-act="meta"]');
+      btn.disabled = true; setMsg('Saving…', 'saving');
+      try {
+        if (newStatus !== s.status) {
+          await postAction({ action: 'set_status', stock_id: stockId, status: newStatus });
+          s.status = newStatus;
+          const badge = card.querySelector('.badge');
+          badge.textContent = newStatus; badge.className = 'badge ' + statusClass(newStatus);
+        }
+        if (newLoc !== (s.location || '')) {
+          await postAction({ action: 'set_location', stock_id: stockId, location: newLoc });
+          s.location = newLoc;
+        }
+        setMsg('✓ saved', 'ok');
+      } catch (err) {
+        setMsg(`✗ ${err.message} — tap to retry`, 'err');
+      } finally { btn.disabled = false; }
+    });
+  }
+
+  // ---- Add stock found ----
+  function resolveSpeciesId(typed) {
+    const val = typed.trim();
+    if (!val) return '';
+    // datalist option value is "Common — Scientific"; match it, else match common/sci/id directly.
+    const opt = Array.from($('speciesList').options).find(o => o.value === val);
+    if (opt) return opt.getAttribute('data-id');
+    const low = val.toLowerCase();
+    const hit = speciesList.find(sp =>
+      (sp.common_name || '').toLowerCase() === low ||
+      (sp.scientific_name || '').toLowerCase() === low ||
+      speciesKey(sp.species_id).toLowerCase() === low);
+    return hit ? hit.species_id : '';
+  }
+
+  async function submitAddStock() {
+    const speciesId = resolveSpeciesId($('addSpecies').value);
+    const addMsg = $('addMsg');
+    if (!speciesId) { addMsg.textContent = 'Pick a species from the list.'; return; }
+    const qtyRaw = $('addQty').value.trim();
+    const qty = qtyRaw === '' ? 0 : parseInt(qtyRaw, 10);
+    if (isNaN(qty) || qty < 0) { addMsg.textContent = 'Qty must be ≥ 0.'; return; }
+    const btn = $('addSave'); btn.disabled = true; addMsg.textContent = 'Adding…';
+    try {
+      const out = await postAction({
+        action: 'add_stock',
+        species_id: speciesId,
+        container_size: $('addContainer').value.trim(),
+        quantity: String(qty),
+        location: $('addLocation').value.trim(),
+        status: $('addStatus').value,
+        price_per_unit: $('addPrice').value.trim(),
+      });
+      const newId = out && out.result && out.result.stock_id;
+      // reset form, refetch so the new row appears, then mark it counted
+      $('addSpecies').value = ''; $('addContainer').value = '';
+      $('addQty').value = ''; $('addLocation').value = ''; $('addPrice').value = '';
+      addMsg.textContent = '';
+      $('addForm').classList.remove('open');
+      await load();
+      if (newId != null) { counted.add(newId); render(); }
+    } catch (err) {
+      addMsg.textContent = `✗ ${err.message}`;
+    } finally { btn.disabled = false; }
+  }
+
+  function setCountMode(on) {
+    countMode = on;
+    document.body.classList.toggle('count-mode', on);
+    $('modeToggle').classList.toggle('active', on);
+    $('modeToggle').textContent = on ? 'Done counting' : 'Start count';
+    $('modeLabel').textContent = on ? 'Count mode · save as you go' : 'Live stock view · read-only';
+    if (!on) { $('addForm').classList.remove('open'); }
+    render();
   }
 
   function esc(str) {
@@ -210,6 +494,10 @@
 
   $('search').addEventListener('input', render);
   $('statusFilter').addEventListener('change', render);
+  $('modeToggle').addEventListener('click', () => setCountMode(!countMode));
+  $('addBtn').addEventListener('click', () => $('addForm').classList.toggle('open'));
+  $('addCancel').addEventListener('click', () => { $('addForm').classList.remove('open'); $('addMsg').textContent = ''; });
+  $('addSave').addEventListener('click', submitAddStock);
   load();
 </script>
 </body>
