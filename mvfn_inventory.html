@@ -78,6 +78,14 @@
     flex: 1 1 120px; padding: 10px; border: 2px solid #d1d5db; border-radius: 6px;
     font-family: 'DM Mono', monospace; font-size: 0.9rem; background: white;
   }
+  .addform .speciesnote { font-size: 0.72rem; min-height: 1em; margin: 0 0 8px; }
+  .addform .speciesnote.match { color: #047857; }
+  .addform .speciesnote.new { color: #b45309; }
+  .addform .newspecies { display: none; }
+  .addform .newspecies.show { display: block; }
+  .addform .nativechk { display: flex; align-items: center; gap: 6px; font-size: 0.8rem;
+    color: #5a6b2d; margin: 0 0 8px; }
+  .addform .nativechk input { flex: 0 0 auto; }
   .addform .actions { display: flex; gap: 8px; margin-top: 4px; }
   .addform .actions button { flex: 1; padding: 11px; border-radius: 6px; font-weight: 600;
     font-family: 'Fraunces', serif; font-size: 0.92rem; cursor: pointer; }
@@ -183,6 +191,13 @@
       <div class="row">
         <input list="speciesList" id="addSpecies" placeholder="Species (type to search)" autocomplete="off">
         <datalist id="speciesList"></datalist>
+      </div>
+      <div class="speciesnote" id="speciesNote"></div>
+      <div class="newspecies" id="newSpecies">
+        <div class="row">
+          <input id="addSci" placeholder="Scientific name (optional)">
+        </div>
+        <label class="nativechk"><input type="checkbox" id="addNative"> True PA native</label>
       </div>
       <div class="row">
         <input id="addContainer" placeholder="Container size">
@@ -446,15 +461,63 @@
     return hit ? hit.species_id : '';
   }
 
+  // "Chester Thornless Blackberry" -> "chester-thornless-blackberry"
+  function slugify(s) {
+    return String(s).toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  // Live feedback as the species field changes: matched existing vs. new-to-create.
+  function onSpeciesInput() {
+    const typed = $('addSpecies').value.trim();
+    const note = $('speciesNote');
+    const block = $('newSpecies');
+    if (!typed) { note.textContent = ''; note.className = 'speciesnote'; block.classList.remove('show'); return; }
+    if (resolveSpeciesId(typed)) {
+      note.textContent = '✓ existing species';
+      note.className = 'speciesnote match';
+      block.classList.remove('show');
+    } else {
+      note.textContent = `✚ new species — will be created as “${typed}” (${slugify(typed)})`;
+      note.className = 'speciesnote new';
+      block.classList.add('show');
+    }
+  }
+
+  function resetAddForm() {
+    ['addSpecies','addContainer','addQty','addLocation','addPrice','addSci'].forEach(id => $(id).value = '');
+    $('addNative').checked = false;
+    $('addMsg').textContent = '';
+    $('speciesNote').textContent = ''; $('speciesNote').className = 'speciesnote';
+    $('newSpecies').classList.remove('show');
+  }
+
   async function submitAddStock() {
-    const speciesId = resolveSpeciesId($('addSpecies').value);
+    const typed = $('addSpecies').value.trim();
     const addMsg = $('addMsg');
-    if (!speciesId) { addMsg.textContent = 'Pick a species from the list.'; return; }
+    if (!typed) { addMsg.textContent = 'Enter a species name.'; return; }
     const qtyRaw = $('addQty').value.trim();
     const qty = qtyRaw === '' ? 0 : parseInt(qtyRaw, 10);
     if (isNaN(qty) || qty < 0) { addMsg.textContent = 'Qty must be ≥ 0.'; return; }
-    const btn = $('addSave'); btn.disabled = true; addMsg.textContent = 'Adding…';
+
+    let speciesId = resolveSpeciesId(typed);
+    const isNew = !speciesId;
+    if (isNew) speciesId = slugify(typed);
+    if (!speciesId) { addMsg.textContent = 'Species name needs at least one letter or number.'; return; }
+
+    const btn = $('addSave'); btn.disabled = true;
     try {
+      if (isNew) {
+        addMsg.textContent = 'Creating species…';
+        await postAction({
+          action: 'add_species',
+          species_id: speciesId,
+          common_name: typed,
+          scientific_name: $('addSci').value.trim(),
+          is_true_native: $('addNative').checked ? 'true' : '',
+        });
+      }
+      addMsg.textContent = 'Adding stock…';
       const out = await postAction({
         action: 'add_stock',
         species_id: speciesId,
@@ -465,15 +528,12 @@
         price_per_unit: $('addPrice').value.trim(),
       });
       const newId = out && out.result && out.result.stock_id;
-      // reset form, refetch so the new row appears, then mark it counted
-      $('addSpecies').value = ''; $('addContainer').value = '';
-      $('addQty').value = ''; $('addLocation').value = ''; $('addPrice').value = '';
-      addMsg.textContent = '';
+      resetAddForm();
       $('addForm').classList.remove('open');
       await load();
       if (newId != null) { counted.add(newId); render(); }
     } catch (err) {
-      addMsg.textContent = `✗ ${err.message}`;
+      addMsg.textContent = `✗ ${err.message} — tap to retry`;
     } finally { btn.disabled = false; }
   }
 
@@ -496,7 +556,8 @@
   $('statusFilter').addEventListener('change', render);
   $('modeToggle').addEventListener('click', () => setCountMode(!countMode));
   $('addBtn').addEventListener('click', () => $('addForm').classList.toggle('open'));
-  $('addCancel').addEventListener('click', () => { $('addForm').classList.remove('open'); $('addMsg').textContent = ''; });
+  $('addCancel').addEventListener('click', () => { $('addForm').classList.remove('open'); resetAddForm(); });
+  $('addSpecies').addEventListener('input', onSpeciesInput);
   $('addSave').addEventListener('click', submitAddStock);
   load();
 </script>
