@@ -228,7 +228,8 @@
       </div>
       <div class="flabel">Container size &amp; quantity</div>
       <div class="row">
-        <input id="addContainer" placeholder="Container size (e.g. 3.5&quot;, 2-quart)">
+        <input id="addContainer" list="containerList" placeholder="Container size (pick or type)">
+        <datalist id="containerList"></datalist>
         <input id="addQty" type="number" inputmode="numeric" min="0" placeholder="Qty">
       </div>
       <div class="flabel">Status · location · price</div>
@@ -268,6 +269,7 @@
   let stock = [];
   let speciesById = {};
   let speciesList = [];
+  let containerList = [];
   let countMode = false;
   const counted = new Set();        // stock_ids saved this session
 
@@ -285,7 +287,9 @@
       speciesById = {};
       speciesList = (data.species || []).slice();
       speciesList.forEach(sp => { speciesById[speciesKey(sp.species_id)] = sp; });
+      containerList = (data.containers || []).slice();
       buildSpeciesDatalist();
+      buildContainerDatalist();
       $('controls').style.display = 'flex';
       $('updated').textContent = 'Updated ' + new Date().toLocaleString();
       render();
@@ -321,6 +325,16 @@
       .map(sp => {
         const label = `${sp.common_name || sp.species_id}${sp.scientific_name ? ' — ' + sp.scientific_name : ''}`;
         return `<option value="${esc(label)}" data-id="${esc(sp.species_id)}"></option>`;
+      }).join('');
+  }
+
+  // Canonical containers from inventory.container -> shared datalist (add form + cards).
+  // Free typing is still allowed; a never-seen value upserts a new container server-side.
+  function buildContainerDatalist() {
+    $('containerList').innerHTML = containerList
+      .map(c => {
+        const lbl = c.nominal_volume ? `${c.container_id} — ${c.nominal_volume}` : c.container_id;
+        return `<option value="${esc(c.container_id)}">${esc(lbl)}</option>`;
       }).join('');
   }
 
@@ -420,7 +434,7 @@
       </div>
       <div class="line">
         <label>Cont.</label>
-        <input class="continput" type="text" value="${esc(s.container_size || '')}" placeholder="container size">
+        <input class="continput" list="containerList" type="text" value="${esc(s.container_size || '')}" placeholder="container size">
       </div>
       <div class="line">
         <label>Status</label>
