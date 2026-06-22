@@ -169,6 +169,9 @@
   .badge-bucket { background: rgba(126,207,79,0.12); color: var(--green); }
   .badge-effort { background: rgba(240,184,64,0.12); color: var(--amber); }
   .badge-project { background: rgba(255,255,255,0.06); color: var(--text3); }
+  .badge-priority { background: rgba(126,207,79,0.18); color: var(--green); font-weight: 700; }
+  .badge-priority.top { background: var(--green); color: #0d1f0d; }
+  .task-reason { font-size: 11px; color: var(--text3); margin-top: 3px; font-style: italic; }
 
   /* EXPAND TOGGLE */
   .expand-btn {
@@ -424,7 +427,13 @@ function renderTasks() {
   const open = allTasks.filter(t =>
     t.status !== 'Done' && t.status !== 'Withdrawn' && t.status !== 'Proposed' &&
     (activeFilter === 'All' || t.bucket === activeFilter)
-  );
+  ).sort((a, b) => {
+    // Nightly-recompiled priority first (lower = do first); unranked sink to the bottom.
+    const pa = a.priority == null ? Infinity : a.priority;
+    const pb = b.priority == null ? Infinity : b.priority;
+    if (pa !== pb) return pa - pb;
+    return (a.created_date || '').localeCompare(b.created_date || '');
+  });
   const done = allTasks
     .filter(t => t.status === 'Done' && (activeFilter === 'All' || t.bucket === activeFilter))
     .sort((a, b) => (b.completed_date || '').localeCompare(a.completed_date || ''))
@@ -491,7 +500,9 @@ function card(t) {
       </button>
       <div class="task-content" onclick="toggleExpand('${esc(id)}')">
         <div class="task-desc">${escH(t.description||'(no description)')}</div>
+        ${(!isDone && t.priority_reason)?`<div class="task-reason">${escH(t.priority_reason)}</div>`:''}
         <div class="task-meta">
+          ${(!isDone && t.priority!=null)?`<span class="badge badge-priority${t.priority<=3?' top':''}">#${t.priority}</span>`:''}
           ${t.bucket?`<span class="badge badge-bucket">${escH(t.bucket)}</span>`:''}
           ${t.effort?`<span class="badge badge-effort">${escH(t.effort)}</span>`:''}
           ${projectLabel?`<span class="badge badge-project">${escH(projectLabel)}</span>`:''}
