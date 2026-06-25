@@ -1,0 +1,21 @@
+{
+  "name": "MVFN Operations Admin",
+  "short_name": "Ops Admin",
+  "description": "Curate MVFN projects, assets and suppliers",
+  "start_url": "/mvf-operations/mvfn_ops_admin.html",
+  "scope": "/mvf-operations/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f5f0",
+  "theme_color": "#2d3319",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/mvf-operations/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"]
+}

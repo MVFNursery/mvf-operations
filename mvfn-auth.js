@@ -1,21 +1,26 @@
 /* mvfn-auth.js — shared one-time unlock + auth header for MVFN field PWAs.
  *
  * Include in <head> BEFORE the app's own script:
- *   <script src="mvfn-auth.js"></script>                      (field apps)
- *   <script src="mvfn-auth.js" data-token-key="mvfn_ops_token"></script>  (ops admin)
+ *   <script src="mvfn-auth.js" data-validate-url="https://.../webhook/mvfn-field-get"></script>
+ *   <script src="mvfn-auth.js" data-token-key="mvfn_ops_token" data-validate-url="https://.../webhook/mvfn-get-ops"></script>
  *
  * What it does:
  *  - Stores an access token in localStorage (one-time unlock per device).
  *  - Monkeypatches fetch() to add the "X-MVFN-Token" header to every request
  *    aimed at the n8n host. n8n's webhook Header Auth checks it server-side.
- *  - Shows a blocking unlock overlay when no token is set, and re-shows it if
- *    the server rejects the token (HTTP 403).
+ *  - Shows a blocking unlock overlay when there's no token. The overlay
+ *    VALIDATES the entered token against data-validate-url (an authed GET) and
+ *    only accepts it on success — a wrong token is rejected on the spot rather
+ *    than letting the user in and failing later.
+ *  - Re-shows the overlay if the server rejects the token mid-session (401/403).
  *
  * The token is NEVER hard-coded here — it lives only in the user's localStorage.
  */
 (function () {
   var script = document.currentScript;
-  var TOKEN_KEY = (script && script.dataset && script.dataset.tokenKey) || 'mvfn_field_token';
+  var ds = (script && script.dataset) || {};
+  var TOKEN_KEY = ds.tokenKey || 'mvfn_field_token';
+  var VALIDATE_URL = ds.validateUrl || '';
   var HEADER = 'X-MVFN-Token';
   var N8N_HOST = 'megamachine.taile865b6.ts.net';
 
@@ -26,7 +31,7 @@
   }
   function isN8n(url) { return typeof url === 'string' && url.indexOf(N8N_HOST) !== -1; }
 
-  // expose a lock control for apps that want a "Lock" button
+  // expose controls for apps that want a "Lock" button
   window.mvfnLock = function () { setTok(''); showOverlay(); };
   window.mvfnToken = getTok;
 
@@ -45,14 +50,33 @@
     }
     return _fetch(input, init).then(function (res) {
       // n8n rejects a missing/wrong Header Auth with 401 or 403 -> re-prompt for the token.
-      if (hitN8n && res && (res.status === 401 || res.status === 403)) { setTok(''); showOverlay(); }
+      if (hitN8n && res && (res.status === 401 || res.status === 403)) {
+        setTok('');
+        showOverlay('Access token rejected — check and re-enter.');
+      }
       return res;
     });
   };
 
+  // Validate a candidate token against the authed GET endpoint, bypassing the
+  // monkeypatch (use the original fetch + explicit header) so we don't trip the
+  // global 401/403 handler while checking. Resolves: 'ok' | 'bad' | 'unreachable'.
+  function validateToken(tok) {
+    if (!VALIDATE_URL) return Promise.resolve('ok');   // no validator configured -> accept
+    var hdrs = {}; hdrs[HEADER] = tok;
+    return _fetch(VALIDATE_URL, { headers: hdrs, cache: 'no-store' }).then(function (res) {
+      if (res.status === 401 || res.status === 403) return 'bad';
+      return 'ok';
+    }).catch(function () { return 'unreachable'; });
+  }
+
   // ---- blocking unlock overlay ----
-  function showOverlay() {
-    if (document.getElementById('mvfn-auth-ov')) return;
+  function showOverlay(reason) {
+    var existing = document.getElementById('mvfn-auth-ov');
+    if (existing) {
+      if (reason) { var m = existing.querySelector('#mvfn-auth-msg'); if (m) m.textContent = reason; }
+      return;
+    }
     var ov = document.createElement('div');
     ov.id = 'mvfn-auth-ov';
     ov.setAttribute('style',
@@ -67,7 +91,8 @@
       'spellcheck="false" placeholder="access token" ' +
       'style="width:100%;padding:12px;border:2px solid #5a6b2d;border-radius:8px;font-size:1rem;' +
       'box-sizing:border-box;font-family:monospace">' +
-      '<div id="mvfn-auth-msg" style="font-size:.72rem;color:#9b2c1f;min-height:1em;margin:6px 0 0"></div>' +
+      '<div id="mvfn-auth-msg" style="font-size:.72rem;color:#9b2c1f;min-height:1em;margin:6px 0 0">' +
+      (reason || '') + '</div>' +
       '<button id="mvfn-auth-go" type="button" ' +
       'style="margin-top:10px;width:100%;padding:12px;border:0;border-radius:8px;background:#2d5016;' +
       'color:#fff;font-size:1rem;font-weight:700;cursor:pointer">Unlock</button>' +
@@ -75,12 +100,26 @@
     document.body.appendChild(ov);
     var inp = ov.querySelector('#mvfn-auth-in');
     var go = ov.querySelector('#mvfn-auth-go');
+    var msg = ov.querySelector('#mvfn-auth-msg');
     function submit() {
       var v = inp.value.trim();
-      if (!v) { ov.querySelector('#mvfn-auth-msg').textContent = 'Token required'; return; }
-      setTok(v);
-      ov.remove();
-      location.reload();   // re-run the app's normal load path, now with the header
+      if (!v) { msg.textContent = 'Token required'; return; }
+      go.disabled = true; msg.style.color = '#5a6b2d'; msg.textContent = 'Checking…';
+      validateToken(v).then(function (result) {
+        if (result === 'bad') {
+          go.disabled = false; msg.style.color = '#9b2c1f';
+          msg.textContent = 'Token rejected — check and re-enter.';
+          return;
+        }
+        if (result === 'unreachable') {
+          go.disabled = false; msg.style.color = '#9b2c1f';
+          msg.textContent = "Can't reach server — check Tailscale and retry.";
+          return;
+        }
+        setTok(v);
+        ov.remove();
+        location.reload();   // re-run the app's normal load path, now authed
+      });
     }
     go.addEventListener('click', submit);
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
@@ -90,6 +129,6 @@
   // gate immediately on load when there's no token yet
   if (!getTok()) {
     if (document.body) showOverlay();
-    else document.addEventListener('DOMContentLoaded', showOverlay);
+    else document.addEventListener('DOMContentLoaded', function () { showOverlay(); });
   }
 })();

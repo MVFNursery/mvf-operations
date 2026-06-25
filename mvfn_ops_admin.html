@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ops Admin">
+<meta name="theme-color" content="#2d3319">
+<link rel="manifest" href="ops-admin-manifest.json">
+<title>MVFN Operations Admin</title>
+<script src="mvfn-auth.js" data-token-key="mvfn_ops_token" data-validate-url="https://megamachine.taile865b6.ts.net:5678/webhook/mvfn-get-ops"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Mono', monospace; background: #f5f5f0; color: #2d3319; min-height: 100vh; }
+  h1, h2 { font-family: 'Fraunces', serif; }
+
+  .container { max-width: 680px; margin: 0 auto; padding: 20px; }
+  header { text-align: center; padding: 20px 0 8px; }
+  header h1 { font-size: 2rem; font-weight: 700; }
+  header .subtitle { font-size: 0.85rem; color: #5a6b2d; margin-top: 4px; }
+
+  /* Lock / unlock bar */
+  .lockbar { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+    font-size: 0.78rem; margin: 6px 0 14px; }
+  .lockbar .state-locked { color: #b45309; }
+  .lockbar .state-unlocked { color: #047857; }
+  .lockbar input { padding: 8px 10px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 0.85rem; background: white; width: 150px; }
+  .lockbar button { padding: 8px 14px; border: 2px solid #2d3319; background: white; color: #2d3319;
+    border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+
+  /* Tabs */
+  .tabs { display: flex; justify-content: center; gap: 8px; margin: 4px 0 16px; flex-wrap: wrap; }
+  .tabs button { padding: 9px 18px; border: 2px solid #2d3319; background: white; color: #2d3319;
+    border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+  .tabs button.active { background: #2d3319; color: white; }
+
+  .controls { display: flex; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
+  .controls input[type="search"] { flex: 1 1 180px; padding: 12px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 1rem; background: white; }
+  .controls input[type="search"]:focus { outline: none; border-color: #5a6b2d; }
+  .summary { font-size: 0.8rem; color: #5a6b2d; margin-bottom: 12px; }
+
+  .addbtn { width: 100%; margin: 0 0 14px; padding: 12px; border: 2px dashed #5a6b2d; background: #fbfbf6;
+    color: #5a6b2d; border-radius: 8px; font-family: 'Fraunces', serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+
+  .list { display: grid; gap: 10px; }
+  .card { background: white; border: 2px solid #2d3319; border-radius: 8px; padding: 14px 16px; }
+  .card .name { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600; }
+  .card .key { font-size: 0.7rem; color: #8a8a7a; margin-top: 2px; }
+  .card .fields { margin-top: 8px; font-size: 0.8rem; color: #2d3319; }
+  .card .fields .f { margin-top: 3px; }
+  .card .fields .f b { color: #5a6b2d; font-weight: 500; }
+  .card .meta { display: flex; gap: 10px; margin-top: 12px; }
+  .card .meta button { padding: 8px 14px; border-radius: 6px; font-family: 'Fraunces', serif;
+    font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+  .card .meta .edit { border: 2px solid #2d3319; background: #2d3319; color: white; }
+  .card .meta .del { border: 2px solid #b91c1c; background: white; color: #b91c1c; margin-left: auto; }
+  .card .stamp { font-size: 0.68rem; color: #aaa; margin-top: 8px; }
+
+  /* Edit form (inline panel) */
+  .form { background: #fbfbf6; border: 2px solid #5a6b2d; border-radius: 8px; padding: 16px; margin: 0 0 14px; display: none; }
+  .form.open { display: block; }
+  .form h2 { font-size: 1.05rem; margin-bottom: 12px; }
+  .form .flabel { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: #8a8a7a; margin: 8px 0 3px; }
+  .form input, .form textarea, .form select { width: 100%; padding: 10px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 0.9rem; background: white; }
+  .form input[readonly] { background: #eee; color: #777; }
+  .form textarea { min-height: 60px; resize: vertical; }
+  .form .actions { display: flex; gap: 8px; margin-top: 14px; }
+  .form .actions button { flex: 1; padding: 11px; border-radius: 6px; font-weight: 600;
+    font-family: 'Fraunces', serif; font-size: 0.92rem; cursor: pointer; }
+  .form .save { border: 2px solid #2d3319; background: #2d3319; color: white; }
+  .form .cancel { border: 2px solid #d1d5db; background: white; color: #2d3319; }
+  .form .msg { font-size: 0.74rem; min-height: 1em; margin-top: 8px; }
+  .form .msg.err { color: #7f1d1d; }
+  .form .msg.ok { color: #047857; }
+  .form .msg.saving { color: #8a8a7a; }
+
+  .state { text-align: center; padding: 40px 20px; color: #5a6b2d; }
+  .state.error { color: #7f1d1d; }
+  .state button { margin-top: 16px; padding: 12px 24px; border: 2px solid #2d3319; background: #2d3319;
+    color: white; border-radius: 8px; font-family: 'Fraunces', serif; font-size: 1rem; font-weight: 600; cursor: pointer; }
+  .updated { text-align: center; font-size: 0.7rem; color: #aaa; padding: 24px 0 12px; }
+
+  .toast { display: none; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center;
+    background: rgba(45, 51, 25, 0.28); }
+  .toast.show { display: flex; }
+  .toast-card { background: white; border: 2px solid #047857; border-radius: 14px; padding: 26px 30px;
+    text-align: center; min-width: 200px; box-shadow: 0 10px 30px rgba(0,0,0,0.18); }
+  .toast-check { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%; background: #047857;
+    color: white; font-size: 2rem; line-height: 56px; }
+  .toast-msg { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 600; }
+  .toast-ok { margin-top: 16px; padding: 9px 28px; border: 2px solid #2d3319; background: white; color: #2d3319;
+    border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>MVFN Operations</h1>
+      <div class="subtitle">Projects · Assets · Suppliers</div>
+    </header>
+
+    <div class="lockbar" id="lockbar"></div>
+
+    <div class="tabs" id="tabs">
+      <button data-tab="projects" class="active" type="button">Projects</button>
+      <button data-tab="assets" type="button">Assets</button>
+      <button data-tab="suppliers" type="button">Suppliers</button>
+    </div>
+
+    <div class="controls">
+      <input type="search" id="search" placeholder="Search…" autocomplete="off">
+    </div>
+    <div class="summary" id="summary"></div>
+
+    <button class="addbtn" id="addBtn" type="button">+ Add</button>
+    <div class="form" id="form"></div>
+
+    <div id="list" class="list"></div>
+    <div id="state" class="state">Loading…</div>
+    <div class="updated" id="updated"></div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">
+    <div class="toast-card">
+      <div class="toast-check">✓</div>
+      <div class="toast-msg" id="toastMsg">Saved</div>
+      <button class="toast-ok" id="toastOk" type="button">OK</button>
+    </div>
+  </div>
+
+<script>
+  // Same tailnet n8n host the other field PWAs use.
+  const N8N_BASE = 'https://megamachine.taile865b6.ts.net:5678/webhook';
+
+  // Field schema per entity. `key` is the business PK (slug). `fields` drive the form + card.
+  const ENTITIES = {
+    projects: {
+      key: 'project_id', single: 'project', saveAction: 'save_project', delAction: 'delete_project',
+      fields: [
+        { n: 'name', l: 'Name', req: true },
+        { n: 'bucket', l: 'Bucket' },
+        { n: 'status', l: 'Status' },
+        { n: 'next_action', l: 'Next action' },
+        { n: 'blockers', l: 'Blockers' },
+        { n: 'seasonal_relevance', l: 'Seasonal relevance' },
+        { n: 'solo_capable', l: 'Solo capable' },
+        { n: 'description', l: 'Description', ta: true },
+        { n: 'notes', l: 'Notes', ta: true },
+      ],
+      cardFields: ['status', 'next_action', 'bucket'],
+    },
+    assets: {
+      key: 'asset_id', single: 'asset', saveAction: 'save_asset', delAction: 'delete_asset',
+      fields: [
+        { n: 'name', l: 'Name', req: true },
+        { n: 'category', l: 'Category' },
+        { n: 'location', l: 'Location' },
+        { n: 'condition', l: 'Condition' },
+        { n: 'approx_value', l: 'Approx value' },
+        { n: 'last_used', l: 'Last used' },
+        { n: 'resale_candidate', l: 'Resale candidate' },
+        { n: 'photo_link', l: 'Photo link' },
+        { n: 'notes', l: 'Notes', ta: true },
+      ],
+      cardFields: ['category', 'location', 'condition'],
+    },
+    suppliers: {
+      key: 'supplier_id', single: 'supplier', saveAction: 'save_supplier', delAction: 'delete_supplier',
+      fields: [
+        { n: 'name', l: 'Name', req: true },
+        { n: 'category', l: 'Category' },
+        { n: 'contact', l: 'Contact' },
+        { n: 'phone', l: 'Phone' },
+        { n: 'address', l: 'Address' },
+        { n: 'hours', l: 'Hours' },
+        { n: 'website', l: 'Website' },
+        { n: 'notes', l: 'Notes', ta: true },
+      ],
+      cardFields: ['category', 'contact', 'phone'],
+    },
+  };
+
+  const state = { projects: [], assets: [], suppliers: [] };
+  let tab = 'projects';
+  let editing = null;   // the record being edited, or null for add-new
+
+  const $ = id => document.getElementById(id);
+  const ent = () => ENTITIES[tab];
+
+  function esc(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function slugify(s) {
+    return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  // ---- lock control (unlock/auth handled by mvfn-auth.js overlay + header) ----
+  function renderLockbar() {
+    $('lockbar').innerHTML =
+      `<span class="state-unlocked">● Editing unlocked</span> <button id="lockBtn" type="button">Lock</button>`;
+    $('lockBtn').onclick = () => { window.mvfnLock(); };
+  }
+
+  // ---- data ----
+  async function load() {
+    setState('Loading…', false);
+    try {
+      const res = await fetch(`${N8N_BASE}/mvfn-get-ops`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      state.projects = Array.isArray(data.projects) ? data.projects : [];
+      state.assets = Array.isArray(data.assets) ? data.assets : [];
+      state.suppliers = Array.isArray(data.suppliers) ? data.suppliers : [];
+      $('updated').textContent = 'Updated ' + new Date().toLocaleString();
+      render();
+    } catch (err) {
+      $('summary').textContent = '';
+      $('list').innerHTML = '';
+      setState(`Couldn't reach operations (${err.message}). Check your Tailscale connection.`, true);
+    }
+  }
+
+  // POST a write action. Tolerant of empty/non-JSON bodies; surfaces 403 (bad token) clearly.
+  async function postAction(payload) {
+    const res = await fetch(`${N8N_BASE}/mvfn-ops`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+    // 403 (bad token) is handled globally by mvfn-auth.js (clears token + shows unlock).
+    if (!res.ok) throw new Error((data && data.message) ? data.message : `server error ${res.status}`);
+    if (data === null) throw new Error('empty response — the save may have failed; check and retry');
+    return data;
+  }
+
+  function setState(msg, isError) {
+    const el = $('state');
+    el.className = 'state' + (isError ? ' error' : '');
+    el.innerHTML = '';
+    el.appendChild(document.createTextNode(msg));
+    if (isError) {
+      const b = document.createElement('button');
+      b.textContent = 'Retry'; b.onclick = load;
+      el.appendChild(document.createElement('br')); el.appendChild(b);
+    }
+    el.style.display = msg ? 'block' : 'none';
+  }
+
+  // ---- render list ----
+  function render() {
+    const e = ent();
+    const q = $('search').value.trim().toLowerCase();
+    const rows = state[tab].filter(r => {
+      if (!q) return true;
+      return Object.values(r).some(v => String(v == null ? '' : v).toLowerCase().includes(q));
+    });
+    $('summary').textContent = `${state[tab].length} ${tab}${q ? ` · ${rows.length} match` : ''}`;
+    if (!rows.length) { $('list').innerHTML = ''; setState(q ? 'No matches.' : `No ${tab} yet.`, false); return; }
+    setState('', false);
+    $('list').innerHTML = rows.map(r => cardHTML(e, r)).join('');
+    rows.forEach(r => wireCard(e, r));
+  }
+
+  function cardHTML(e, r) {
+    const id = r[e.key];
+    const fields = e.cardFields
+      .filter(n => r[n])
+      .map(n => `<div class="f"><b>${esc(labelFor(e, n))}:</b> ${esc(r[n])}</div>`).join('');
+    const stamp = r.updated_at ? `<div class="stamp">Updated ${new Date(r.updated_at).toLocaleDateString()}</div>` : '';
+    return `<div class="card" data-id="${esc(id)}">
+      <div class="name">${esc(r.name || id)}</div>
+      <div class="key">${esc(id)}</div>
+      <div class="fields">${fields}</div>
+      <div class="meta">
+        <button class="edit" type="button" data-act="edit">Edit</button>
+        <button class="del" type="button" data-act="del">Delete</button>
+      </div>
+      ${stamp}
+    </div>`;
+  }
+
+  function labelFor(e, n) { const f = e.fields.find(x => x.n === n); return f ? f.l : n; }
+
+  function wireCard(e, r) {
+    const card = document.querySelector(`.card[data-id="${cssEsc(r[e.key])}"]`);
+    if (!card) return;
+    card.querySelector('[data-act="edit"]').onclick = () => openForm(r);
+    card.querySelector('[data-act="del"]').onclick = () => doDelete(r);
+  }
+  // Minimal CSS.escape fallback for attribute selectors.
+  function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
+
+  // ---- form ----
+  function requireToken() {
+    if (window.mvfnToken && window.mvfnToken()) return true;
+    if (window.mvfnLock) window.mvfnLock();   // re-show the unlock overlay
+    return false;
+  }
+
+  function openForm(record) {
+    if (!requireToken()) return;
+    const e = ent();
+    editing = record || null;
+    const isNew = !editing;
+    const keyVal = isNew ? '' : editing[e.key];
+    const rows = e.fields.map(f => {
+      const val = esc(editing ? (editing[f.n] || '') : '');
+      const input = f.ta
+        ? `<textarea data-f="${f.n}">${val}</textarea>`
+        : `<input data-f="${f.n}" type="text" value="${val}">`;
+      return `<div class="flabel">${esc(f.l)}${f.req ? ' *' : ''}</div>${input}`;
+    }).join('');
+    const keyRow = `<div class="flabel">ID (${esc(e.key)})</div>` +
+      `<input id="keyField" type="text" value="${esc(keyVal)}" ${isNew ? 'placeholder="auto from name if left blank"' : 'readonly'}>`;
+    $('form').innerHTML = `
+      <h2>${isNew ? 'Add' : 'Edit'} ${esc(e.single)}</h2>
+      ${rows}
+      ${keyRow}
+      <div class="msg err" id="formMsg"></div>
+      <div class="actions">
+        <button class="cancel" type="button" id="formCancel">Cancel</button>
+        <button class="save" type="button" id="formSave">${isNew ? 'Create' : 'Save'}</button>
+      </div>`;
+    $('form').classList.add('open');
+    $('formCancel').onclick = closeForm;
+    $('formSave').onclick = submitForm;
+    $('form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function closeForm() { $('form').classList.remove('open'); $('form').innerHTML = ''; editing = null; }
+
+  async function submitForm() {
+    const e = ent();
+    const msg = $('formMsg');
+    const payload = { action: e.saveAction };
+    e.fields.forEach(f => {
+      const el = $('form').querySelector(`[data-f="${f.n}"]`);
+      payload[f.n] = (el ? el.value : '').trim();
+    });
+    if (!payload.name) { msg.textContent = 'Name is required.'; return; }
+
+    // Resolve the business key. Edit keeps existing; add derives a slug from name (or manual entry).
+    let keyVal = $('keyField').value.trim();
+    if (!keyVal) keyVal = slugify(payload.name);
+    if (!keyVal) { msg.textContent = 'Could not derive an ID — give it a name with letters/numbers.'; return; }
+    payload[e.key] = keyVal;
+
+    const btn = $('formSave'); btn.disabled = true;
+    msg.className = 'msg saving'; msg.textContent = 'Saving…';
+    try {
+      await postAction(payload);
+      closeForm();
+      flashToast('Saved');
+      await load();
+    } catch (err) {
+      msg.className = 'msg err'; msg.textContent = `✗ ${err.message}`;
+    } finally { btn.disabled = false; }
+  }
+
+  async function doDelete(r) {
+    if (!requireToken()) return;
+    const e = ent();
+    if (!confirm(`Delete ${e.single} "${r.name || r[e.key]}"? It will be hidden from the daily doc.`)) return;
+    try {
+      await postAction({ action: e.delAction, [e.key]: r[e.key] });
+      flashToast('Deleted');
+      await load();
+    } catch (err) {
+      flashToast(`✗ ${err.message}`);
+    }
+  }
+
+  // ---- toast ----
+  let toastTimer = null;
+  function flashToast(m) {
+    $('toastMsg').textContent = m || 'Saved';
+    $('toast').classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 2500);
+  }
+  function hideToast() { clearTimeout(toastTimer); $('toast').classList.remove('show'); }
+
+  // ---- wire ----
+  document.querySelectorAll('#tabs button').forEach(b => {
+    b.onclick = () => {
+      tab = b.dataset.tab;
+      document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('active', x === b));
+      closeForm();
+      $('search').value = '';
+      render();
+    };
+  });
+  $('search').addEventListener('input', render);
+  $('addBtn').onclick = () => openForm(null);
+  $('toastOk').onclick = hideToast;
+  $('toast').addEventListener('click', ev => { if (ev.target.id === 'toast') hideToast(); });
+
+  renderLockbar();
+  load();
+</script>
+</body>
+</html>
