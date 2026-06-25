@@ -653,6 +653,7 @@ function stopListening() {
     document.getElementById('reviewSpeciesWrap').style.display = 'none';
   }
 
+  finalTranscript = collapseRepeats(finalTranscript);
   document.getElementById('reviewTranscript').value = finalTranscript || '(no transcript — photo only)';
 
   const rp = document.getElementById('reviewPhoto');
@@ -850,6 +851,44 @@ function dedupeAppend(existing, newText) {
   }
 
   return existing + newText + ' ';
+}
+
+// Last line of defense before a transcript is shown for review / inserted.
+// Complements the live-append dedupeAppend(): catches repeats that still slip
+// through continuous Web Speech recognition. Collapses adjacent identical
+// phrase repeats (2+ words) and runs of 3+ identical single words down to one.
+// Intentional doubles ("very very", "no no") are preserved — the review
+// textarea remains the human override.
+function collapseRepeats(text) {
+  if (!text) return text;
+  let words = text.trim().split(/\s+/).filter(Boolean);
+
+  // Adjacent identical phrase repeats, longest window first.
+  for (let n = 6; n >= 2; n--) {
+    let i = 0;
+    while (i + 2 * n <= words.length) {
+      const a = words.slice(i, i + n).join(' ').toLowerCase();
+      const b = words.slice(i + n, i + 2 * n).join(' ').toLowerCase();
+      if (a === b) {
+        words.splice(i + n, n);   // drop the duplicate copy, re-test at i
+      } else {
+        i++;
+      }
+    }
+  }
+
+  // Runs of 3+ identical single words → one (keep singles and doubles).
+  const out = [];
+  let i = 0;
+  while (i < words.length) {
+    let j = i;
+    while (j < words.length && words[j].toLowerCase() === words[i].toLowerCase()) j++;
+    const count = j - i;
+    const emit = count >= 3 ? 1 : count;
+    for (let k = 0; k < emit; k++) out.push(words[i]);
+    i = j;
+  }
+  return out.join(' ');
 }
 
 function showScreen(id) {
