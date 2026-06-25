@@ -1,9 +1,9 @@
 {
-  "id": "/mvf-operations/observe",
-  "name": "MVFN Observe",
-  "short_name": "Observe",
-  "description": "MVFN field observation capture",
-  "start_url": "/mvf-operations/mvfn_observe.html",
+  "id": "/mvf-operations/field",
+  "name": "MVFN Tasks",
+  "short_name": "Tasks",
+  "description": "MVFN field task list",
+  "start_url": "/mvf-operations/mvfn_field.html",
   "scope": "/mvf-operations/",
   "display": "standalone",
   "orientation": "portrait",
@@ -12,7 +12,7 @@
   "lang": "en",
   "icons": [
     {
-      "src": "/mvf-operations/icon-observe.svg",
+      "src": "/mvf-operations/icon-field.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

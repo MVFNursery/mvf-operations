@@ -1,4 +1,5 @@
 {
+  "id": "/mvf-operations/trainer",
   "name": "Species Trainer",
   "short_name": "Species",
   "description": "Native plant identification trainer with spaced repetition",
@@ -11,16 +12,10 @@
   "lang": "en",
   "icons": [
     {
-      "src": "/mvf-operations/icon.svg",
+      "src": "/mvf-operations/icon-trainer.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/mvf-operations/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
   "categories": ["education", "lifestyle"]

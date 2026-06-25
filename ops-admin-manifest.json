@@ -1,4 +1,5 @@
 {
+  "id": "/mvf-operations/ops-admin",
   "name": "MVFN Operations Admin",
   "short_name": "Ops Admin",
   "description": "Curate MVFN projects, assets and suppliers",
@@ -11,7 +12,7 @@
   "lang": "en",
   "icons": [
     {
-      "src": "/mvf-operations/icon.svg",
+      "src": "/mvf-operations/icon-ops-admin.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

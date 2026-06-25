@@ -1,4 +1,5 @@
 {
+  "id": "/mvf-operations/inventory",
   "name": "MVFN Inventory",
   "short_name": "Inventory",
   "description": "MVFN live nursery stock view",
@@ -11,7 +12,7 @@
   "lang": "en",
   "icons": [
     {
-      "src": "/mvf-operations/icon.svg",
+      "src": "/mvf-operations/icon-inventory.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
