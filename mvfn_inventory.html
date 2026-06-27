@@ -29,24 +29,6 @@
   header { text-align: center; padding: 20px 0 12px; }
   header h1 { font-size: 2rem; font-weight: 700; }
   header .subtitle { font-size: 0.85rem; color: #5a6b2d; margin-top: 4px; }
-  header .readonly { font-size: 0.7rem; color: #8a8a7a; margin-top: 8px; letter-spacing: 0.03em; }
-
-  /* Mode toggle */
-  .modebar { display: flex; justify-content: center; margin: 10px 0 2px; }
-  .modebar button {
-    padding: 9px 18px; border: 2px solid #2d3319; background: white; color: #2d3319;
-    border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.92rem;
-    font-weight: 600; cursor: pointer;
-  }
-  .modebar button.active { background: #2d3319; color: white; }
-  body.count-mode header .readonly { color: #b45309; }
-
-  /* Count progress */
-  .progress { display: none; margin: 10px 0 2px; }
-  body.count-mode .progress { display: block; }
-  .progress .bar { height: 8px; background: #e3e3d8; border-radius: 999px; overflow: hidden; }
-  .progress .bar > span { display: block; height: 100%; background: #5a6b2d; width: 0; transition: width .2s; }
-  .progress .label { font-size: 0.75rem; color: #5a6b2d; margin-top: 5px; text-align: center; }
 
   /* Controls */
   .controls { display: flex; gap: 10px; margin: 8px 0 16px; flex-wrap: wrap; }
@@ -64,11 +46,10 @@
 
   /* Add-stock */
   .addbtn {
-    display: none; width: 100%; margin: 0 0 14px; padding: 12px; border: 2px dashed #5a6b2d;
+    display: block; width: 100%; margin: 0 0 14px; padding: 12px; border: 2px dashed #5a6b2d;
     background: #fbfbf6; color: #5a6b2d; border-radius: 8px; font-family: 'Fraunces', serif;
     font-size: 0.95rem; font-weight: 600; cursor: pointer;
   }
-  body.count-mode .addbtn { display: block; }
   .addform {
     display: none; background: #fbfbf6; border: 2px solid #5a6b2d; border-radius: 8px;
     padding: 14px 16px; margin: 0 0 14px;
@@ -100,8 +81,9 @@
   .stock-list { display: grid; gap: 10px; }
   .stock-card {
     background: white; border: 2px solid #2d3319; border-radius: 8px; padding: 14px 16px;
+    cursor: pointer;
   }
-  .stock-card.counted { border-color: #047857; background: #f3fbf6; }
+  .stock-card.editing { border-color: #5a6b2d; background: #fbfbf6; }
   .stock-card .name { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600; }
   .stock-card .sci { font-style: italic; font-size: 0.8rem; color: #5a6b2d; margin-top: 2px; }
   .stock-card .meta {
@@ -120,11 +102,10 @@
   .badge.growing { color: #b45309; }
   .badge.other   { color: #6b7280; }
   .native-dot { color: #047857; font-size: 0.72rem; }
-  .counted-tick { color: #047857; font-size: 0.75rem; margin-left: auto; }
 
-  /* Count editor (inside card, count mode) */
+  /* Inline editor (inside card, shown when the card is tapped) */
   .editor { display: none; margin-top: 12px; border-top: 1px dashed #d1d5db; padding-top: 12px; }
-  body.count-mode .editor { display: block; }
+  .stock-card.editing .editor { display: block; }
   .editor .line { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
   .editor label { font-size: 0.72rem; color: #5a6b2d; min-width: 64px; }
   .editor input.count {
@@ -191,17 +172,7 @@
     <header>
       <h1>MVFN Inventory</h1>
       <div class="subtitle">Mountain View Farm Nursery</div>
-      <div class="readonly" id="modeLabel">Live stock view · read-only</div>
     </header>
-
-    <div class="modebar">
-      <button id="modeToggle" type="button">Start count</button>
-    </div>
-
-    <div class="progress" id="progress">
-      <div class="bar"><span id="progBar"></span></div>
-      <div class="label" id="progLabel"></div>
-    </div>
 
     <div class="controls" id="controls" style="display:none;">
       <input type="search" id="search" placeholder="Search species…" autocomplete="off">
@@ -209,14 +180,13 @@
         <option value="all">All statuses</option>
         <option value="for-sale">For sale</option>
         <option value="growing">Growing</option>
-        <option value="uncounted">Uncounted (this session)</option>
       </select>
     </div>
     <div class="summary" id="summary"></div>
 
-    <button class="addbtn" id="addBtn" type="button">+ Add stock found</button>
+    <button class="addbtn" id="addBtn" type="button">+ Add Stock</button>
     <div class="addform" id="addForm">
-      <h2>Add stock found</h2>
+      <h2>Add Stock</h2>
       <div class="row">
         <input list="speciesList" id="addSpecies" placeholder="Species (type to search)" autocomplete="off">
         <datalist id="speciesList"></datalist>
@@ -272,8 +242,6 @@
   let speciesById = {};
   let speciesList = [];
   let containerList = [];
-  let countMode = false;
-  const counted = new Set();        // stock_ids saved this session
 
   const $ = id => document.getElementById(id);
 
@@ -367,13 +335,6 @@
     return 'other';
   }
 
-  function updateProgress() {
-    const total = stock.length;
-    const done = counted.size;
-    $('progBar').style.width = total ? (100 * done / total) + '%' : '0%';
-    $('progLabel').textContent = `${done} / ${total} counted this session`;
-  }
-
   function render() {
     const q = $('search').value.trim().toLowerCase();
     const statusF = $('statusFilter').value;
@@ -381,8 +342,7 @@
     const rows = stock
       .map(s => ({ s, sp: speciesById[speciesKey(s.species_id)] || {} }))
       .filter(({ s, sp }) => {
-        if (statusF === 'uncounted') { if (counted.has(s.stock_id)) return false; }
-        else if (statusF !== 'all' && s.status !== statusF) return false;
+        if (statusF !== 'all' && s.status !== statusF) return false;
         if (!q) return true;
         const hay = `${sp.common_name || ''} ${sp.scientific_name || ''} ${s.species_id || ''}`.toLowerCase();
         return hay.includes(q);
@@ -399,8 +359,7 @@
     setState('', false);
 
     $('list').innerHTML = rows.map(({ s, sp }) => cardHTML(s, sp)).join('');
-    if (countMode) rows.forEach(({ s }) => wireCard(s.stock_id));
-    updateProgress();
+    rows.forEach(({ s }) => wireCard(s.stock_id));
   }
 
   function cardHTML(s, sp) {
@@ -409,9 +368,7 @@
     const native = sp.is_true_native ? '<span class="native-dot" title="True native">● native</span>' : '';
     const price = fmtPrice(s.price_per_unit);
     const loc = s.location ? `<div class="loc">${esc(s.location)}</div>` : '';
-    const isCounted = counted.has(s.stock_id);
-    const tick = isCounted ? '<span class="counted-tick">✓ counted</span>' : '';
-    return `<div class="stock-card${isCounted ? ' counted' : ''}" data-card="${s.stock_id}">
+    return `<div class="stock-card" data-card="${s.stock_id}">
       <div class="name">${esc(name)} ${native}</div>
       ${sci}
       <div class="meta">
@@ -419,10 +376,9 @@
         <span class="qty">${s.quantity ?? 0} avail</span>
         <span class="badge ${statusClass(s.status)}">${esc(s.status || '—')}</span>
         ${price ? `<span class="price">${price}</span>` : ''}
-        ${tick}
       </div>
       ${loc}
-      ${countMode ? editorHTML(s) : ''}
+      ${editorHTML(s)}
     </div>`;
   }
 
@@ -470,17 +426,9 @@
       try {
         await postAction({ action: 'set_qty', stock_id: stockId, quantity: n });
         s.quantity = n;
-        counted.add(stockId);
         setMsg('✓ saved', 'ok');
         showToast(`Count saved · ${n}`);
-        card.classList.add('counted');
-        if (!card.querySelector('.counted-tick')) {
-          const t = document.createElement('span');
-          t.className = 'counted-tick'; t.textContent = '✓ counted';
-          card.querySelector('.meta').appendChild(t);
-        }
         card.querySelector('.meta .qty').textContent = `${n} avail`;
-        updateProgress();
       } catch (err) {
         setMsg(`✗ ${err.message} — tap to retry`, 'err');
       } finally { btn.disabled = false; }
@@ -528,7 +476,7 @@
     });
   }
 
-  // ---- Add stock found ----
+  // ---- Add Stock ----
   function resolveSpeciesId(typed) {
     const val = typed.trim();
     if (!val) return '';
@@ -600,7 +548,7 @@
         });
       }
       addMsg.textContent = 'Adding stock…';
-      const out = await postAction({
+      await postAction({
         action: 'add_stock',
         species_id: speciesId,
         container_size: $('addContainer').value.trim(),
@@ -609,25 +557,13 @@
         status: $('addStatus').value,
         price_per_unit: $('addPrice').value.trim(),
       });
-      const newId = out && out.result && out.result.stock_id;
       resetAddForm();
       $('addForm').classList.remove('open');
       showToast(isNew ? 'Species + stock added' : 'Stock added');
       await load();
-      if (newId != null) { counted.add(newId); render(); }
     } catch (err) {
       addMsg.textContent = `✗ ${err.message} — tap to retry`;
     } finally { btn.disabled = false; }
-  }
-
-  function setCountMode(on) {
-    countMode = on;
-    document.body.classList.toggle('count-mode', on);
-    $('modeToggle').classList.toggle('active', on);
-    $('modeToggle').textContent = on ? 'Done counting' : 'Start count';
-    $('modeLabel').textContent = on ? 'Count mode · save as you go' : 'Live stock view · read-only';
-    if (!on) { $('addForm').classList.remove('open'); }
-    render();
   }
 
   function esc(str) {
@@ -647,7 +583,14 @@
 
   $('search').addEventListener('input', render);
   $('statusFilter').addEventListener('change', render);
-  $('modeToggle').addEventListener('click', () => setCountMode(!countMode));
+  // Tap a card to expand/collapse its inline editor; ignore taps inside the
+  // editor itself so typing / hitting Save doesn't toggle the card.
+  $('list').addEventListener('click', (e) => {
+    const card = e.target.closest('.stock-card');
+    if (!card) return;
+    if (e.target.closest('.editor')) return;
+    card.classList.toggle('editing');
+  });
   $('addBtn').addEventListener('click', () => $('addForm').classList.toggle('open'));
   $('addCancel').addEventListener('click', () => { $('addForm').classList.remove('open'); resetAddForm(); });
   $('addSpecies').addEventListener('input', onSpeciesInput);
