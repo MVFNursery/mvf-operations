@@ -1,11 +1,11 @@
 // Species Trainer — Service Worker
 // Scope: /mvf-operations/
 
-const CACHE_NAME = 'species-trainer-v2';
+const CACHE_NAME = 'species-trainer-v3';
 const BASE = '/mvf-operations';
 
 const APP_SHELL = [
-  `${BASE}/mvf_trainer_v2.html`,
+  `${BASE}/mvf_trainer_v3.html`,
   `${BASE}/manifest.json`,
   `${BASE}/icon.svg`,
   'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap',
@@ -85,7 +85,7 @@ self.addEventListener('fetch', e => {
       caches.match(e.request).then(cached => {
         if (cached) return cached;
         if (e.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match(`${BASE}/mvf_trainer_v2.html`);
+          return caches.match(`${BASE}/mvf_trainer_v3.html`);
         }
         return new Response('', { status: 503 });
       })

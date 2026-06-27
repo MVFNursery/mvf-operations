@@ -3,7 +3,7 @@
   "name": "Species Trainer",
   "short_name": "Species",
   "description": "Native plant identification trainer with spaced repetition",
-  "start_url": "/mvf-operations/mvf_trainer_v2.html",
+  "start_url": "/mvf-operations/mvf_trainer_v3.html",
   "scope": "/mvf-operations/",
   "display": "standalone",
   "orientation": "any",
