@@ -5,34 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Ecology">
+<meta name="apple-mobile-web-app-title" content="Content Idea">
 <meta name="theme-color" content="#1f2e17">
 <link rel="manifest" href="ecology-manifest.json">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-ecology.png">
 <title>MVFN Content Idea Board</title>
-<script src="mvfn-auth.js" data-token-key="mvfn_ecology_token" data-validate-url="https://megamachine.taile865b6.ts.net:5678/webhook/mvfn-ecology-channels"></script>
+<script src="mvfn-auth.js" data-token-key="mvfn_ecology_token" data-validate-url="https://megamachine.taile865b6.ts.net:5678/webhook/mvfn-ecology-candidates"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'DM Mono', monospace; background: #f5f5f0; color: #1f2e17; min-height: 100vh; }
-  h1, h2 { font-family: 'Fraunces', serif; }
+  h1, h2 { font-family: 'Quicksand', sans-serif; }
 
   .container { max-width: 680px; margin: 0 auto; padding: 20px; }
   header { text-align: center; padding: 20px 0 8px; }
   header h1 { font-size: 1.8rem; font-weight: 700; }
   header .subtitle { font-size: 0.85rem; color: #5a7d2d; margin-top: 4px; }
 
-  .lockbar { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
-    font-size: 0.78rem; margin: 6px 0 14px; }
-  .lockbar .state-unlocked { color: #047857; }
-  .lockbar button { padding: 8px 14px; border: 2px solid #1f2e17; background: white; color: #1f2e17;
-    border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
-
   .tabs { display: flex; justify-content: center; gap: 8px; margin: 4px 0 16px; flex-wrap: wrap; }
   .tabs button { padding: 9px 18px; border: 2px solid #1f2e17; background: white; color: #1f2e17;
-    border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+    border-radius: 999px; font-family: 'Quicksand', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
   .tabs button.active { background: #1f2e17; color: white; }
 
   .controls { display: flex; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
@@ -47,7 +41,7 @@
   .card .thumb { width: 100%; max-height: 220px; object-fit: cover; border-radius: 6px; margin-bottom: 10px;
     border: 1px solid #ddd; display: block; }
   .card .toprow { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-  .card .species { font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 600; }
+  .card .species { font-family: 'Quicksand', sans-serif; font-size: 1.05rem; font-weight: 600; }
   .card .sci { font-size: 0.72rem; color: #8a8a7a; font-style: italic; }
   .card .chip { display: inline-block; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em;
     padding: 3px 8px; border-radius: 999px; background: #eef2e2; color: #5a7d2d; white-space: nowrap; }
@@ -56,34 +50,22 @@
   .card textarea.edit-text { width: 100%; min-height: 80px; margin-top: 10px; padding: 10px; border: 2px solid #5a7d2d;
     border-radius: 6px; font-family: 'DM Mono', monospace; font-size: 0.9rem; resize: vertical; }
   .card .attribution { font-size: 0.65rem; color: #aaa; margin-top: 6px; }
+  .card .note { font-size: 0.82rem; color: #5a7d2d; margin-top: 10px; font-style: italic; }
   .card .flags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-  .card .flags .flag { font-size: 0.66rem; padding: 3px 8px; border-radius: 999px; border: 1px solid #ccc; color: #888; }
+  .card .flags .flag { font-size: 0.66rem; padding: 3px 8px; border-radius: 999px; border: 1px solid #ccc; color: #888; cursor: pointer; }
   .card .flags .flag.on { border-color: #b8860b; color: #b8860b; background: #fdf6e3; }
 
   .card .actions { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
-  .card .actions button { padding: 8px 12px; border-radius: 6px; font-family: 'Fraunces', serif;
-    font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 2px solid #1f2e17; background: white; color: #1f2e17; }
-  .card .actions .used { background: #1f2e17; color: white; }
+  .card .actions button { padding: 8px 12px; border-radius: 6px; font-family: 'Quicksand', sans-serif;
+    font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 2px solid #1f2e17; background: white; color: #1f2e17; }
+  .card .actions .draft { background: #1f2e17; color: white; }
   .card .actions .dismiss { border-color: #b91c1c; color: #b91c1c; }
   .card .actions .save { background: #5a7d2d; border-color: #5a7d2d; color: white; }
-
-  .usepanel { background: #fbfbf6; border: 2px solid #5a7d2d; border-radius: 8px; padding: 12px; margin-top: 10px; }
-  .usepanel .chans { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-  .usepanel .chan { padding: 6px 12px; border-radius: 999px; border: 2px solid #1f2e17; background: white;
-    font-size: 0.78rem; cursor: pointer; }
-  .usepanel .chan.sel { background: #1f2e17; color: white; }
-  .usepanel input { width: 100%; padding: 8px; border: 2px solid #d1d5db; border-radius: 6px; font-family: 'DM Mono', monospace;
-    font-size: 0.85rem; margin-bottom: 8px; }
-  .usepanel .row { display: flex; gap: 8px; }
-  .usepanel .row button { flex: 1; padding: 9px; border-radius: 6px; font-weight: 600; font-family: 'Fraunces', serif;
-    font-size: 0.85rem; cursor: pointer; }
-  .usepanel .confirm { border: 2px solid #1f2e17; background: #1f2e17; color: white; }
-  .usepanel .cancel { border: 2px solid #d1d5db; background: white; color: #1f2e17; }
 
   .qcard { background: white; border: 2px solid #1f2e17; border-radius: 8px; padding: 12px 14px; display: flex; gap: 10px; }
   .qcard input[type="checkbox"] { margin-top: 3px; width: 18px; height: 18px; }
   .qcard .body { flex: 1; }
-  .qcard .species { font-family: 'Fraunces', serif; font-weight: 600; font-size: 0.95rem; }
+  .qcard .species { font-family: 'Quicksand', sans-serif; font-weight: 600; font-size: 0.95rem; }
   .qcard .text { font-size: 0.85rem; margin-top: 4px; }
 
   .issuebox { background: white; border: 2px solid #1f2e17; border-radius: 8px; padding: 16px; margin-top: 16px; }
@@ -92,21 +74,21 @@
     font-family: 'DM Mono', monospace; font-size: 0.9rem; }
   .issuebox textarea { min-height: 90px; resize: vertical; }
   .issuebox .item { border-top: 1px solid #eee; padding: 10px 0; font-size: 0.85rem; }
-  .issuebox .item b { font-family: 'Fraunces', serif; }
+  .issuebox .item b { font-family: 'Quicksand', sans-serif; }
   .issuebox .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-  .issuebox .actions button { padding: 10px 16px; border-radius: 6px; font-weight: 600; font-family: 'Fraunces', serif;
+  .issuebox .actions button { padding: 10px 16px; border-radius: 6px; font-weight: 600; font-family: 'Quicksand', sans-serif;
     font-size: 0.85rem; cursor: pointer; border: 2px solid #1f2e17; }
   .issuebox .save { background: #1f2e17; color: white; }
   .issuebox .copy { background: white; color: #1f2e17; }
   .issuebox .sent { background: #047857; border-color: #047857; color: white; }
 
   .addbtn { width: 100%; margin: 0 0 14px; padding: 12px; border: 2px dashed #5a7d2d; background: #fbfbf6;
-    color: #5a7d2d; border-radius: 8px; font-family: 'Fraunces', serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+    color: #5a7d2d; border-radius: 8px; font-family: 'Quicksand', sans-serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
 
   .state { text-align: center; padding: 40px 20px; color: #5a7d2d; }
   .state.error { color: #7f1d1d; }
   .state button { margin-top: 16px; padding: 12px 24px; border: 2px solid #1f2e17; background: #1f2e17;
-    color: white; border-radius: 8px; font-family: 'Fraunces', serif; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    color: white; border-radius: 8px; font-family: 'Quicksand', sans-serif; font-size: 1rem; font-weight: 600; cursor: pointer; }
   .updated { text-align: center; font-size: 0.7rem; color: #aaa; padding: 24px 0 12px; }
 
   .toast { display: none; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center;
@@ -116,9 +98,9 @@
     text-align: center; min-width: 200px; box-shadow: 0 10px 30px rgba(0,0,0,0.18); }
   .toast-check { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%; background: #047857;
     color: white; font-size: 2rem; line-height: 56px; }
-  .toast-msg { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 600; }
+  .toast-msg { font-family: 'Quicksand', sans-serif; font-size: 1.15rem; font-weight: 600; }
   .toast-ok { margin-top: 16px; padding: 9px 28px; border: 2px solid #1f2e17; background: white; color: #1f2e17;
-    border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+    border-radius: 999px; font-family: 'Quicksand', sans-serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -128,10 +110,8 @@
       <div class="subtitle">What's happening in your ecosystem right now</div>
     </header>
 
-    <div class="lockbar" id="lockbar"></div>
-
     <div class="tabs" id="tabs">
-      <button data-tab="inbox" class="active" type="button">Inbox</button>
+      <button data-tab="inbox" class="active" type="button">Ideas</button>
       <button data-tab="newsletter" type="button">Newsletter</button>
     </div>
 
@@ -139,6 +119,8 @@
       <div class="controls">
         <select id="statusFilter">
           <option value="new">New</option>
+          <option value="drafting">Drafting</option>
+          <option value="ready">Ready</option>
           <option value="held">Held</option>
           <option value="dismissed">Dismissed</option>
           <option value="expired">Expired</option>
@@ -170,21 +152,13 @@
   const N8N_BASE = 'https://megamachine.taile865b6.ts.net:5678/webhook';
   const $ = id => document.getElementById(id);
 
-  const state = { candidates: [], channels: [], queue: [], issue: null };
+  const state = { candidates: [], queue: [], issue: null };
   let tab = 'inbox';
   let editingId = null;      // candidate id whose text textarea is open
-  let usePanelId = null;     // candidate id whose "Used" channel picker is open
-  let selectedChannels = new Set();
 
   function esc(str) {
     return String(str == null ? '' : str).replace(/[&<>"']/g, c =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  }
-
-  function renderLockbar() {
-    $('lockbar').innerHTML =
-      `<span class="state-unlocked">&#9679; Editing unlocked</span> <button id="lockBtn" type="button">Lock</button>`;
-    $('lockBtn').onclick = () => { window.mvfnLock(); };
   }
 
   function setState(msg, isError) {
@@ -228,14 +202,10 @@
     return false;
   }
 
-  // ---- Inbox ----
+  // ---- Ideas ----
   async function loadInbox() {
     setState('Loading…', false);
     try {
-      if (!state.channels.length) {
-        const chData = await getJSON('mvfn-ecology-channels');
-        state.channels = Array.isArray(chData.channels) ? chData.channels : [];
-      }
       const status = $('statusFilter').value;
       const q = $('search').value.trim();
       const params = new URLSearchParams({ status, q });
@@ -264,6 +234,29 @@
     rows.forEach(wireCard);
   }
 
+  // Deliberately different action sets per status — the human decision is a
+  // single 3-way triage on a fresh idea (Dismiss / Hold / Draft); editing and
+  // copying only matter once there's an actual elaborated draft to work with.
+  function actionsHTML(r, isEditing) {
+    if (r.status === 'new') {
+      return `<button data-act="dismiss" class="dismiss">Dismiss</button>
+        <button data-act="hold">Hold</button>
+        <button data-act="draft" class="draft">Draft this</button>`;
+    }
+    if (r.status === 'drafting') {
+      return `<button data-act="cancel-draft">Cancel</button>`;
+    }
+    if (r.status === 'ready') {
+      return isEditing
+        ? `<button class="save" data-act="save-text">Save</button><button data-act="cancel-edit">Cancel</button>`
+        : `<button data-act="edit">Edit</button>
+           <button data-act="copy">Copy</button>
+           <button data-act="dismiss" class="dismiss">Dismiss</button>`;
+    }
+    // held / dismissed / expired
+    return `<button data-act="reopen">Reopen</button>`;
+  }
+
   function cardHTML(r) {
     const name = r.common_name || 'Unknown species';
     const sci = r.scientific_name ? `<span class="sci">${esc(r.scientific_name)}</span>` : '';
@@ -273,14 +266,21 @@
     const metaBits = [when, dist, r.place_label].filter(Boolean).join(' · ');
     const text = r.final_text || r.draft_angle || '(no draft)';
     const isEditing = editingId === r.id;
+    const isDrafting = r.status === 'drafting';
     const bodyHTML = isEditing
       ? `<textarea class="edit-text" data-edit="${r.id}">${esc(text)}</textarea>`
-      : `<div class="text">${esc(text)}</div>`;
-    const attribution = r.photo_attribution ? `<div class="attribution">${esc(r.photo_attribution)}</div>` : '';
+      : isDrafting
+        ? `<div class="note">Drafting overnight — check back tomorrow for the full post.</div>`
+        : `<div class="text">${esc(text)}</div>`;
+    const attribution = (!isDrafting && r.photo_attribution) ? `<div class="attribution">${esc(r.photo_attribution)}</div>` : '';
     const blogOn = r.blog_flagged_at ? ' on' : '';
     const nlOn = r.newsletter_queued_at ? ' on' : '';
-    const usable = r.status !== 'used';
-    const usePanel = (usePanelId === r.id) ? usePanelHTML(r) : '';
+    const flagsHTML = r.status === 'ready'
+      ? `<div class="flags">
+          <span class="flag${blogOn}" data-flag="blog">Flag for blog</span>
+          <span class="flag${nlOn}" data-flag="newsletter">Queue for newsletter</span>
+        </div>`
+      : '';
 
     return `<div class="card" data-id="${r.id}">
       ${thumb}
@@ -291,35 +291,8 @@
       <div class="meta-line">${esc(metaBits)} &middot; status: ${esc(r.status)}</div>
       ${bodyHTML}
       ${attribution}
-      <div class="flags">
-        <span class="flag${blogOn}" data-flag="blog">Blog</span>
-        <span class="flag${nlOn}" data-flag="newsletter">Newsletter</span>
-      </div>
-      <div class="actions">
-        ${isEditing
-          ? `<button class="save" data-act="save-text">Save</button><button data-act="cancel-edit">Cancel</button>`
-          : `<button data-act="edit">Edit</button>`}
-        <button data-act="copy">Copy</button>
-        ${usable ? `<button class="used" data-act="use">Used</button>` : ''}
-        ${usable ? `<button data-act="hold">Hold</button>` : ''}
-        ${usable ? `<button class="dismiss" data-act="dismiss">Dismiss</button>` : ''}
-        ${r.status !== 'new' && usable ? `<button data-act="reopen">Reopen</button>` : ''}
-      </div>
-      ${usePanel}
-    </div>`;
-  }
-
-  function usePanelHTML(r) {
-    const chans = state.channels.map(c =>
-      `<span class="chan${selectedChannels.has(c.code) ? ' sel' : ''}" data-chan="${esc(c.code)}">${esc(c.label)}</span>`
-    ).join('');
-    return `<div class="usepanel">
-      <div class="chans">${chans}</div>
-      <input type="text" id="postUrl-${r.id}" placeholder="permalink (optional)">
-      <div class="row">
-        <button class="cancel" data-act="use-cancel">Cancel</button>
-        <button class="confirm" data-act="use-confirm">Confirm</button>
-      </div>
+      ${flagsHTML}
+      <div class="actions">${actionsHTML(r, isEditing)}</div>
     </div>`;
   }
 
@@ -327,6 +300,13 @@
     const card = document.querySelector(`.card[data-id="${r.id}"]`);
     if (!card) return;
     const act = (sel, fn) => { const el = card.querySelector(sel); if (el) el.onclick = fn; };
+    const setStatus = async (status, msg) => {
+      if (!requireToken()) return;
+      try {
+        await postAction('mvfn-ecology-candidates', { action: 'set_status', id: r.id, status });
+        flashToast(msg); await loadInbox();
+      } catch (err) { flashToast(`✗ ${err.message}`); }
+    };
 
     act('[data-act="edit"]', () => { if (!requireToken()) return; editingId = r.id; renderInbox(); });
     act('[data-act="cancel-edit"]', () => { editingId = null; renderInbox(); });
@@ -347,46 +327,11 @@
         () => flashToast('Copied'),
         () => flashToast('Copy failed — select and copy manually'));
     });
-    act('[data-act="hold"]', async () => {
-      if (!requireToken()) return;
-      try { await postAction('mvfn-ecology-candidates', { action: 'set_status', id: r.id, status: 'held' });
-        flashToast('Held'); await loadInbox(); } catch (err) { flashToast(`✗ ${err.message}`); }
-    });
-    act('[data-act="dismiss"]', async () => {
-      if (!requireToken()) return;
-      try { await postAction('mvfn-ecology-candidates', { action: 'set_status', id: r.id, status: 'dismissed' });
-        flashToast('Dismissed'); await loadInbox(); } catch (err) { flashToast(`✗ ${err.message}`); }
-    });
-    act('[data-act="reopen"]', async () => {
-      if (!requireToken()) return;
-      try { await postAction('mvfn-ecology-candidates', { action: 'set_status', id: r.id, status: 'new' });
-        flashToast('Reopened'); await loadInbox(); } catch (err) { flashToast(`✗ ${err.message}`); }
-    });
-    act('[data-act="use"]', () => {
-      if (!requireToken()) return;
-      usePanelId = r.id; selectedChannels = new Set(); renderInbox();
-    });
-    act('[data-act="use-cancel"]', () => { usePanelId = null; renderInbox(); });
-    act('[data-act="use-confirm"]', async () => {
-      if (!selectedChannels.size) { flashToast('Pick at least one channel'); return; }
-      const postUrl = card.querySelector(`#postUrl-${r.id}`).value;
-      try {
-        await postAction('mvfn-ecology-candidates', {
-          action: 'mark_used', id: r.id,
-          channel_codes: Array.from(selectedChannels), post_url: postUrl,
-        });
-        usePanelId = null;
-        flashToast('Marked used');
-        await loadInbox();
-      } catch (err) { flashToast(`✗ ${err.message}`); }
-    });
-    card.querySelectorAll('.chan').forEach(el => {
-      el.onclick = () => {
-        const code = el.dataset.chan;
-        if (selectedChannels.has(code)) selectedChannels.delete(code); else selectedChannels.add(code);
-        renderInbox();
-      };
-    });
+    act('[data-act="hold"]', () => setStatus('held', 'Held'));
+    act('[data-act="dismiss"]', () => setStatus('dismissed', 'Dismissed'));
+    act('[data-act="draft"]', () => setStatus('drafting', 'Drafting overnight'));
+    act('[data-act="cancel-draft"]', () => setStatus('new', 'Back to new'));
+    act('[data-act="reopen"]', () => setStatus('new', 'Reopened'));
     card.querySelectorAll('.flag').forEach(el => {
       el.onclick = async () => {
         if (!requireToken()) return;
@@ -426,7 +371,7 @@
       </div>`).join('');
     $('newsletterBody').innerHTML = `
       <div class="summary">${rows.length} queued for the newsletter</div>
-      <div class="list">${list || '<div class="state">Nothing queued yet — flag candidates for the newsletter from the Inbox.</div>'}</div>
+      <div class="list">${list || '<div class="state">Nothing queued yet — flag a Ready idea for the newsletter first.</div>'}</div>
       ${rows.length ? '<button class="addbtn" id="createIssueBtn" type="button">Create draft issue from selected</button>' : ''}
     `;
     $('newsletterBody').querySelectorAll('[data-qid]').forEach(cb => {
@@ -536,11 +481,10 @@
     };
   });
   $('statusFilter').addEventListener('change', loadInbox);
-  $('search').addEventListener('input', () => { editingId = null; usePanelId = null; loadInbox(); });
+  $('search').addEventListener('input', () => { editingId = null; loadInbox(); });
   $('toastOk').onclick = hideToast;
   $('toast').addEventListener('click', ev => { if (ev.target.id === 'toast') hideToast(); });
 
-  renderLockbar();
   loadInbox();
 </script>
 </body>

@@ -1,8 +1,8 @@
 {
   "id": "/mvf-operations/ecology",
   "name": "MVFN Content Idea Board",
-  "short_name": "Ecology",
-  "description": "Review and curate ecology sighting drafts into social posts and the newsletter",
+  "short_name": "Content Idea",
+  "description": "Review and curate content ideas into social posts and the newsletter",
   "start_url": "/mvf-operations/mvfn_ecology.html",
   "scope": "/mvf-operations/",
   "display": "standalone",
