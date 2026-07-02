@@ -1,0 +1,22 @@
+{
+  "id": "/mvf-operations/ecology",
+  "name": "MVFN Content Idea Board",
+  "short_name": "Ecology",
+  "description": "Review and curate ecology sighting drafts into social posts and the newsletter",
+  "start_url": "/mvf-operations/mvfn_ecology.html",
+  "scope": "/mvf-operations/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f5f0",
+  "theme_color": "#1f2e17",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/mvf-operations/icon-ecology.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "lifestyle"]
+}
