@@ -1,0 +1,11 @@
+{
+  "name": "MVFN Household Tasks",
+  "short_name": "Household",
+  "start_url": "mvfn_household.html",
+  "display": "standalone",
+  "background_color": "#1a2e0f",
+  "theme_color": "#2d5016",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

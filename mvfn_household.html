@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2d5016">
+<link rel="manifest" href="household-manifest.json">
+<title>MVFN Household Tasks</title>
+<script src="mvfn-auth.js"
+        data-token-key="mvfn_household_token"
+        data-validate-url="https://megamachine.taile865b6.ts.net:5680/webhook/mvfn-household-tasks"></script>
+<style>
+  :root { --ink:#2d5016; --moss:#5a6b2d; --paper:#f5f0e8; --card:#fffdf8; --red:#9b2c1f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#1a2e0f; font-family:Georgia,serif; color:#222; }
+  header { background:var(--ink); color:#fff; padding:14px 16px 12px; display:flex; align-items:baseline; gap:10px; }
+  header h1 { font-size:1.15rem; margin:0; flex:1; }
+  header select { border:0; border-radius:6px; padding:4px 6px; font-family:inherit; background:var(--paper); color:var(--ink); }
+  main { max-width:560px; margin:0 auto; padding:12px 12px 60px; }
+  .banner { display:none; background:var(--red); color:#fff; padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:.85rem; }
+  details.add { background:var(--paper); border-radius:12px; padding:10px 14px; margin-bottom:14px; }
+  details.add summary { font-weight:700; color:var(--ink); cursor:pointer; padding:4px 0; }
+  .add label { display:block; font-size:.72rem; color:var(--moss); margin:8px 0 2px; text-transform:uppercase; letter-spacing:.04em; }
+  .add input[type=text], .add input[type=date], .add input[type=number],
+  .add select, .add textarea {
+    width:100%; padding:9px 10px; border:1.5px solid var(--moss); border-radius:8px;
+    font-family:inherit; font-size:.95rem; background:#fff;
+  }
+  .add textarea { min-height:56px; resize:vertical; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .checks { display:flex; gap:16px; margin-top:10px; font-size:.85rem; color:var(--ink); flex-wrap:wrap; }
+  .checks label { display:flex; align-items:center; gap:5px; margin:0; text-transform:none; font-size:.85rem; color:var(--ink); }
+  .add button { margin-top:12px; width:100%; padding:12px; border:0; border-radius:8px;
+    background:var(--ink); color:#fff; font-family:inherit; font-size:1rem; font-weight:700; cursor:pointer; }
+  .add button:disabled { opacity:.5; }
+  .card { background:var(--card); border-radius:12px; padding:11px 13px; margin-bottom:10px; box-shadow:0 1px 4px rgba(0,0,0,.25); }
+  .card .t { font-weight:700; color:#1e3a0d; font-size:1rem; }
+  .card .d { font-size:.82rem; color:#555; margin-top:2px; white-space:pre-wrap; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
+  .chip { font-size:.68rem; background:#e7e2d2; color:#3d4a1e; border-radius:999px; padding:2px 8px; }
+  .chip.due { background:#dbe7c9; }
+  .chip.over { background:var(--red); color:#fff; }
+  .chip.hard { background:#3d1f1a; color:#fff; }
+  .chip.priv { background:#4a3d6b; color:#fff; }
+  .actions { display:flex; gap:8px; margin-top:9px; }
+  .actions button { flex:1; padding:8px; border:0; border-radius:8px; font-family:inherit; font-weight:700; cursor:pointer; font-size:.85rem; }
+  .done-btn { background:var(--ink); color:#fff; }
+  .cancel-btn { background:#e7e2d2; color:var(--red); }
+  .empty { color:var(--paper); text-align:center; padding:30px 10px; font-size:.9rem; opacity:.85; }
+  .section-h { color:var(--paper); font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; margin:16px 4px 8px; opacity:.8; }
+</style>
+</head>
+<body>
+<header>
+  <h1>MVFN Household</h1>
+  <label style="font-size:.7rem;opacity:.85">Me:</label>
+  <select id="me"></select>
+</header>
+<main>
+  <div class="banner" id="banner"></div>
+
+  <details class="add" id="addBox">
+    <summary>+ Add task</summary>
+    <label>Title *</label>
+    <input type="text" id="f_title" autocomplete="off">
+    <div class="row2">
+      <div><label>Category *</label><select id="f_cat"></select></div>
+      <div><label>Assign to</label><select id="f_assign"><option value="">Unassigned</option></select></div>
+    </div>
+    <div class="row2">
+      <div><label>Due</label><input type="date" id="f_due"></div>
+      <div><label>Effort (min)</label><input type="number" id="f_effort" min="1" inputmode="numeric"></div>
+    </div>
+    <div class="row2">
+      <div><label>Weather needs</label>
+        <select id="f_wx">
+          <option value="none">None</option>
+          <option value="dry_window">Dry window</option>
+          <option value="no_frost">No frost</option>
+          <option value="calm_wind">Calm wind</option>
+        </select></div>
+      <div><label>Repeat</label>
+        <select id="f_recur">
+          <option value="">Never</option>
+          <option value="1 week">Weekly</option>
+          <option value="2 weeks">Every 2 weeks</option>
+          <option value="1 month">Monthly</option>
+          <option value="2 months">Every 2 months</option>
+          <option value="3 months">Every 3 months</option>
+          <option value="6 months">Every 6 months</option>
+          <option value="1 year">Yearly</option>
+        </select></div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="f_hard"> Hard deadline</label>
+      <label><input type="checkbox" id="f_priv"> Private (only me)</label>
+    </div>
+    <label>Detail</label>
+    <textarea id="f_detail"></textarea>
+    <button id="f_go">Add task</button>
+  </details>
+
+  <div id="list"><div class="empty">Loading…</div></div>
+</main>
+<script>
+(function () {
+  var API = 'https://megamachine.taile865b6.ts.net:5680/webhook/mvfn-household-tasks';
+  var ME_KEY = 'mvfn_household_user';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { users: [], categories: [], tasks: [] };
+
+  function banner(msg) {
+    var b = $('banner');
+    b.textContent = msg || '';
+    b.style.display = msg ? 'block' : 'none';
+  }
+  function me() { return localStorage.getItem(ME_KEY) || 'ian'; }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function load() {
+    banner('');
+    fetch(API).then(function (r) {
+      if (!r.ok) throw new Error('list failed: HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      state = j;
+      renderMeta();
+      renderList();
+    }).catch(function (e) { banner(String(e.message || e)); });
+  }
+
+  function renderMeta() {
+    var meSel = $('me'), aSel = $('f_assign'), cSel = $('f_cat');
+    meSel.innerHTML = ''; cSel.innerHTML = '';
+    aSel.innerHTML = '<option value="">Unassigned</option>';
+    state.users.forEach(function (u) {
+      meSel.insertAdjacentHTML('beforeend',
+        '<option value="' + esc(u.user_id) + '">' + esc(u.display_name) + '</option>');
+      aSel.insertAdjacentHTML('beforeend',
+        '<option value="' + esc(u.user_id) + '">' + esc(u.display_name) + '</option>');
+    });
+    meSel.value = me();
+    state.categories.forEach(function (c) {
+      cSel.insertAdjacentHTML('beforeend',
+        '<option value="' + esc(c.category_id) + '">' + esc(c.label) + '</option>');
+    });
+  }
+
+  function chip(text, cls) { return '<span class="chip ' + (cls || '') + '">' + esc(text) + '</span>'; }
+
+  function renderList() {
+    var today = new Date().toISOString().slice(0, 10);
+    // Private rows: server returns all; render only what this device's user may see.
+    var visible = state.tasks.filter(function (t) {
+      return t.visibility !== 'private' || t.assigned_to === me()
+        || (!t.assigned_to && t.created_by === me());
+    });
+    if (!visible.length) {
+      $('list').innerHTML = '<div class="empty">No open tasks. Add one above.</div>';
+      return;
+    }
+    var html = '';
+    visible.forEach(function (t) {
+      var chips = [chip(t.category_label)];
+      chips.push(chip(t.assigned_to
+        ? '@' + (state.users.find(function (u) { return u.user_id === t.assigned_to; }) || { display_name: t.assigned_to }).display_name
+        : 'unassigned'));
+      if (t.due_date) chips.push(chip('due ' + t.due_date, t.due_date < today ? 'over' : 'due'));
+      if (t.hard_deadline) chips.push(chip('HARD', 'hard'));
+      if (t.effort_minutes) chips.push(chip(t.effort_minutes + 'm'));
+      if (t.weather_rule && t.weather_rule !== 'none') chips.push(chip(t.weather_rule.replace('_', ' ')));
+      if (t.recur_interval) chips.push(chip('↻ ' + t.recur_interval.replace('mons', 'months')));
+      if (t.visibility === 'private') chips.push(chip('private', 'priv'));
+      if (t.status === 'blocked') chips.push(chip('BLOCKED', 'over'));
+      html += '<div class="card">'
+        + '<div class="t">' + esc(t.title) + '</div>'
+        + (t.detail ? '<div class="d">' + esc(t.detail) + '</div>' : '')
+        + '<div class="chips">' + chips.join('') + '</div>'
+        + '<div class="actions">'
+        + '<button class="done-btn" data-done="' + t.task_id + '">Done</button>'
+        + '<button class="cancel-btn" data-cancel="' + t.task_id + '">Cancel</button>'
+        + '</div></div>';
+    });
+    $('list').innerHTML = html;
+  }
+
+  function post(payload, btn) {
+    if (btn) btn.disabled = true;
+    banner('');
+    return fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(function (r) {
+      if (!r.ok) return r.text().then(function (tx) { throw new Error('HTTP ' + r.status + ': ' + tx.slice(0, 160)); });
+      return r.json();
+    }).then(function () { load(); })
+      .catch(function (e) { banner(String(e.message || e)); })
+      .finally(function () { if (btn) btn.disabled = false; });
+  }
+
+  $('me').addEventListener('change', function () {
+    localStorage.setItem(ME_KEY, $('me').value);
+    renderList();
+  });
+
+  $('f_go').addEventListener('click', function () {
+    // Trim everything (hard rule: mobile autofill appends trailing spaces).
+    var title = $('f_title').value.trim();
+    if (!title) { banner('Title required'); return; }
+    var due = $('f_due').value.trim();
+    if ($('f_hard').checked && !due) { banner('Hard deadline needs a due date'); return; }
+    if ($('f_recur').value && !due) { banner('Repeat needs a due date'); return; }
+    post({
+      action: 'add',
+      title: title,
+      detail: $('f_detail').value.trim(),
+      category_id: $('f_cat').value,
+      created_by: me(),
+      assigned_to: $('f_assign').value,
+      due_date: due,
+      hard_deadline: $('f_hard').checked,
+      effort_minutes: $('f_effort').value.trim(),
+      weather_rule: $('f_wx').value,
+      visibility: $('f_priv').checked ? 'private' : 'shared',
+      recur_interval: $('f_recur').value,
+    }, $('f_go')).then(function () {
+      ['f_title', 'f_due', 'f_effort', 'f_detail'].forEach(function (id) { $(id).value = ''; });
+      $('f_hard').checked = false; $('f_priv').checked = false;
+      $('f_wx').value = 'none'; $('f_recur').value = '';
+    });
+  });
+
+  $('list').addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.done) {
+      post({ action: 'complete', task_id: parseInt(btn.dataset.done, 10), user_id: me() }, btn);
+    } else if (btn.dataset.cancel) {
+      if (confirm('Cancel this task? (It is removed, not completed.)')) {
+        post({ action: 'cancel', task_id: parseInt(btn.dataset.cancel, 10) }, btn);
+      }
+    }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
