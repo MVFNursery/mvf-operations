@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Home">
+<meta name="theme-color" content="#2d5016">
+<link rel="manifest" href="hh-home-manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-hh-home.png">
+<title>Home</title>
+<style>
+  :root {
+    --ink: #2d5016;
+    --moss: #5a6b2d;
+    --paper: #f5f0e8;
+    --card: #fffdf8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Georgia, serif;
+    min-height: 100vh;
+    padding: max(env(safe-area-inset-top), 24px) 20px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 24px 0 4px;
+  }
+  .sub {
+    color: var(--moss);
+    font-size: 0.95rem;
+    font-style: italic;
+    margin-bottom: 32px;
+  }
+  .grid {
+    width: 100%;
+    max-width: 420px;
+    display: grid;
+    gap: 16px;
+  }
+  .app {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--card);
+    border: 1px solid #e0d8c8;
+    border-radius: 14px;
+    padding: 18px 20px;
+    text-decoration: none;
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgba(45, 80, 22, 0.08);
+  }
+  .app:active { background: #efe8da; }
+  .app img { width: 52px; height: 52px; border-radius: 12px; }
+  .app .name { font-size: 1.15rem; font-weight: 700; }
+  .app .desc { color: var(--moss); font-size: 0.85rem; margin-top: 2px; }
+</style>
+</head>
+<body>
+<h1>Home</h1>
+<p class="sub">household apps</p>
+<nav class="grid">
+  <a class="app" href="mvfn_household.html">
+    <img src="icon.svg" alt="">
+    <span>
+      <span class="name">Household Tasks</span><br>
+      <span class="desc">capture &amp; complete tasks</span>
+    </span>
+  </a>
+</nav>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MVFN">
+<meta name="theme-color" content="#1a2e0f">
+<link rel="manifest" href="mvfn-launcher-manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-mvfn-launcher.png">
+<title>MVFN</title>
+<style>
+  :root {
+    --bg: #0f1a08;
+    --bg2: #1a2e0f;
+    --bg3: #243d18;
+    --text: #e8f0e0;
+    --text2: #9ab88a;
+    --green: #7ecf4f;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    padding: max(env(safe-area-inset-top), 24px) 16px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 20px 0 2px;
+    letter-spacing: 0.04em;
+  }
+  .sub {
+    color: var(--text2);
+    font-size: 0.85rem;
+    margin-bottom: 28px;
+  }
+  .grid {
+    width: 100%;
+    max-width: 440px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg2);
+    border: 1px solid var(--bg3);
+    border-radius: var(--radius);
+    padding: 20px 10px 16px;
+    text-decoration: none;
+    color: var(--text);
+    text-align: center;
+  }
+  .app:active { background: var(--bg3); }
+  .app img, .app .glyph {
+    width: 56px;
+    height: 56px;
+    border-radius: 13px;
+  }
+  .app .glyph {
+    background: var(--bg3);
+    color: var(--green);
+    font-size: 1.7rem;
+    line-height: 56px;
+  }
+  .app .name { font-size: 0.95rem; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>MVFN</h1>
+<p class="sub">nursery apps</p>
+<nav class="grid">
+  <a class="app" href="mvfn_field.html">
+    <img src="icon-field.svg" alt="">
+    <span class="name">Tasks</span>
+  </a>
+  <a class="app" href="mvfn_observe.html">
+    <img src="icon-observe.svg" alt="">
+    <span class="name">Observe</span>
+  </a>
+  <a class="app" href="mvfn_inventory.html">
+    <img src="icon-inventory.svg" alt="">
+    <span class="name">Inventory</span>
+  </a>
+  <a class="app" href="mvfn_ecology.html">
+    <img src="icon-ecology.svg" alt="">
+    <span class="name">Content Ideas</span>
+  </a>
+  <a class="app" href="mvfn_ops_admin.html">
+    <img src="icon-ops-admin.svg" alt="">
+    <span class="name">Ops Admin</span>
+  </a>
+  <a class="app" href="mvfn_intel.html">
+    <span class="glyph">&#128172;</span>
+    <span class="name">Capture Mention</span>
+  </a>
+  <a class="app" href="mvf_trainer_v3.html">
+    <img src="icon-trainer.svg" alt="">
+    <span class="name">Species Trainer</span>
+  </a>
+</nav>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "MVFN Nursery",
+  "short_name": "MVFN",
+  "start_url": "/mvf-operations/mvfn_launcher.html",
+  "scope": "/mvf-operations/",
+  "display": "standalone",
+  "theme_color": "#1a2e0f",
+  "background_color": "#0f1a08",
+  "icons": [
+    {
+      "src": "icon-mvfn-launcher.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
