@@ -554,7 +554,8 @@ async function completeTask(taskId) {
   card.classList.add('done');
   showToast('Marking done…', '');
   try {
-    const r = await post({ action: 'complete_task', task_id: taskId });
+    const r = await post({ action: 'complete_task', task_id: taskId,
+      device_token: localStorage.getItem('mvfn_device_token') || '' });
     if (r.status === 'ok') {
       const t = allTasks.find(x => x.task_id === taskId);
       if (t) t.status = 'Done';
