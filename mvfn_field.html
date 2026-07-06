@@ -170,21 +170,20 @@
   .task-card.done .task-desc { color: var(--done-text); text-decoration: line-through; text-decoration-color: var(--done-text); }
   .task-meta { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
   .badge { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 500; }
-  .badge-bucket { background: rgba(126,207,79,0.12); color: var(--green); }
+  .badge-category { background: rgba(126,207,79,0.12); color: var(--green); }
   .badge-effort { background: rgba(240,184,64,0.12); color: var(--amber); }
-  .badge-project { background: rgba(255,255,255,0.06); color: var(--text3); }
   .badge-loc { background: rgba(96,165,250,0.14); color: #93c5fd; }
   .badge-area { background: rgba(196,132,252,0.14); color: #d8b4fe; }
   .badge-assignee { background: rgba(255,255,255,0.08); color: var(--text2); }
   .badge-suggest { background: rgba(240,184,64,0.12); color: var(--amber); }
-  .badge-priority { background: rgba(126,207,79,0.18); color: var(--green); font-weight: 700; }
+  .badge-score { background: rgba(126,207,79,0.18); color: var(--green); font-weight: 700; }
   /* WORK-LOCATION EDITOR (expanded card) */
   .loc-edit { margin-top: 10px; }
   .loc-edit-label { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
   .loc-btns { display: flex; gap: 6px; flex-wrap: wrap; }
   .loc-pill { font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-family: inherit; cursor: pointer; }
   .loc-pill.active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
-  .badge-priority.top { background: var(--green); color: #0d1f0d; }
+  .badge-score.top { background: var(--green); color: #0d1f0d; }
   .task-reason { font-size: 11px; color: var(--text3); margin-top: 3px; font-style: italic; }
 
   /* EXPAND TOGGLE */
@@ -197,7 +196,7 @@
   /* EXPANDED AREA */
   .task-expand { display: none; padding: 0 12px 12px 56px; border-top: 1px solid var(--border); }
   .task-expand.open { display: block; }
-  .task-notes-text { font-size: 12px; color: var(--text3); line-height: 1.5; margin-bottom: 8px; }
+  .task-notes-text { font-size: 12px; color: var(--text3); line-height: 1.5; margin-bottom: 8px; white-space: pre-line; }
   .note-row { display: flex; gap: 8px; align-items: flex-end; }
   .note-input {
     flex: 1; background: var(--bg3); border: 1px solid var(--border2);
@@ -242,31 +241,32 @@
   }
   .add-btn:active { opacity: 0.8; }
 
-  /* BUCKET PICKER SHEET */
-  .bucket-overlay {
+  /* QUICK-ADD PICKER SHEET (domain → category → location) */
+  .sheet-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.6);
     display: flex; align-items: flex-end; justify-content: center;
     z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.18s;
   }
-  .bucket-overlay.show { opacity: 1; pointer-events: all; }
-  .bucket-sheet {
+  .sheet-overlay.show { opacity: 1; pointer-events: all; }
+  .sheet {
     background: var(--bg2); border: 1px solid var(--border2);
     border-radius: var(--radius) var(--radius) 0 0;
     padding: 20px 20px 32px; width: 100%; max-width: 480px;
     transform: translateY(12px); transition: transform 0.18s;
   }
-  .bucket-overlay.show .bucket-sheet { transform: translateY(0); }
-  .bucket-sheet-title { font-size: 13px; color: var(--text3); margin-bottom: 4px; }
-  .bucket-sheet-desc { font-size: 14px; color: var(--text); margin-bottom: 18px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bucket-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-  .bucket-btn {
-    height: 52px; border: 1px solid var(--border2); border-radius: 10px;
+  .sheet-overlay.show .sheet { transform: translateY(0); }
+  .sheet-title { font-size: 13px; color: var(--text3); margin-bottom: 4px; }
+  .sheet-desc { font-size: 14px; color: var(--text); margin-bottom: 18px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sheet-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .sheet-btn {
+    min-height: 52px; border: 1px solid var(--border2); border-radius: 10px;
     font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
-    background: var(--bg3); color: var(--text2);
+    background: var(--bg3); color: var(--text2); padding: 8px;
   }
-  .bucket-btn:active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
-  .bucket-cancel { width: 100%; height: 44px; border: none; border-radius: 10px; background: transparent; color: var(--text3); font-size: 14px; font-family: inherit; cursor: pointer; }
-  .bucket-cancel:active { opacity: 0.6; }
+  .sheet-btn:active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .sheet-empty { grid-column: 1 / -1; font-size: 13px; color: var(--text3); padding: 12px 4px; }
+  .sheet-cancel { width: 100%; height: 44px; border: none; border-radius: 10px; background: transparent; color: var(--text3); font-size: 14px; font-family: inherit; cursor: pointer; }
+  .sheet-cancel:active { opacity: 0.6; }
 
   /* ARCHIVE CONFIRM OVERLAY */
   .archive-overlay {
@@ -323,13 +323,8 @@
   <a class="observe-link" href="mvfn_observe.html" title="Observe">🌿</a>
 </div>
 
-<div class="filter-bar">
+<div class="filter-bar" id="filterBar">
   <button class="filter-chip active" onclick="setFilter('All',this)">All</button>
-  <button class="filter-chip" id="mineChip" style="display:none" onclick="setFilter('Mine',this)">Mine</button>
-  <button class="filter-chip" onclick="setFilter('Nursery',this)">Nursery</button>
-  <button class="filter-chip" onclick="setFilter('Property',this)">Property</button>
-  <button class="filter-chip" onclick="setFilter('Biz-Infra',this)">Biz-Infra</button>
-  <button class="filter-chip" onclick="setFilter('Personal',this)">Personal</button>
   <button class="filter-chip" id="proposedChip" onclick="setFilter('Proposed',this)">Proposed</button>
 </div>
 
@@ -348,30 +343,33 @@
 
 <div class="toast" id="toast"></div>
 
-<div class="bucket-overlay" id="bucketOverlay" onclick="cancelBucketPick(event)">
-  <div class="bucket-sheet">
-    <div class="bucket-sheet-desc" id="bucketDesc"></div>
-    <!-- Stage 1: bucket -->
-    <div id="bucketStage">
-      <div class="bucket-sheet-title">Add to which bucket?</div>
-      <div class="bucket-btns">
-        <button class="bucket-btn" onclick="pickBucket('Nursery')">🌱 Nursery</button>
-        <button class="bucket-btn" onclick="pickBucket('Property')">🏡 Property</button>
-        <button class="bucket-btn" onclick="pickBucket('Biz-Infra')">⚙️ Biz-Infra</button>
-        <button class="bucket-btn" onclick="pickBucket('Personal')">👤 Personal</button>
+<div class="sheet-overlay" id="addOverlay" onclick="cancelAddPick(event)">
+  <div class="sheet">
+    <div class="sheet-desc" id="addDesc"></div>
+    <!-- Stage 1: domain (REQUIRED — no default, cannot be skipped) -->
+    <div id="domainStage">
+      <div class="sheet-title">Business or household?</div>
+      <div class="sheet-btns">
+        <button class="sheet-btn" onclick="pickDomain('business')">🌱 Business</button>
+        <button class="sheet-btn" onclick="pickDomain('household')">🏠 Household</button>
       </div>
     </div>
-    <!-- Stage 2: work location -->
+    <!-- Stage 2: category (chips filled from the GET payload) -->
+    <div id="categoryStage" style="display:none">
+      <div class="sheet-title">Which category?</div>
+      <div class="sheet-btns" id="categoryBtns"></div>
+    </div>
+    <!-- Stage 3: work location (business only — household defaults server-side) -->
     <div id="locStage" style="display:none">
-      <div class="bucket-sheet-title">Where is this work done?</div>
-      <div class="bucket-btns">
-        <button class="bucket-btn" onclick="pickLocation('outdoor')">🌳 Outdoor</button>
-        <button class="bucket-btn" onclick="pickLocation('indoor')">🏠 Indoor</button>
-        <button class="bucket-btn" onclick="pickLocation('mixed')">🔀 Mixed</button>
-        <button class="bucket-btn" onclick="pickLocation('unknown')">🤷 Not sure</button>
+      <div class="sheet-title">Where is this work done?</div>
+      <div class="sheet-btns">
+        <button class="sheet-btn" onclick="pickLocation('outdoor')">🌳 Outdoor</button>
+        <button class="sheet-btn" onclick="pickLocation('indoor')">🏠 Indoor</button>
+        <button class="sheet-btn" onclick="pickLocation('mixed')">🔀 Mixed</button>
+        <button class="sheet-btn" onclick="pickLocation('unknown')">🤷 Not sure</button>
       </div>
     </div>
-    <button class="bucket-cancel" onclick="cancelBucketPick()">Cancel</button>
+    <button class="sheet-cancel" onclick="cancelAddPick()">Cancel</button>
   </div>
 </div>
 
@@ -394,10 +392,12 @@ const WEBHOOK_GET  = N8N_BASE + '/mvfn-field-get';
 // ──────────────────────────────────────────────────────────
 
 let allTasks = [];
-let allAreas = [];   // [{id, name}]
-let allUsers = [];   // [{slug, display_name}]
-let ownership = [];  // [{area, owner}]
-let me = null;       // my slug, resolved server-side from device_token
+let allAreas = [];            // [{id, name}]
+let allUsers = [];            // [{slug, display_name}]
+let ownership = [];           // [{area, owner}]
+let categories = [];          // business tasks.categories [{category_id, label}]
+let householdCategories = []; // household capture options [{category_id, label}]
+let me = null;                // my slug, resolved server-side from device_token
 let activeFilter = 'All';
 let expandedId = null;
 
@@ -416,17 +416,18 @@ async function loadTasks() {
     const rows = Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : [data]);
     const row = rows[0] || {};
     if (row && Array.isArray(row.tasks)) {
-      // single-payload shape: {tasks, areas, users, ownership, me}
+      // single-payload shape: {tasks, areas, users, ownership, me, categories, household_categories}
       allTasks = row.tasks;
       allAreas = row.areas || [];
       allUsers = row.users || [];
       ownership = row.ownership || [];
+      categories = row.categories || [];
+      householdCategories = row.household_categories || [];
       me = row.me || null;
     } else {
       allTasks = rows; // legacy shape: bare task rows
     }
-    const mc = document.getElementById('mineChip');
-    if (mc) mc.style.display = me ? '' : 'none';
+    renderFilterChips();
     renderTasks();
   } catch(e) {
     const isTailscale = e.message.includes('Tailscale') || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch');
@@ -440,6 +441,7 @@ async function loadTasks() {
 }
 
 // ── FILTER ────────────────────────────────────────────────
+// Chips: All | Mine | one per business category | Proposed.
 // "Mine" mirrors the briefing's ownership relevance: assigned to me, OR
 // unassigned in an area I own, OR not yet zoned (inbox — nobody's blind spot).
 function matchesFilter(t) {
@@ -451,13 +453,29 @@ function matchesFilter(t) {
     if (!t.area) return true;
     return ownership.some(o => o.owner === me && o.area === t.area);
   }
-  return t.bucket === activeFilter;
+  return t.category_id === activeFilter;
 }
-function setFilter(bucket, el) {
-  activeFilter = bucket;
-  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+function renderFilterChips() {
+  const bar = document.getElementById('filterBar');
+  if (!bar) return;
+  // If the previously active category disappeared, fall back to All.
+  if (activeFilter !== 'All' && activeFilter !== 'Mine' && activeFilter !== 'Proposed'
+      && !categories.some(c => c.category_id === activeFilter)) {
+    activeFilter = 'All';
+  }
+  const chip = (val, label) =>
+    '<button class="filter-chip' + (activeFilter === val ? ' active' : '') + '" onclick="setFilter(\'' + esc(val) + '\',this)">' + escH(label) + '</button>';
+  let html = chip('All', 'All');
+  if (me) html += chip('Mine', 'Mine');
+  categories.forEach(c => { html += chip(c.category_id, c.label); });
+  html += '<button class="filter-chip' + (activeFilter === 'Proposed' ? ' active proposed-chip' : '') + '" id="proposedChip" onclick="setFilter(\'Proposed\',this)">Proposed</button>';
+  bar.innerHTML = html;
+}
+function setFilter(val, el) {
+  activeFilter = val;
+  document.querySelectorAll('.filter-chip').forEach(c => { c.classList.remove('active'); c.classList.remove('proposed-chip'); });
   el.classList.add('active');
-  if (bucket === 'Proposed') el.classList.add('proposed-chip');
+  if (val === 'Proposed') el.classList.add('proposed-chip');
   renderTasks();
 }
 
@@ -466,7 +484,7 @@ function renderTasks() {
   const list = document.getElementById('taskList');
 
   if (activeFilter === 'Proposed') {
-    const proposed = allTasks.filter(t => t.status === 'Proposed');
+    const proposed = allTasks.filter(t => t.status === 'proposed');
     const chip = document.getElementById('proposedChip');
     if (chip) chip.textContent = proposed.length ? `Proposed (${proposed.length})` : 'Proposed';
     document.getElementById('countBadge').textContent = proposed.length + ' proposed';
@@ -479,22 +497,21 @@ function renderTasks() {
   }
 
   // Update proposed chip count badge
-  const proposedCount = allTasks.filter(t => t.status === 'Proposed').length;
+  const proposedCount = allTasks.filter(t => t.status === 'proposed').length;
   const chip = document.getElementById('proposedChip');
   if (chip) chip.textContent = proposedCount ? `Proposed (${proposedCount})` : 'Proposed';
 
   const open = allTasks.filter(t =>
-    t.status !== 'Done' && t.status !== 'Withdrawn' && t.status !== 'Proposed' &&
-    matchesFilter(t)
+    (t.status === 'open' || t.status === 'blocked') && matchesFilter(t)
   ).sort((a, b) => {
-    // Nightly-recompiled priority first (lower = do first); unranked sink to the bottom.
-    const pa = a.priority == null ? Infinity : a.priority;
-    const pb = b.priority == null ? Infinity : b.priority;
-    if (pa !== pb) return pa - pb;
+    // Weather-aware score first (higher = do first); unscored sink to the bottom.
+    const sa = a.score == null ? -Infinity : Number(a.score);
+    const sb = b.score == null ? -Infinity : Number(b.score);
+    if (sa !== sb) return sb - sa;
     return (a.created_date || '').localeCompare(b.created_date || '');
   });
   const done = allTasks
-    .filter(t => t.status === 'Done' && matchesFilter(t))
+    .filter(t => t.status === 'done' && matchesFilter(t))
     .sort((a, b) => (b.completed_date || '').localeCompare(a.completed_date || ''))
     .slice(0, 5);
 
@@ -506,29 +523,46 @@ function renderTasks() {
   }
 
   let html = '';
-  open.forEach(t => { html += card(t); });
+  open.forEach((t, i) => { html += card(t, i); });
   if (done.length) {
     html += '<div class="section-label">Recently Done</div>';
-    done.forEach(t => { html += card(t); });
+    done.forEach(t => { html += card(t, null); });
   }
   list.innerHTML = html;
 }
 
+function taskById(taskId) {
+  return allTasks.find(x => String(x.task_id) === String(taskId));
+}
+
+function fmtEffort(m) {
+  m = Number(m);
+  if (!m || m <= 0) return '';
+  if (m < 60) return m + 'm';
+  const h = m / 60;
+  return (h % 1 === 0 ? h : h.toFixed(1)) + 'h';
+}
+
+// gate_reason verbatim when present, else weather_status when informative
+function reasonText(t) {
+  if (t.gate_reason) return t.gate_reason;
+  if (t.weather_status && t.weather_status !== 'N/A') return t.weather_status;
+  return '';
+}
+
 function proposedCard(t) {
-  const id = t.task_id || '';
-  const projectLabel = t.project_name || t.project_id || '';
+  const id = t.task_id != null ? String(t.task_id) : '';
   return `
   <div class="task-card-wrap" id="wrap-${esc(id)}">
     <div class="task-card proposed" id="card-${esc(id)}">
       <div class="task-main">
         <div style="width:56px;min-height:64px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💡</div>
         <div class="task-content" onclick="toggleExpand('${esc(id)}')">
-          <div class="task-desc">${escH(t.description||'(no description)')}</div>
+          <div class="task-desc">${escH(t.title||'(no title)')}</div>
           <div class="task-meta">
-            ${t.bucket?`<span class="badge badge-bucket">${escH(t.bucket)}</span>`:''}
+            ${t.category_label?`<span class="badge badge-category">${escH(t.category_label)}</span>`:''}
             ${t.suggested_assignee?`<span class="badge badge-suggest">💡 ${escH(userLabel(t.suggested_assignee))}?</span>`:''}
-            ${t.effort?`<span class="badge badge-effort">${escH(t.effort)}</span>`:''}
-            ${projectLabel?`<span class="badge badge-project">${escH(projectLabel)}</span>`:''}
+            ${t.effort_minutes?`<span class="badge badge-effort">${escH(fmtEffort(t.effort_minutes))}</span>`:''}
           </div>
         </div>
       </div>
@@ -540,11 +574,11 @@ function proposedCard(t) {
   </div>`;
 }
 
-function card(t) {
-  const id = t.task_id || '';
-  const isDone = t.status === 'Done';
+function card(t, rank) {
+  const id = t.task_id != null ? String(t.task_id) : '';
+  const isDone = t.status === 'done';
   const isOpen = expandedId === id;
-  const projectLabel = t.project_name || t.project_id || '';
+  const reason = reasonText(t);
   return `
   <div class="task-card-wrap" id="wrap-${esc(id)}">
     <div class="swipe-reveal">Archive</div>
@@ -559,23 +593,22 @@ function card(t) {
         </div>
       </button>
       <div class="task-content" onclick="toggleExpand('${esc(id)}')">
-        <div class="task-desc">${escH(t.description||'(no description)')}</div>
-        ${(!isDone && t.priority_reason)?`<div class="task-reason">${escH(t.priority_reason)}</div>`:''}
+        <div class="task-desc">${escH(t.title||'(no title)')}</div>
+        ${(!isDone && reason)?`<div class="task-reason">${escH(reason)}</div>`:''}
         <div class="task-meta">
-          ${(!isDone && t.priority!=null)?`<span class="badge badge-priority${t.priority<=3?' top':''}">#${t.priority}</span>`:''}
-          ${t.bucket?`<span class="badge badge-bucket">${escH(t.bucket)}</span>`:''}
+          ${(!isDone && t.score!=null)?`<span class="badge badge-score${(rank!=null && rank<3)?' top':''}">★ ${Math.round(Number(t.score))}</span>`:''}
+          ${t.category_label?`<span class="badge badge-category">${escH(t.category_label)}</span>`:''}
           ${t.area?`<span class="badge badge-area">📍 ${escH(t.area)}</span>`:''}
           ${t.assignee?`<span class="badge badge-assignee">👤 ${escH(userLabel(t.assignee))}</span>`:''}
           ${(!t.assignee && t.suggested_assignee)?`<span class="badge badge-suggest">💡 ${escH(userLabel(t.suggested_assignee))}?</span>`:''}
-          ${t.effort?`<span class="badge badge-effort">${escH(t.effort)}</span>`:''}
+          ${t.effort_minutes?`<span class="badge badge-effort">${escH(fmtEffort(t.effort_minutes))}</span>`:''}
           ${locBadge(t.work_location)}
-          ${projectLabel?`<span class="badge badge-project">${escH(projectLabel)}</span>`:''}
         </div>
       </div>
       <button class="expand-btn" onclick="toggleExpand('${esc(id)}')">${isOpen?'▲':'▼'}</button>
     </div>
     <div class="task-expand${isOpen?' open':''}" id="exp-${esc(id)}">
-      ${t.notes?`<div class="task-notes-text">${escH(t.notes)}</div>`:''}
+      ${t.detail?`<div class="task-notes-text">${escH(t.detail)}</div>`:''}
       ${areaEditor(id, t.area)}
       ${assigneeEditor(id, t.assignee, t.suggested_assignee)}
       ${locEditor(id, t.work_location)}
@@ -595,11 +628,13 @@ async function completeTask(taskId) {
   card.classList.add('done');
   showToast('Marking done…', '');
   try {
-    const r = await post({ action: 'complete_task', task_id: taskId,
-      device_token: localStorage.getItem('mvfn_device_token') || '' });
+    const r = await post({ action: 'complete_task', task_id: taskId });
     if (r.status === 'ok') {
-      const t = allTasks.find(x => x.task_id === taskId);
-      if (t) t.status = 'Done';
+      const t = taskById(taskId);
+      if (t) {
+        t.status = 'done';
+        t.completed_date = new Date().toISOString().split('T')[0];
+      }
       showToast('Done ✓', 'success');
       setTimeout(renderTasks, 600);
     } else {
@@ -620,8 +655,8 @@ async function saveNote(taskId) {
   try {
     const r = await post({ action: 'update_task', task_id: taskId, notes: note });
     if (r.status === 'ok') {
-      const t = allTasks.find(x => x.task_id === taskId);
-      if (t) t.notes = note;
+      const t = taskById(taskId);
+      if (t) t.detail = (t.detail ? t.detail + '\n\n' : '') + note;
       expandedId = null;
       renderTasks();
       showToast('Saved ✓', 'success');
@@ -634,10 +669,12 @@ async function saveNote(taskId) {
 }
 
 let _pendingAddDesc = null;
-let _pendingBucket = null;
+let _pendingDomain = null;
+let _pendingCategory = null;
 
-function _showAddStage(stage) {  // 'bucket' | 'loc'
-  document.getElementById('bucketStage').style.display = (stage === 'bucket') ? '' : 'none';
+function _showAddStage(stage) {  // 'domain' | 'category' | 'loc'
+  document.getElementById('domainStage').style.display = (stage === 'domain') ? '' : 'none';
+  document.getElementById('categoryStage').style.display = (stage === 'category') ? '' : 'none';
   document.getElementById('locStage').style.display = (stage === 'loc') ? '' : 'none';
 }
 
@@ -647,44 +684,62 @@ async function quickAdd() {
   if (!desc) return;
   inp.blur();
   _pendingAddDesc = desc;
-  document.getElementById('bucketDesc').textContent = desc;
-
-  if (activeFilter === 'All') {
-    _pendingBucket = null;
-    _showAddStage('bucket');
-  } else {
-    // bucket is already known from the active filter — go straight to location
-    _pendingBucket = activeFilter;
-    _showAddStage('loc');
-  }
-  document.getElementById('bucketOverlay').classList.add('show');
+  _pendingDomain = null;
+  _pendingCategory = null;
+  document.getElementById('addDesc').textContent = desc;
+  _showAddStage('domain');  // domain is REQUIRED — always asked, never defaulted
+  document.getElementById('addOverlay').classList.add('show');
 }
 
-function pickBucket(bucket) {
-  _pendingBucket = bucket;
-  _showAddStage('loc');  // advance to the work-location step
+function pickDomain(domain) {
+  _pendingDomain = domain;
+  const cats = domain === 'household' ? householdCategories : categories;
+  const btns = document.getElementById('categoryBtns');
+  if (!cats.length) {
+    btns.innerHTML = '<div class="sheet-empty">No categories loaded — pull to refresh, then try again.</div>';
+  } else {
+    btns.innerHTML = cats.map(c =>
+      `<button class="sheet-btn" onclick="pickCategory('${esc(c.category_id)}')">${escH(c.label)}</button>`
+    ).join('');
+  }
+  _showAddStage('category');
+}
+
+async function pickCategory(catId) {
+  _pendingCategory = catId;
+  if (_pendingDomain === 'business') {
+    _showAddStage('loc');  // business asks where the work happens
+    return;
+  }
+  // Household skips the work-location stage (server defaults to 'unknown')
+  const desc = _pendingAddDesc, domain = _pendingDomain, cat = _pendingCategory;
+  cancelAddPick();  // hide + reset state
+  document.getElementById('quickAdd').value = '';
+  await _submitAdd(desc, domain, cat, null);
 }
 
 async function pickLocation(loc) {
-  const desc = _pendingAddDesc;
-  const bucket = _pendingBucket;
-  cancelBucketPick();  // hide + reset state
+  const desc = _pendingAddDesc, domain = _pendingDomain, cat = _pendingCategory;
+  cancelAddPick();  // hide + reset state
   document.getElementById('quickAdd').value = '';
-  await _submitAdd(desc, bucket, loc);
+  await _submitAdd(desc, domain, cat, loc);
 }
 
-function cancelBucketPick(e) {
-  if (e && e.target !== document.getElementById('bucketOverlay')) return;
-  document.getElementById('bucketOverlay').classList.remove('show');
+function cancelAddPick(e) {
+  if (e && e.target !== document.getElementById('addOverlay')) return;
+  document.getElementById('addOverlay').classList.remove('show');
   _pendingAddDesc = null;
-  _pendingBucket = null;
-  _showAddStage('bucket');  // reset to first stage for next time
+  _pendingDomain = null;
+  _pendingCategory = null;
+  _showAddStage('domain');  // reset to first stage for next time
 }
 
-async function _submitAdd(desc, bucket, workLocation) {
+async function _submitAdd(desc, domain, categoryId, workLocation) {
   showToast('Adding…', '');
   try {
-    const r = await post({ action: 'add_task', description: desc, bucket, work_location: workLocation || 'unknown' });
+    const body = { action: 'add_task', domain: domain, category_id: categoryId, description: desc };
+    if (domain === 'business') body.work_location = workLocation || 'unknown';
+    const r = await post(body);
     if (r.status === 'ok') {
       showToast('Added ✓', 'success');
       loadTasks();
@@ -768,7 +823,7 @@ function handleVoiceCommand(text) {
   }
 
   const lower = text.toLowerCase();
-  // "add task [description]" or "new task [description]"
+  // "add task [title]" or "new task [title]"
   if (lower.startsWith('add task ') || lower.startsWith('new task ')) {
     const desc = text.replace(/^(add task|new task)\s+/i, '');
     document.getElementById('quickAdd').value = desc;
@@ -780,10 +835,10 @@ function handleVoiceCommand(text) {
   if (lower.startsWith('done ') || lower.startsWith('complete ')) {
     const query = text.replace(/^(done|complete)\s+/i, '').toLowerCase();
     const match = allTasks.find(t =>
-      t.status !== 'Done' && t.description && t.description.toLowerCase().includes(query)
+      t.status !== 'done' && t.title && t.title.toLowerCase().includes(query)
     );
     if (match) {
-      showTranscript('Completing: ' + match.description);
+      showTranscript('Completing: ' + match.title);
       completeTask(match.task_id);
     } else {
       showTranscript('No match found for: ' + query);
@@ -874,9 +929,9 @@ function _resetSwipe(taskId) {
 }
 
 function showArchiveConfirm(taskId) {
-  const t = allTasks.find(x => x.task_id === taskId);
+  const t = taskById(taskId);
   _pendingArchiveId = taskId;
-  document.getElementById('archiveDesc').textContent = t ? t.description : taskId;
+  document.getElementById('archiveDesc').textContent = t ? t.title : taskId;
   document.getElementById('archiveOverlay').classList.add('show');
 }
 
@@ -898,7 +953,7 @@ async function confirmArchive() {
   try {
     const r = await post({ action: 'archive_task', task_id: taskId });
     if (r.status === 'ok') {
-      allTasks = allTasks.filter(x => x.task_id !== taskId);
+      allTasks = allTasks.filter(x => String(x.task_id) !== String(taskId));
       renderTasks();
       showToast('Archived', 'success');
     } else {
@@ -919,8 +974,11 @@ async function acceptTask(taskId) {
   try {
     const r = await post({ action: 'accept_task', task_id: taskId });
     if (r.status === 'ok') {
-      const t = allTasks.find(x => x.task_id === taskId);
-      if (t) t.status = 'Todo';
+      const t = taskById(taskId);
+      if (t) {
+        t.status = 'open';
+        if (!t.assignee && t.suggested_assignee) t.assignee = t.suggested_assignee;
+      }
       showToast('Added to tasks ✓', 'success');
       renderTasks();
     } else {
@@ -940,7 +998,7 @@ async function dismissTask(taskId) {
   try {
     const r = await post({ action: 'dismiss_task', task_id: taskId });
     if (r.status === 'ok') {
-      allTasks = allTasks.filter(x => x.task_id !== taskId);
+      allTasks = allTasks.filter(x => String(x.task_id) !== String(taskId));
       showToast('Dismissed', '');
       renderTasks();
     } else {
@@ -958,9 +1016,10 @@ async function dismissTask(taskId) {
 function sqlEsc(s) { return (s || '').replace(/'/g, "''"); }
 
 async function post(body) {
+  // Every POST carries the device token so the server can resolve who acted.
+  const safe = { ...body, device_token: localStorage.getItem('mvfn_device_token') || '' };
   // Sanitize string fields that land in n8n SQL templates
-  const safe = { ...body };
-  ['description', 'notes', 'task_id', 'area_id', 'assignee_slug'].forEach(k => {
+  ['description', 'notes', 'task_id', 'area_id', 'assignee_slug', 'category_id', 'device_token'].forEach(k => {
     if (typeof safe[k] === 'string') safe[k] = sqlEsc(safe[k]);
   });
   const r = await fetch(WEBHOOK_POST, {
@@ -1033,7 +1092,7 @@ async function setArea(taskId, areaId) {
   try {
     const r = await post({ action: 'set_area', task_id: taskId, area_id: areaId });
     if (r.status === 'ok') {
-      const t = allTasks.find(x => x.task_id === taskId);
+      const t = taskById(taskId);
       if (t) { const a = allAreas.find(x => x.id === areaId); t.area = a ? a.name : null; }
       renderTasks();
       showToast('Saved ✓', 'success');
@@ -1045,7 +1104,7 @@ async function setAssignee(taskId, slug) {
   try {
     const r = await post({ action: 'set_assignee', task_id: taskId, assignee_slug: slug });
     if (r.status === 'ok') {
-      const t = allTasks.find(x => x.task_id === taskId);
+      const t = taskById(taskId);
       if (t) t.assignee = slug || null;
       renderTasks();
       showToast(slug ? 'Assigned to ' + userLabel(slug) + ' ✓' : 'Unassigned ✓', 'success');
@@ -1055,7 +1114,7 @@ async function setAssignee(taskId, slug) {
 
 async function setWorkLocation(taskId, loc) {
   if (!LOC_ORDER.includes(loc)) return;
-  const t = allTasks.find(x => x.task_id === taskId);
+  const t = taskById(taskId);
   if (t && t.work_location === loc) return;
   showToast('Saving…', '');
   try {
@@ -1072,8 +1131,8 @@ async function setWorkLocation(taskId, loc) {
   }
 }
 
-function esc(s) { return (s||'').replace(/['"<>&]/g, c => ({'\'':'&#39;','"':'&quot;','<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
-function escH(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) { return String(s == null ? '' : s).replace(/['"<>&]/g, c => ({'\'':'&#39;','"':'&quot;','<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+function escH(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ── INIT ──────────────────────────────────────────────────
 document.getElementById('quickAdd').addEventListener('keydown', e => {
