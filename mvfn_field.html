@@ -174,6 +174,9 @@
   .badge-effort { background: rgba(240,184,64,0.12); color: var(--amber); }
   .badge-project { background: rgba(255,255,255,0.06); color: var(--text3); }
   .badge-loc { background: rgba(96,165,250,0.14); color: #93c5fd; }
+  .badge-area { background: rgba(196,132,252,0.14); color: #d8b4fe; }
+  .badge-assignee { background: rgba(255,255,255,0.08); color: var(--text2); }
+  .badge-suggest { background: rgba(240,184,64,0.12); color: var(--amber); }
   .badge-priority { background: rgba(126,207,79,0.18); color: var(--green); font-weight: 700; }
   /* WORK-LOCATION EDITOR (expanded card) */
   .loc-edit { margin-top: 10px; }
@@ -322,6 +325,7 @@
 
 <div class="filter-bar">
   <button class="filter-chip active" onclick="setFilter('All',this)">All</button>
+  <button class="filter-chip" id="mineChip" style="display:none" onclick="setFilter('Mine',this)">Mine</button>
   <button class="filter-chip" onclick="setFilter('Nursery',this)">Nursery</button>
   <button class="filter-chip" onclick="setFilter('Property',this)">Property</button>
   <button class="filter-chip" onclick="setFilter('Biz-Infra',this)">Biz-Infra</button>
@@ -390,6 +394,10 @@ const WEBHOOK_GET  = N8N_BASE + '/mvfn-field-get';
 // ──────────────────────────────────────────────────────────
 
 let allTasks = [];
+let allAreas = [];   // [{id, name}]
+let allUsers = [];   // [{slug, display_name}]
+let ownership = [];  // [{area, owner}]
+let me = null;       // my slug, resolved server-side from device_token
 let activeFilter = 'All';
 let expandedId = null;
 
@@ -398,13 +406,27 @@ async function loadTasks() {
   document.getElementById('taskList').innerHTML =
     '<div class="loading"><div class="spinner"></div>Loading…</div>';
   try {
-    const r = await fetch(WEBHOOK_GET);
+    const tok = encodeURIComponent(localStorage.getItem('mvfn_device_token') || '');
+    const r = await fetch(WEBHOOK_GET + (tok ? '?device_token=' + tok : ''));
     if (!r.ok) {
       const hint = r.status === 503 ? 'Make sure Tailscale is connected.' : 'HTTP ' + r.status;
       throw new Error(hint);
     }
     const data = await r.json();
-    allTasks = Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : []);
+    const rows = Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : [data]);
+    const row = rows[0] || {};
+    if (row && Array.isArray(row.tasks)) {
+      // single-payload shape: {tasks, areas, users, ownership, me}
+      allTasks = row.tasks;
+      allAreas = row.areas || [];
+      allUsers = row.users || [];
+      ownership = row.ownership || [];
+      me = row.me || null;
+    } else {
+      allTasks = rows; // legacy shape: bare task rows
+    }
+    const mc = document.getElementById('mineChip');
+    if (mc) mc.style.display = me ? '' : 'none';
     renderTasks();
   } catch(e) {
     const isTailscale = e.message.includes('Tailscale') || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch');
@@ -418,6 +440,19 @@ async function loadTasks() {
 }
 
 // ── FILTER ────────────────────────────────────────────────
+// "Mine" mirrors the briefing's ownership relevance: assigned to me, OR
+// unassigned in an area I own, OR not yet zoned (inbox — nobody's blind spot).
+function matchesFilter(t) {
+  if (activeFilter === 'All') return true;
+  if (activeFilter === 'Mine') {
+    if (!me) return true;
+    if (t.assignee === me) return true;
+    if (t.assignee) return false;
+    if (!t.area) return true;
+    return ownership.some(o => o.owner === me && o.area === t.area);
+  }
+  return t.bucket === activeFilter;
+}
 function setFilter(bucket, el) {
   activeFilter = bucket;
   document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
@@ -450,7 +485,7 @@ function renderTasks() {
 
   const open = allTasks.filter(t =>
     t.status !== 'Done' && t.status !== 'Withdrawn' && t.status !== 'Proposed' &&
-    (activeFilter === 'All' || t.bucket === activeFilter)
+    matchesFilter(t)
   ).sort((a, b) => {
     // Nightly-recompiled priority first (lower = do first); unranked sink to the bottom.
     const pa = a.priority == null ? Infinity : a.priority;
@@ -459,7 +494,7 @@ function renderTasks() {
     return (a.created_date || '').localeCompare(b.created_date || '');
   });
   const done = allTasks
-    .filter(t => t.status === 'Done' && (activeFilter === 'All' || t.bucket === activeFilter))
+    .filter(t => t.status === 'Done' && matchesFilter(t))
     .sort((a, b) => (b.completed_date || '').localeCompare(a.completed_date || ''))
     .slice(0, 5);
 
@@ -491,6 +526,7 @@ function proposedCard(t) {
           <div class="task-desc">${escH(t.description||'(no description)')}</div>
           <div class="task-meta">
             ${t.bucket?`<span class="badge badge-bucket">${escH(t.bucket)}</span>`:''}
+            ${t.suggested_assignee?`<span class="badge badge-suggest">💡 ${escH(userLabel(t.suggested_assignee))}?</span>`:''}
             ${t.effort?`<span class="badge badge-effort">${escH(t.effort)}</span>`:''}
             ${projectLabel?`<span class="badge badge-project">${escH(projectLabel)}</span>`:''}
           </div>
@@ -528,6 +564,9 @@ function card(t) {
         <div class="task-meta">
           ${(!isDone && t.priority!=null)?`<span class="badge badge-priority${t.priority<=3?' top':''}">#${t.priority}</span>`:''}
           ${t.bucket?`<span class="badge badge-bucket">${escH(t.bucket)}</span>`:''}
+          ${t.area?`<span class="badge badge-area">📍 ${escH(t.area)}</span>`:''}
+          ${t.assignee?`<span class="badge badge-assignee">👤 ${escH(userLabel(t.assignee))}</span>`:''}
+          ${(!t.assignee && t.suggested_assignee)?`<span class="badge badge-suggest">💡 ${escH(userLabel(t.suggested_assignee))}?</span>`:''}
           ${t.effort?`<span class="badge badge-effort">${escH(t.effort)}</span>`:''}
           ${locBadge(t.work_location)}
           ${projectLabel?`<span class="badge badge-project">${escH(projectLabel)}</span>`:''}
@@ -537,6 +576,8 @@ function card(t) {
     </div>
     <div class="task-expand${isOpen?' open':''}" id="exp-${esc(id)}">
       ${t.notes?`<div class="task-notes-text">${escH(t.notes)}</div>`:''}
+      ${areaEditor(id, t.area)}
+      ${assigneeEditor(id, t.assignee, t.suggested_assignee)}
       ${locEditor(id, t.work_location)}
       <div class="note-row">
         <textarea class="note-input" id="note-${esc(id)}" placeholder="Add note…" rows="1"></textarea>
@@ -919,7 +960,7 @@ function sqlEsc(s) { return (s || '').replace(/'/g, "''"); }
 async function post(body) {
   // Sanitize string fields that land in n8n SQL templates
   const safe = { ...body };
-  ['description', 'notes', 'task_id'].forEach(k => {
+  ['description', 'notes', 'task_id', 'area_id', 'assignee_slug'].forEach(k => {
     if (typeof safe[k] === 'string') safe[k] = sqlEsc(safe[k]);
   });
   const r = await fetch(WEBHOOK_POST, {
@@ -959,6 +1000,59 @@ function locEditor(id, wl) {
     </div>
   </div>`;
 }
+// ── AREA + ASSIGNEE ───────────────────────────────────────
+function userLabel(slug) {
+  const u = allUsers.find(x => x.slug === slug);
+  return u ? u.display_name : slug;
+}
+function areaEditor(id, curArea) {
+  if (!allAreas.length) return '';
+  const pill = (v, txt, on) => `<button class="loc-pill${on?' active':''}" onclick="setArea('${esc(id)}','${esc(v)}')">${txt}</button>`;
+  return `<div class="loc-edit">
+    <div class="loc-edit-label">Area</div>
+    <div class="loc-btns">
+      ${allAreas.map(a => pill(a.id, '📍 ' + escH(a.name), curArea === a.name)).join('')}${pill('', 'None', !curArea)}
+    </div>
+  </div>`;
+}
+function assigneeEditor(id, curAssignee, suggested) {
+  if (!allUsers.length) return '';
+  const pill = (v, txt, on) => `<button class="loc-pill${on?' active':''}" onclick="setAssignee('${esc(id)}','${esc(v)}')">${txt}</button>`;
+  const hint = (!curAssignee && suggested)
+    ? `<div class="loc-edit-label" style="color:var(--amber)">💡 Overnight pipeline suggests ${escH(userLabel(suggested))} — tap to accept</div>` : '';
+  return `<div class="loc-edit">
+    <div class="loc-edit-label">Assigned to</div>
+    ${hint}
+    <div class="loc-btns">
+      ${allUsers.map(u => pill(u.slug, ((!curAssignee && suggested === u.slug) ? '💡 ' : '👤 ') + escH(u.display_name), curAssignee === u.slug)).join('')}${pill('', 'Unassigned', !curAssignee)}
+    </div>
+  </div>`;
+}
+async function setArea(taskId, areaId) {
+  showToast('Saving…', '');
+  try {
+    const r = await post({ action: 'set_area', task_id: taskId, area_id: areaId });
+    if (r.status === 'ok') {
+      const t = allTasks.find(x => x.task_id === taskId);
+      if (t) { const a = allAreas.find(x => x.id === areaId); t.area = a ? a.name : null; }
+      renderTasks();
+      showToast('Saved ✓', 'success');
+    } else { showToast('Save failed', 'error'); }
+  } catch (e) { showToast('Save failed', 'error'); }
+}
+async function setAssignee(taskId, slug) {
+  showToast('Saving…', '');
+  try {
+    const r = await post({ action: 'set_assignee', task_id: taskId, assignee_slug: slug });
+    if (r.status === 'ok') {
+      const t = allTasks.find(x => x.task_id === taskId);
+      if (t) t.assignee = slug || null;
+      renderTasks();
+      showToast(slug ? 'Assigned to ' + userLabel(slug) + ' ✓' : 'Unassigned ✓', 'success');
+    } else { showToast('Save failed', 'error'); }
+  } catch (e) { showToast('Save failed', 'error'); }
+}
+
 async function setWorkLocation(taskId, loc) {
   if (!LOC_ORDER.includes(loc)) return;
   const t = allTasks.find(x => x.task_id === taskId);
