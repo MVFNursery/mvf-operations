@@ -112,6 +112,19 @@
     width: 84px; padding: 10px; border: 2px solid #2d3319; border-radius: 6px;
     font-family: 'DM Mono', monospace; font-size: 1.05rem; text-align: center; background: white;
   }
+  .editor button.step {
+    width: 44px; height: 44px; padding: 0; border: 2px solid #2d3319; background: white;
+    color: #2d3319; border-radius: 6px; font-family: 'DM Mono', monospace; font-size: 1.4rem;
+    font-weight: 500; line-height: 1; cursor: pointer;
+    touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  }
+  .editor button.step:active { background: #2d3319; color: white; }
+  .editor .delta {
+    min-width: 2.6em; text-align: center; font-size: 0.9rem; font-weight: 500;
+    color: #8a8a7a;
+  }
+  .editor .delta.neg { color: #b91c1c; }
+  .editor .delta.pos { color: #047857; }
   .editor input.locinput {
     flex: 1 1 120px; padding: 9px; border: 2px solid #d1d5db; border-radius: 6px;
     font-family: 'DM Mono', monospace; font-size: 0.85rem; background: white;
@@ -443,7 +456,10 @@
     return `<div class="editor">
       <div class="line">
         <label>Count</label>
+        <button class="step" type="button" data-step="-1" aria-label="minus one">−</button>
         <input class="count" type="number" inputmode="numeric" min="0" value="${s.quantity ?? 0}">
+        <button class="step" type="button" data-step="1" aria-label="plus one">+</button>
+        <span class="delta" data-delta></span>
         <button class="save" type="button" data-act="count">Save count</button>
         <span class="msg" data-msg></span>
       </div>
@@ -473,11 +489,33 @@
 
     function setMsg(text, cls) { msg.textContent = text; msg.className = 'msg ' + (cls || ''); }
 
+    // Stepper buttons + running delta vs the saved count, so pulling 12 from a
+    // stack of 150 is 12 taps, not mental arithmetic. Delta rebases after save.
+    const countInput = card.querySelector('input.count');
+    const deltaEl = card.querySelector('[data-delta]');
+    function updateDelta() {
+      const n = parseInt(countInput.value, 10);
+      const d = isNaN(n) ? 0 : n - Number(s.quantity ?? 0);
+      deltaEl.textContent = d > 0 ? `+${d}` : d < 0 ? `−${-d}` : '±0';
+      deltaEl.className = 'delta' + (d > 0 ? ' pos' : d < 0 ? ' neg' : '');
+    }
+    card.querySelectorAll('button.step').forEach(b => {
+      b.addEventListener('click', () => {
+        const cur = parseInt(countInput.value, 10);
+        const next = Math.max(0, (isNaN(cur) ? Number(s.quantity ?? 0) : cur) + Number(b.dataset.step));
+        countInput.value = next;
+        updateDelta();
+        setMsg('', '');
+      });
+    });
+    countInput.addEventListener('input', updateDelta);
+    updateDelta();
+
     // Save count. Unchanged count -> plain set_qty (a "verified today" record).
     // Changed count -> reason modal first (moved / culled / new / recount / other),
     // which saves via adjust_qty and can mirror a move onto the counterpart row.
     card.querySelector('[data-act="count"]').addEventListener('click', async () => {
-      const val = card.querySelector('input.count').value.trim();
+      const val = countInput.value.trim();
       const n = parseInt(val, 10);
       if (val === '' || isNaN(n) || n < 0) { setMsg('Enter a number ≥ 0', 'err'); return; }
       const btn = card.querySelector('[data-act="count"]');
@@ -485,6 +523,7 @@
         openReasonModal(s, n, {
           onSaved: (result) => {
             s.quantity = n;
+            updateDelta();
             setMsg('✓ saved', 'ok');
             card.querySelector('.meta .qty').textContent = `${n} avail`;
           },
@@ -495,6 +534,7 @@
       try {
         await postAction({ action: 'set_qty', stock_id: stockId, quantity: n });
         s.quantity = n;
+        updateDelta();
         setMsg('✓ saved', 'ok');
         showToast(`Count saved · ${n}`);
         card.querySelector('.meta .qty').textContent = `${n} avail`;
