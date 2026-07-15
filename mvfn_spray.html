@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Spray Log">
+<meta name="theme-color" content="#2d3319">
+<link rel="manifest" href="spray-manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-spray.svg">
+<title>MVFN Spray Log</title>
+<script src="mvfn-auth.js" data-validate-url="https://megamachine.taile865b6.ts.net:5678/webhook/mvfn-spray-get"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Mono', monospace; background: #f5f5f0; color: #2d3319; min-height: 100vh; }
+  h1, h2 { font-family: 'Fraunces', serif; }
+  .container { max-width: 640px; margin: 0 auto; padding: 20px; }
+  header { text-align: center; padding: 20px 0 12px; }
+  header h1 { font-size: 2rem; font-weight: 700; }
+  header .subtitle { font-size: 0.85rem; color: #5a6b2d; margin-top: 4px; }
+
+  .card {
+    background: #fbfbf6; border: 2px solid #5a6b2d; border-radius: 10px;
+    padding: 16px 16px 18px; margin: 0 0 18px;
+  }
+  .card h2 { font-size: 1.1rem; margin-bottom: 12px; }
+  label { display: block; font-size: 0.78rem; color: #5a6b2d; margin: 10px 0 4px; }
+  select, input[type="date"], textarea {
+    width: 100%; padding: 12px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 1rem; background: white; color: #2d3319;
+  }
+  select:focus, input:focus, textarea:focus { outline: none; border-color: #5a6b2d; }
+  textarea { resize: vertical; min-height: 56px; }
+  .hint { font-size: 0.72rem; color: #8a8a70; margin-top: 4px; min-height: 1em; }
+  button.primary {
+    display: block; width: 100%; margin-top: 16px; padding: 14px; border: 0; border-radius: 8px;
+    background: #2d5016; color: #fff; font-family: 'Fraunces', serif; font-size: 1.05rem;
+    font-weight: 700; cursor: pointer;
+  }
+  button.primary:disabled { opacity: 0.5; cursor: default; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: #2d5016; color: #fff; padding: 12px 20px; border-radius: 8px;
+    font-size: 0.9rem; box-shadow: 0 6px 20px rgba(0,0,0,.3); opacity: 0;
+    transition: opacity .2s; pointer-events: none; max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; }
+  .toast.err { background: #9b2c1f; }
+
+  .recent h2 { font-size: 1rem; margin-bottom: 10px; }
+  .logrow {
+    background: white; border: 1px solid #e2e2d5; border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 10px;
+  }
+  .logrow .prod { font-weight: 500; }
+  .logrow .meta { font-size: 0.75rem; color: #8a8a70; text-align: right; white-space: nowrap; }
+  .logrow .notes { font-size: 0.75rem; color: #5a6b2d; margin-top: 3px; }
+  .empty { font-size: 0.82rem; color: #8a8a70; text-align: center; padding: 14px 0; }
+  .loading { text-align: center; color: #5a6b2d; padding: 30px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Spray Log</h1>
+    <div class="subtitle">log an application &middot; MVF Nursery</div>
+  </header>
+
+  <div class="card">
+    <h2>Log application</h2>
+    <label for="product">Product</label>
+    <select id="product"><option value="">Loading&hellip;</option></select>
+    <div class="hint" id="prodHint"></div>
+
+    <label for="applied">Date applied</label>
+    <input type="date" id="applied">
+
+    <label for="notes">Notes (optional)</label>
+    <textarea id="notes" placeholder="target, rate, conditions&hellip;"></textarea>
+
+    <button class="primary" id="logBtn" disabled>Log it</button>
+  </div>
+
+  <div class="recent">
+    <h2>Recent applications</h2>
+    <div id="recentList"><div class="loading">Loading&hellip;</div></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  const N8N_BASE = 'https://megamachine.taile865b6.ts.net:5678/webhook';
+  const $ = (id) => document.getElementById(id);
+  let products = [];
+
+  function toast(msg, isErr) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    setTimeout(() => { t.className = 'toast'; }, isErr ? 4000 : 2500);
+  }
+
+  function todayLocalISO() {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  }
+
+  function renderProducts() {
+    const sel = $('product');
+    sel.innerHTML = '<option value="">Select a product&hellip;</option>' +
+      products.map(p => `<option value="${p.product.replace(/"/g, '&quot;')}">${p.product}</option>`).join('');
+    $('logBtn').disabled = false;
+  }
+
+  function updateHint() {
+    const p = products.find(x => x.product === $('product').value);
+    $('prodHint').textContent = p
+      ? `Interval ${p.interval_min}–${p.interval_max} days` + (p.rei_hours ? ` · REI ${p.rei_hours}h` : '')
+      : '';
+  }
+
+  function renderRecent(recent) {
+    const el = $('recentList');
+    if (!recent || !recent.length) { el.innerHTML = '<div class="empty">No applications logged yet.</div>'; return; }
+    el.innerHTML = recent.map(r => {
+      const ago = r.days_ago === 0 ? 'today' : (r.days_ago === 1 ? 'yesterday' : `${r.days_ago}d ago`);
+      return `<div class="logrow"><div><div class="prod">${r.product}</div>` +
+        (r.notes ? `<div class="notes">${r.notes.replace(/</g, '&lt;')}</div>` : '') +
+        `</div><div class="meta">${r.applied_at}<br>${ago}</div></div>`;
+    }).join('');
+  }
+
+  async function load() {
+    try {
+      const res = await fetch(`${N8N_BASE}/mvfn-spray-get`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      products = data.products || [];
+      renderProducts();
+      renderRecent(data.recent || []);
+    } catch (e) {
+      $('recentList').innerHTML = '<div class="empty">Could not load. Check connection and retry.</div>';
+      $('product').innerHTML = '<option value="">Could not load products</option>';
+    }
+  }
+
+  async function logSpray() {
+    const product = $('product').value.trim();
+    const applied_at = $('applied').value.trim();
+    const notes = $('notes').value.trim();
+    if (!product) { toast('Pick a product first', true); return; }
+    const btn = $('logBtn');
+    btn.disabled = true; btn.textContent = 'Logging…';
+    try {
+      const res = await fetch(`${N8N_BASE}/mvfn-spray`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product, applied_at, notes }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (res.ok && out.status === 'ok') {
+        toast(`Logged ${out.logged.product}`);
+        $('notes').value = '';
+        await load();
+      } else {
+        toast(out.message || 'Could not log', true);
+      }
+    } catch (e) {
+      toast('Network error — not logged', true);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Log it';
+    }
+  }
+
+  $('product').addEventListener('change', updateHint);
+  $('logBtn').addEventListener('click', logSpray);
+  $('applied').value = todayLocalISO();
+  load();
+</script>
+</body>
+</html>
