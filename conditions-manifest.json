@@ -1,0 +1,22 @@
+{
+  "id": "/mvf-operations/conditions",
+  "name": "MVFN Condition Curation",
+  "short_name": "Conditions",
+  "description": "Confirm the light and moisture each native species actually wants",
+  "start_url": "/mvf-operations/mvfn_conditions.html",
+  "scope": "/mvf-operations/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f5f0",
+  "theme_color": "#2d3319",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/mvf-operations/icon-conditions.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"]
+}

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Conditions">
+<meta name="theme-color" content="#2d3319">
+<link rel="manifest" href="conditions-manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-conditions.png">
+<title>MVFN Condition Curation</title>
+<script src="mvfn-auth.js" data-token-key="mvfn_ops_token" data-validate-url="https://megamachine.taile865b6.ts.net:5678/webhook/mvfn-get-conditions"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Mono', monospace; background: #f5f5f0; color: #2d3319; min-height: 100vh; }
+  h1, h2, h3 { font-family: 'Fraunces', serif; }
+
+  .container { max-width: 720px; margin: 0 auto; padding: 20px 16px 80px; }
+  header { text-align: center; padding: 18px 0 6px; }
+  header h1 { font-size: 1.9rem; font-weight: 700; }
+  header .subtitle { font-size: 0.82rem; color: #5a6b2d; margin-top: 4px; }
+
+  .lockbar { display: flex; align-items: center; justify-content: center; gap: 8px;
+    flex-wrap: wrap; font-size: 0.78rem; margin: 6px 0 14px; }
+  .lockbar button { padding: 7px 14px; border: 2px solid #2d3319; background: white; color: #2d3319;
+    border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+
+  /* progress */
+  .progress { background: white; border: 2px solid #2d3319; border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 14px; }
+  .progress .row { display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 0.82rem; margin-bottom: 8px; }
+  .progress .big { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 700; }
+  .bar { height: 10px; background: #e4e6dd; border-radius: 999px; overflow: hidden; }
+  .bar span { display: block; height: 100%; background: #5a6b2d; width: 0%; transition: width .3s ease; }
+  .progress .tiers { font-size: 0.72rem; color: #6b7280; margin-top: 8px; }
+
+  /* filters */
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filters button { padding: 7px 13px; border: 2px solid #2d3319; background: white; color: #2d3319;
+    border-radius: 999px; font-family: 'DM Mono', monospace; font-size: 0.76rem; cursor: pointer; }
+  .filters button.on { background: #2d3319; color: #f5f5f0; }
+  .filters button .n { opacity: .65; margin-left: 4px; }
+
+  /* species card */
+  .card { background: white; border: 2px solid #2d3319; border-radius: 12px;
+    padding: 15px 16px; margin-bottom: 12px; }
+  .card.done { border-color: #b8c4a0; background: #fbfcf8; }
+  .card .head { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .card h3 { font-size: 1.05rem; font-weight: 600; line-height: 1.25; flex: 1 1 auto; }
+  .card .sci { font-family: 'Fraunces', serif; font-style: italic; font-size: 0.8rem;
+    color: #6b7280; display: block; font-weight: 400; }
+
+  .tag { font-size: 0.62rem; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
+  .tag.retail     { background: #dcefd6; color: #2f6b28; }
+  .tag.production { background: #fbeccd; color: #8a5a12; }
+  .tag.grass      { background: #e2ecd3; color: #4b6b1f; }
+  .tag.conflict   { background: #fadcd6; color: #9e3b2c; }
+  .tag.weak       { background: #eceff0; color: #6b7280; }
+  .tag.ok         { background: #dcefd6; color: #2f6b28; }
+
+  /* choice groups */
+  .group { margin-top: 13px; }
+  .group .label { font-size: 0.7rem; letter-spacing: .1em; text-transform: uppercase;
+    color: #6b7280; margin-bottom: 6px; }
+  .choices { display: flex; gap: 6px; flex-wrap: wrap; }
+  .choices button { flex: 1 1 30%; min-width: 96px; padding: 11px 8px;
+    border: 2px solid #d1d5db; background: white; color: #2d3319; border-radius: 8px;
+    font-family: 'DM Mono', monospace; font-size: 0.8rem; cursor: pointer; }
+  .choices button.sel { border-color: #2d3319; background: #2d3319; color: #f5f5f0; }
+  .choices button.proposed::after { content: " ·"; opacity: .6; }
+
+  /* conflict / evidence */
+  .conflict-note { margin-top: 11px; padding: 9px 11px; background: #fdf1ee;
+    border-left: 3px solid #9e3b2c; border-radius: 4px; font-size: 0.76rem; color: #7d2f22; }
+  .evidence { margin-top: 11px; font-size: 0.73rem; color: #6b7280; line-height: 1.7; }
+  .evidence b { color: #2d3319; font-weight: 500; }
+  .evidence .k { display: inline-block; min-width: 74px; color: #9ca3af; }
+
+  .preview { margin-top: 12px; padding: 9px 11px; background: #f2f5ec;
+    border-radius: 6px; font-size: 0.78rem; }
+  .preview .none { color: #9e3b2c; }
+
+  .noteinput { margin-top: 11px; width: 100%; padding: 9px 10px; border: 2px solid #d1d5db;
+    border-radius: 8px; font-family: 'DM Mono', monospace; font-size: 0.8rem; background: white; }
+
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .actions button { padding: 10px 16px; border-radius: 999px; cursor: pointer;
+    font-family: 'Fraunces', serif; font-size: 0.85rem; font-weight: 600; border: 2px solid #2d3319; }
+  .btn-confirm { background: #2d3319; color: #f5f5f0; flex: 1 1 auto; }
+  .btn-undo    { background: white; color: #2d3319; }
+  .confirmed-line { margin-top: 10px; font-size: 0.76rem; color: #4b6b1f; }
+
+  .msg { text-align: center; padding: 26px 10px; color: #6b7280; font-size: 0.85rem; }
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px;
+    background: #2d3319; color: #f5f5f0; padding: 11px 18px; border-radius: 999px;
+    font-size: 0.8rem; opacity: 0; pointer-events: none; transition: opacity .25s ease; z-index: 50; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Growing Conditions</h1>
+    <div class="subtitle">Confirm where each plant actually wants to be</div>
+  </header>
+
+  <div class="lockbar">
+    <span id="lockstate"></span>
+    <button type="button" onclick="window.mvfnLock()">Lock</button>
+    <button type="button" onclick="load()">Reload</button>
+  </div>
+
+  <div class="progress">
+    <div class="row">
+      <span class="big" id="pdone">–</span>
+      <span id="ptotal"></span>
+    </div>
+    <div class="bar"><span id="pbar"></span></div>
+    <div class="tiers" id="ptiers"></div>
+  </div>
+
+  <div class="filters" id="filters"></div>
+
+  <div id="list"><div class="msg">Loading…</div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var API = 'https://megamachine.taile865b6.ts.net:5678/webhook';
+  var SUN = [
+    { v: 'full-sun',   label: 'Full sun' },
+    { v: 'part-shade', label: 'Part shade' },
+    { v: 'shade',      label: 'Shade' }
+  ];
+  var MOIST = [
+    { v: 'dry',   label: 'Dry' },
+    { v: 'moist', label: 'Moist' },
+    { v: 'wet',   label: 'Wet' }
+  ];
+  var FILTERS = [
+    { k: 'review',    label: 'Needs a look' },
+    { k: 'unconfirmed', label: 'All to do' },
+    { k: 'confirmed', label: 'Confirmed' },
+    { k: 'all',       label: 'Everything' }
+  ];
+
+  var state = { species: [], conditions: [], progress: [], filter: 'review', draft: {} };
+
+  function $(id) { return document.getElementById(id); }
+
+  function toast(text) {
+    var t = $('toast');
+    t.textContent = text;
+    t.className = 'toast show';
+    setTimeout(function () { t.className = 'toast'; }, 2000);
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch];
+    });
+  }
+
+  // Which named bundles does this sun+moisture combination land in? Computed from
+  // the condition definitions the server sent, so renaming the line needs no rebuild.
+  function tagsFor(sun, moisture) {
+    if (!sun || !moisture) return [];
+    return state.conditions.filter(function (c) {
+      return c.sun_prefs.indexOf(sun) !== -1 && c.moisture_prefs.indexOf(moisture) !== -1;
+    }).map(function (c) { return c.display_name; });
+  }
+
+  function needsLook(s) {
+    return s.moisture_confidence === 'conflict' ||
+           s.sun_confidence === 'low' || s.sun_confidence === 'none' ||
+           s.moisture_confidence === 'low' || s.moisture_confidence === 'none';
+  }
+
+  function visible() {
+    return state.species.filter(function (s) {
+      if (state.filter === 'all') return true;
+      if (state.filter === 'confirmed') return s.is_confirmed;
+      if (state.filter === 'unconfirmed') return !s.is_confirmed;
+      return !s.is_confirmed && needsLook(s);
+    });
+  }
+
+  function counts() {
+    return {
+      review: state.species.filter(function (s) { return !s.is_confirmed && needsLook(s); }).length,
+      unconfirmed: state.species.filter(function (s) { return !s.is_confirmed; }).length,
+      confirmed: state.species.filter(function (s) { return s.is_confirmed; }).length,
+      all: state.species.length
+    };
+  }
+
+  // current working values for a species: an unsaved edit, else the confirmed
+  // value, else the proposal
+  function draftOf(s) {
+    var d = state.draft[s.species_id] || {};
+    return {
+      sun: d.sun || s.confirmed_sun || s.proposed_sun || '',
+      moisture: d.moisture || s.confirmed_moisture || s.proposed_moisture || '',
+      note: d.note !== undefined ? d.note : (s.confirmed_note || '')
+    };
+  }
+
+  function renderProgress() {
+    var c = counts();
+    $('pdone').textContent = c.confirmed + ' of ' + c.all;
+    $('ptotal').textContent = 'confirmed';
+    $('pbar').style.width = (c.all ? (100 * c.confirmed / c.all) : 0).toFixed(1) + '%';
+    $('ptiers').textContent = state.progress.map(function (p) {
+      return p.availability + ' ' + p.confirmed + '/' + p.species;
+    }).join('  ·  ');
+  }
+
+  function renderFilters() {
+    var c = counts();
+    $('filters').innerHTML = FILTERS.map(function (f) {
+      return '<button type="button" data-f="' + f.k + '"' +
+             (state.filter === f.k ? ' class="on"' : '') + '>' +
+             esc(f.label) + '<span class="n">' + c[f.k] + '</span></button>';
+    }).join('');
+    Array.prototype.forEach.call($('filters').querySelectorAll('button'), function (b) {
+      b.onclick = function () { state.filter = b.getAttribute('data-f'); render(); };
+    });
+  }
+
+  function choiceRow(s, kind, opts, current, proposed) {
+    return '<div class="choices">' + opts.map(function (o) {
+      var cls = [];
+      if (o.v === current) cls.push('sel');
+      if (o.v === proposed) cls.push('proposed');
+      return '<button type="button" data-kind="' + kind + '" data-sp="' + esc(s.species_id) +
+             '" data-v="' + o.v + '"' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') +
+             '>' + esc(o.label) + '</button>';
+    }).join('') + '</div>';
+  }
+
+  function evidenceHtml(s) {
+    var bits = [];
+    if (s.evidence_sun_text)      bits.push('<span class="k">Sun</span><b>' + esc(s.evidence_sun_text) + '</b>');
+    if (s.evidence_moisture_text) bits.push('<span class="k">Moisture</span><b>' + esc(s.evidence_moisture_text) + '</b>');
+    if (s.evidence_wetland_code)  bits.push('<span class="k">USDA</span><b>' + esc(s.evidence_wetland_code) + '</b>');
+    if (s.evidence_drought_tolerance) bits.push('<span class="k">Drought</span><b>' + esc(s.evidence_drought_tolerance) + '</b>');
+    if (s.evidence_moisture_use)  bits.push('<span class="k">Water use</span><b>' + esc(s.evidence_moisture_use) + '</b>');
+    if (s.flowering_months)       bits.push('<span class="k">Bloom</span><b>' + esc(s.flowering_months) + '</b>');
+    if (!bits.length) return '<div class="evidence"><i>No recorded evidence — judge from what you know.</i></div>';
+    return '<div class="evidence">' + bits.join('<br>') + '</div>';
+  }
+
+  function cardHtml(s) {
+    var d = draftOf(s);
+    var tags = tagsFor(d.sun, d.moisture);
+    var chips = [];
+    if (s.availability === 'retail') chips.push('<span class="tag retail">Ships now</span>');
+    if (s.availability === 'production') chips.push('<span class="tag production">Growing</span>');
+    if (s.is_grass) chips.push('<span class="tag grass">Grass</span>');
+    if (!s.is_confirmed && s.moisture_confidence === 'conflict') chips.push('<span class="tag conflict">Sources disagree</span>');
+    else if (!s.is_confirmed && needsLook(s)) chips.push('<span class="tag weak">Thin evidence</span>');
+    if (s.is_confirmed) chips.push('<span class="tag ok">Confirmed</span>');
+
+    var h = '<div class="card' + (s.is_confirmed ? ' done' : '') + '" id="card-' + esc(s.species_id) + '">';
+    h += '<div class="head"><h3>' + esc(s.common_name) +
+         '<span class="sci">' + esc(s.scientific_name) + '</span></h3>' + chips.join('') + '</div>';
+
+    if (!s.is_confirmed && s.moisture_confidence === 'conflict') {
+      h += '<div class="conflict-note">USDA wetland rating (<b>' + esc(s.evidence_wetland_code) +
+           '</b>) reads <b>' + esc(s.signal_usda_moisture) + '</b>, but the recorded text says <b>' +
+           esc(s.signal_text_moisture) + '</b>. Your call.</div>';
+    }
+
+    h += '<div class="group"><div class="label">Light it wants</div>' +
+         choiceRow(s, 'sun', SUN, d.sun, s.proposed_sun) + '</div>';
+    h += '<div class="group"><div class="label">Moisture it wants</div>' +
+         choiceRow(s, 'moisture', MOIST, d.moisture, s.proposed_moisture) + '</div>';
+
+    h += '<div class="preview">Lands in: ' + (tags.length
+          ? '<b>' + tags.map(esc).join('</b>, <b>') + '</b>'
+          : '<span class="none">no bundle</span>') + '</div>';
+
+    h += evidenceHtml(s);
+
+    h += '<input class="noteinput" type="text" placeholder="Note (optional)" ' +
+         'data-note="' + esc(s.species_id) + '" value="' + esc(d.note) + '">';
+
+    h += '<div class="actions">';
+    h += '<button type="button" class="btn-confirm" data-save="' + esc(s.species_id) + '">' +
+         (s.is_confirmed ? 'Update' : 'Confirm') + '</button>';
+    if (s.is_confirmed) {
+      h += '<button type="button" class="btn-undo" data-clear="' + esc(s.species_id) + '">Undo</button>';
+    }
+    h += '</div>';
+
+    if (s.is_confirmed) {
+      h += '<div class="confirmed-line">Confirmed by ' + esc(s.confirmed_by) +
+           (s.confirmed_at ? ' · ' + esc(String(s.confirmed_at).slice(0, 10)) : '') + '</div>';
+    }
+
+    h += '</div>';
+    return h;
+  }
+
+  function render() {
+    renderProgress();
+    renderFilters();
+    var rows = visible();
+    var list = $('list');
+    if (!rows.length) {
+      list.innerHTML = '<div class="msg">' +
+        (state.filter === 'review'
+          ? 'Nothing left needing a second look. Switch to “All to do”.'
+          : 'Nothing here.') + '</div>';
+      return;
+    }
+    list.innerHTML = rows.map(cardHtml).join('');
+    wire();
+  }
+
+  function wire() {
+    var list = $('list');
+
+    Array.prototype.forEach.call(list.querySelectorAll('button[data-kind]'), function (b) {
+      b.onclick = function () {
+        var sp = b.getAttribute('data-sp');
+        var kind = b.getAttribute('data-kind');
+        state.draft[sp] = state.draft[sp] || {};
+        state.draft[sp][kind] = b.getAttribute('data-v');
+        redrawCard(sp);
+      };
+    });
+
+    Array.prototype.forEach.call(list.querySelectorAll('input[data-note]'), function (inp) {
+      inp.oninput = function () {
+        var sp = inp.getAttribute('data-note');
+        state.draft[sp] = state.draft[sp] || {};
+        state.draft[sp].note = inp.value;
+      };
+    });
+
+    Array.prototype.forEach.call(list.querySelectorAll('button[data-save]'), function (b) {
+      b.onclick = function () { save(b.getAttribute('data-save'), b); };
+    });
+    Array.prototype.forEach.call(list.querySelectorAll('button[data-clear]'), function (b) {
+      b.onclick = function () { clearOne(b.getAttribute('data-clear'), b); };
+    });
+  }
+
+  // Repaint one card in place so choosing a value doesn't scroll the page away.
+  function redrawCard(speciesId) {
+    var s = state.species.filter(function (x) { return x.species_id === speciesId; })[0];
+    if (!s) return;
+    var old = document.getElementById('card-' + speciesId);
+    if (!old) return;
+    var tmp = document.createElement('div');
+    tmp.innerHTML = cardHtml(s);
+    old.parentNode.replaceChild(tmp.firstChild, old);
+    wire();
+  }
+
+  function post(body) {
+    return fetch(API + '/mvfn-conditions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  function save(speciesId, btn) {
+    var s = state.species.filter(function (x) { return x.species_id === speciesId; })[0];
+    if (!s) return;
+    var d = draftOf(s);
+    if (!d.sun || !d.moisture) { toast('Pick both light and moisture'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    post({
+      action: 'save_condition',
+      species_id: speciesId,
+      sun_pref: d.sun,
+      moisture_pref: d.moisture,
+      note: d.note || '',
+      confirmed_by: 'ian'
+    }).then(function () {
+      s.is_confirmed = true;
+      s.confirmed_sun = d.sun;
+      s.confirmed_moisture = d.moisture;
+      s.confirmed_note = d.note || null;
+      s.confirmed_by = 'ian';
+      s.confirmed_at = new Date().toISOString();
+      delete state.draft[speciesId];
+      bumpProgress(s.availability, 1);
+      toast(s.common_name + ' confirmed');
+      render();
+    })['catch'](function (e) {
+      btn.disabled = false;
+      btn.textContent = 'Confirm';
+      toast('Save failed: ' + e.message);
+    });
+  }
+
+  function clearOne(speciesId, btn) {
+    var s = state.species.filter(function (x) { return x.species_id === speciesId; })[0];
+    if (!s) return;
+    btn.disabled = true;
+    post({ action: 'clear_condition', species_id: speciesId }).then(function () {
+      s.is_confirmed = false;
+      s.confirmed_sun = null;
+      s.confirmed_moisture = null;
+      s.confirmed_note = null;
+      bumpProgress(s.availability, -1);
+      toast(s.common_name + ' cleared');
+      render();
+    })['catch'](function (e) {
+      btn.disabled = false;
+      toast('Failed: ' + e.message);
+    });
+  }
+
+  function bumpProgress(tier, delta) {
+    state.progress.forEach(function (p) {
+      if (p.availability === tier) {
+        p.confirmed += delta;
+        p.remaining -= delta;
+      }
+    });
+  }
+
+  function load() {
+    $('list').innerHTML = '<div class="msg">Loading…</div>';
+    fetch(API + '/mvfn-get-conditions').then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (data) {
+      state.species = data.species || [];
+      state.conditions = data.conditions || [];
+      state.progress = data.progress || [];
+      state.draft = {};
+      $('lockstate').textContent = 'unlocked';
+      $('lockstate').className = 'state-unlocked';
+      render();
+    })['catch'](function (e) {
+      $('list').innerHTML = '<div class="msg">Could not load: ' + esc(e.message) +
+        '<br>If this says 403, unlock with your ops token.</div>';
+    });
+  }
+
+  window.load = load;
+  load();
+})();
+</script>
+</body>
+</html>
