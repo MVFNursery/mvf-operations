@@ -85,6 +85,18 @@
   .preview { margin-top: 12px; padding: 9px 11px; background: #f2f5ec;
     border-radius: 6px; font-size: 0.78rem; }
   .preview .none { color: #9e3b2c; }
+  .preview.held { background: #f4f1ea; color: #6b5b3a; }
+
+  /* bundle hold toggle */
+  .hold { margin-top: 12px; display: flex; align-items: center; gap: 9px;
+    padding: 9px 11px; border: 2px dashed #d1d5db; border-radius: 8px; cursor: pointer;
+    font-size: 0.79rem; color: #4b5563; }
+  .hold.on { border-style: solid; border-color: #8a5a12; background: #fdf6e7; color: #7a4f10; }
+  .hold .box { width: 20px; height: 20px; border: 2px solid #9ca3af; border-radius: 5px;
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; line-height: 1; color: transparent; }
+  .hold.on .box { border-color: #8a5a12; background: #8a5a12; color: #fdf6e7; }
+  .tag.held { background: #f6e7c8; color: #8a5a12; }
 
   .noteinput { margin-top: 11px; width: 100%; padding: 9px 10px; border: 2px solid #d1d5db;
     border-radius: 8px; font-family: 'DM Mono', monospace; font-size: 0.8rem; background: white; }
@@ -212,7 +224,8 @@
     return {
       sun: d.sun || s.confirmed_sun || s.proposed_sun || '',
       moisture: d.moisture || s.confirmed_moisture || s.proposed_moisture || '',
-      note: d.note !== undefined ? d.note : (s.confirmed_note || '')
+      note: d.note !== undefined ? d.note : (s.confirmed_note || ''),
+      held: d.held !== undefined ? d.held : !!s.is_excluded
     };
   }
 
@@ -271,6 +284,7 @@
     if (!s.is_confirmed && s.moisture_confidence === 'conflict') chips.push('<span class="tag conflict">Sources disagree</span>');
     else if (!s.is_confirmed && needsLook(s)) chips.push('<span class="tag weak">Thin evidence</span>');
     if (s.is_confirmed) chips.push('<span class="tag ok">Confirmed</span>');
+    if (s.is_excluded) chips.push('<span class="tag held">Not for bundles</span>');
 
     var h = '<div class="card' + (s.is_confirmed ? ' done' : '') + '" id="card-' + esc(s.species_id) + '">';
     h += '<div class="head"><h3>' + esc(s.common_name) +
@@ -287,14 +301,26 @@
     h += '<div class="group"><div class="label">Moisture it wants</div>' +
          choiceRow(s, 'moisture', MOIST, d.moisture, s.proposed_moisture) + '</div>';
 
-    h += '<div class="preview">Lands in: ' + (tags.length
-          ? '<b>' + tags.map(esc).join('</b>, <b>') + '</b>'
-          : '<span class="none">no bundle</span>') + '</div>';
+    if (d.held) {
+      h += '<div class="preview held">Held out of bundles' +
+           (tags.length ? ' — would otherwise land in <b>' + tags.map(esc).join('</b>, <b>') + '</b>' : '') +
+           '</div>';
+    } else {
+      h += '<div class="preview">Lands in: ' + (tags.length
+            ? '<b>' + tags.map(esc).join('</b>, <b>') + '</b>'
+            : '<span class="none">no bundle</span>') + '</div>';
+    }
 
     h += evidenceHtml(s);
 
-    h += '<input class="noteinput" type="text" placeholder="Note (optional)" ' +
+    h += '<input class="noteinput" type="text" placeholder="' +
+         (d.held ? 'Why it is held out (saved as the reason)' : 'Note (optional)') + '" ' +
          'data-note="' + esc(s.species_id) + '" value="' + esc(d.note) + '">';
+
+    h += '<div class="hold' + (d.held ? ' on' : '') + '" data-hold="' + esc(s.species_id) + '">' +
+         '<span class="box">&#10003;</span>' +
+         '<span>Do not include in bundles' +
+         (d.held ? ' — the note above is saved as the reason' : '') + '</span></div>';
 
     h += '<div class="actions">';
     h += '<button type="button" class="btn-confirm" data-save="' + esc(s.species_id) + '">' +
@@ -350,6 +376,16 @@
       };
     });
 
+    Array.prototype.forEach.call(list.querySelectorAll('div[data-hold]'), function (el) {
+      el.onclick = function () {
+        var sp = el.getAttribute('data-hold');
+        state.draft[sp] = state.draft[sp] || {};
+        state.draft[sp].held = !draftOf(
+          state.species.filter(function (x) { return x.species_id === sp; })[0]).held;
+        redrawCard(sp);
+      };
+    });
+
     Array.prototype.forEach.call(list.querySelectorAll('button[data-save]'), function (b) {
       b.onclick = function () { save(b.getAttribute('data-save'), b); };
     });
@@ -387,8 +423,13 @@
     var d = draftOf(s);
     if (!d.sun || !d.moisture) { toast('Pick both light and moisture'); return; }
 
+    var wasConfirmed = s.is_confirmed;
     btn.disabled = true;
     btn.textContent = 'Saving…';
+
+    // The condition and the bundle hold are independent records: a held-out plant
+    // still has a light and moisture worth keeping. Write the condition first, then
+    // reconcile the hold only if it actually changed.
     post({
       action: 'save_condition',
       species_id: speciesId,
@@ -397,19 +438,31 @@
       note: d.note || '',
       confirmed_by: 'ian'
     }).then(function () {
+      if (d.held === !!s.is_excluded) return null;
+      return post({
+        action: 'set_exclusion',
+        species_id: speciesId,
+        excluded: d.held ? 'true' : 'false',
+        reason_code: 'curator-hold',
+        reason: d.note || '',
+        confirmed_by: 'ian'
+      });
+    }).then(function () {
       s.is_confirmed = true;
       s.confirmed_sun = d.sun;
       s.confirmed_moisture = d.moisture;
       s.confirmed_note = d.note || null;
       s.confirmed_by = 'ian';
       s.confirmed_at = new Date().toISOString();
+      s.is_excluded = d.held;
+      s.exclusion_reason = d.held ? (d.note || null) : null;
       delete state.draft[speciesId];
-      bumpProgress(s.availability, 1);
-      toast(s.common_name + ' confirmed');
+      if (!wasConfirmed) bumpProgress(s.availability, 1);
+      toast(s.common_name + (d.held ? ' confirmed and held out' : ' confirmed'));
       render();
     })['catch'](function (e) {
       btn.disabled = false;
-      btn.textContent = 'Confirm';
+      btn.textContent = wasConfirmed ? 'Update' : 'Confirm';
       toast('Save failed: ' + e.message);
     });
   }
