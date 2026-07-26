@@ -1,7 +1,7 @@
 // Species Trainer — Service Worker
 // Scope: /mvf-operations/
 
-const CACHE_NAME = 'species-trainer-v3';
+const CACHE_NAME = 'species-trainer-v4';
 const BASE = '/mvf-operations';
 
 const APP_SHELL = [

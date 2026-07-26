@@ -72,6 +72,10 @@
       <div><label>Effort (min)</label><input type="number" id="f_effort" min="1" inputmode="numeric"></div>
     </div>
     <div class="row2">
+      <div><label>Not before (window opens)</label><input type="date" id="f_nb"></div>
+      <div></div>
+    </div>
+    <div class="row2">
       <div><label>Weather needs</label>
         <select id="f_wx">
           <option value="none">None</option>
@@ -169,6 +173,7 @@
       chips.push(chip(t.assigned_to
         ? '@' + (state.users.find(function (u) { return u.user_id === t.assigned_to; }) || { display_name: t.assigned_to }).display_name
         : 'unassigned'));
+      if (t.not_before && t.not_before > today) chips.push(chip('opens ' + t.not_before));
       if (t.due_date) chips.push(chip('due ' + t.due_date, t.due_date < today ? 'over' : 'due'));
       if (t.hard_deadline) chips.push(chip('HARD', 'hard'));
       if (t.effort_minutes) chips.push(chip(t.effort_minutes + 'm'));
@@ -215,6 +220,8 @@
     var due = $('f_due').value.trim();
     if ($('f_hard').checked && !due) { banner('Hard deadline needs a due date'); return; }
     if ($('f_recur').value && !due) { banner('Repeat needs a due date'); return; }
+    var nb = $('f_nb').value.trim();
+    if (nb && due && nb > due) { banner('Not-before must be on or before the due date'); return; }
     post({
       action: 'add',
       title: title,
@@ -223,13 +230,14 @@
       created_by: me(),
       assigned_to: $('f_assign').value,
       due_date: due,
+      not_before: nb,
       hard_deadline: $('f_hard').checked,
       effort_minutes: $('f_effort').value.trim(),
       weather_rule: $('f_wx').value,
       visibility: $('f_priv').checked ? 'private' : 'shared',
       recur_interval: $('f_recur').value,
     }, $('f_go')).then(function () {
-      ['f_title', 'f_due', 'f_effort', 'f_detail'].forEach(function (id) { $(id).value = ''; });
+      ['f_title', 'f_due', 'f_nb', 'f_effort', 'f_detail'].forEach(function (id) { $(id).value = ''; });
       $('f_hard').checked = false; $('f_priv').checked = false;
       $('f_wx').value = 'none'; $('f_recur').value = '';
     });
