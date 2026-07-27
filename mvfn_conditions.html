@@ -39,6 +39,16 @@
   .bar span { display: block; height: 100%; background: #5a6b2d; width: 0%; transition: width .3s ease; }
   .progress .tiers { font-size: 0.72rem; color: #6b7280; margin-top: 8px; }
 
+  /* source toggle */
+  .source { display: flex; gap: 0; margin-bottom: 12px; border: 2px solid #2d3319;
+    border-radius: 999px; overflow: hidden; }
+  .source button { flex: 1 1 0; padding: 10px 8px; border: 0; background: white; color: #2d3319;
+    font-family: 'Fraunces', serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+  .source button + button { border-left: 2px solid #2d3319; }
+  .source button.on { background: #2d3319; color: #f5f5f0; }
+  .source button .n { font-family: 'DM Mono', monospace; font-weight: 400; opacity: .7;
+    font-size: 0.76rem; margin-left: 5px; }
+
   /* filters */
   .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
   .filters button { padding: 7px 13px; border: 2px solid #2d3319; background: white; color: #2d3319;
@@ -59,6 +69,7 @@
     padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
   .tag.retail     { background: #dcefd6; color: #2f6b28; }
   .tag.production { background: #fbeccd; color: #8a5a12; }
+  .tag.steve      { background: #dde6ef; color: #2f4a6b; }
   .tag.grass      { background: #e2ecd3; color: #4b6b1f; }
   .tag.conflict   { background: #fadcd6; color: #9e3b2c; }
   .tag.weak       { background: #eceff0; color: #6b7280; }
@@ -129,6 +140,8 @@
     <button type="button" onclick="load()">Reload</button>
   </div>
 
+  <div class="source" id="source"></div>
+
   <div class="progress">
     <div class="row">
       <span class="big" id="pdone">–</span>
@@ -166,8 +179,17 @@
     { k: 'confirmed', label: 'Confirmed' },
     { k: 'all',       label: 'Everything' }
   ];
+  var SOURCES = [
+    { k: 'mine',  label: 'My stock' },
+    { k: 'steve', label: "Steve's list" }
+  ];
 
-  var state = { species: [], conditions: [], progress: [], filter: 'review', draft: {} };
+  var state = { species: [], conditions: [], progress: [],
+                source: 'mine', filter: 'review', draft: {} };
+
+  // A species belongs to "mine" if it's in my stock, else it's on Steve's list.
+  function sourceOf(s) { return s.in_mvfn ? 'mine' : 'steve'; }
+  function inSource(s) { return sourceOf(s) === state.source; }
 
   function $(id) { return document.getElementById(id); }
 
@@ -201,6 +223,7 @@
 
   function visible() {
     return state.species.filter(function (s) {
+      if (!inSource(s)) return false;
       if (state.filter === 'all') return true;
       if (state.filter === 'confirmed') return s.is_confirmed;
       if (state.filter === 'unconfirmed') return !s.is_confirmed;
@@ -208,12 +231,21 @@
     });
   }
 
+  // counts within the active source
   function counts() {
+    var pool = state.species.filter(inSource);
     return {
-      review: state.species.filter(function (s) { return !s.is_confirmed && needsLook(s); }).length,
-      unconfirmed: state.species.filter(function (s) { return !s.is_confirmed; }).length,
-      confirmed: state.species.filter(function (s) { return s.is_confirmed; }).length,
-      all: state.species.length
+      review: pool.filter(function (s) { return !s.is_confirmed && needsLook(s); }).length,
+      unconfirmed: pool.filter(function (s) { return !s.is_confirmed; }).length,
+      confirmed: pool.filter(function (s) { return s.is_confirmed; }).length,
+      all: pool.length
+    };
+  }
+
+  function sourceCounts() {
+    return {
+      mine:  state.species.filter(function (s) { return sourceOf(s) === 'mine'; }).length,
+      steve: state.species.filter(function (s) { return sourceOf(s) === 'steve'; }).length
     };
   }
 
@@ -229,10 +261,26 @@
     };
   }
 
+  function renderSource() {
+    var sc = sourceCounts();
+    $('source').innerHTML = SOURCES.map(function (s) {
+      return '<button type="button" data-s="' + s.k + '"' +
+             (state.source === s.k ? ' class="on"' : '') + '>' +
+             esc(s.label) + '<span class="n">' + (sc[s.k] || 0) + '</span></button>';
+    }).join('');
+    Array.prototype.forEach.call($('source').querySelectorAll('button'), function (b) {
+      b.onclick = function () {
+        state.source = b.getAttribute('data-s');
+        render();
+      };
+    });
+  }
+
   function renderProgress() {
     var c = counts();
+    var label = state.source === 'steve' ? "Steve's list" : 'my stock';
     $('pdone').textContent = c.confirmed + ' of ' + c.all;
-    $('ptotal').textContent = 'confirmed';
+    $('ptotal').textContent = 'placed in ' + label;
     $('pbar').style.width = (c.all ? (100 * c.confirmed / c.all) : 0).toFixed(1) + '%';
     $('ptiers').textContent = state.progress.map(function (p) {
       return p.availability + ' ' + p.confirmed + '/' + p.species;
@@ -280,6 +328,7 @@
     var chips = [];
     if (s.availability === 'retail') chips.push('<span class="tag retail">Ships now</span>');
     if (s.availability === 'production') chips.push('<span class="tag production">Growing</span>');
+    if (s.availability === 'steve') chips.push('<span class="tag steve">Steve</span>');
     if (s.is_grass) chips.push('<span class="tag grass">Grass</span>');
     if (!s.is_confirmed && s.moisture_confidence === 'conflict') chips.push('<span class="tag conflict">Sources disagree</span>');
     else if (!s.is_confirmed && needsLook(s)) chips.push('<span class="tag weak">Thin evidence</span>');
@@ -340,6 +389,7 @@
   }
 
   function render() {
+    renderSource();
     renderProgress();
     renderFilters();
     var rows = visible();
