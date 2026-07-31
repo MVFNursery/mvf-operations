@@ -777,7 +777,7 @@ async function saveNote(taskId) {
       showToast('Save failed', 'error');
     }
   } catch(e) {
-    showToast('Save failed', 'error');
+    reportWriteFailure(e, 'Save');
   }
 }
 
@@ -1068,16 +1068,22 @@ async function confirmArchive() {
   try {
     const r = await post({ action: 'archive_task', task_id: taskId });
     if (r.status === 'ok') {
-      allTasks = allTasks.filter(x => String(x.task_id) !== String(taskId));
+      // Same rule as completion: name what the DATABASE archived, not what the
+      // request asked for. The server returns the row it actually wrote.
+      const res = (r && r.result) || {};
+      const goneId = res.task_id != null ? String(res.task_id) : String(taskId);
+      const title = res.title || (taskById(goneId) || {}).title || ('task ' + goneId);
+      allTasks = allTasks.filter(x => String(x.task_id) !== goneId);
       renderTasks();
       showToast('Archived', 'success');
+      showNotice('Archived “' + title + '”.', goneId === String(taskId) ? '' : 'error');
     } else {
       if (card) card.style.opacity = '';
       showToast('Archive failed', 'error');
     }
   } catch(e) {
     if (card) card.style.opacity = '';
-    showToast('Archive failed — check connection', 'error');
+    reportWriteFailure(e, 'Archive');
   }
 }
 
@@ -1089,10 +1095,14 @@ async function acceptTask(taskId) {
   try {
     const r = await post({ action: 'accept_task', task_id: taskId });
     if (r.status === 'ok') {
-      const t = taskById(taskId);
+      // The server resolves the suggested assignee; take its answer rather than
+      // guessing locally, so the row shows who it is really assigned to.
+      const res = (r && r.result) || {};
+      const t = taskById(res.task_id != null ? String(res.task_id) : taskId);
       if (t) {
         t.status = 'open';
-        if (!t.assignee && t.suggested_assignee) t.assignee = t.suggested_assignee;
+        t.assignee = (res.assignee !== undefined) ? res.assignee
+          : (t.assignee || t.suggested_assignee);
       }
       showToast('Added to tasks ✓', 'success');
       renderTasks();
@@ -1102,7 +1112,7 @@ async function acceptTask(taskId) {
     }
   } catch(e) {
     if (card) card.style.opacity = '';
-    showToast('Failed — check connection', 'error');
+    reportWriteFailure(e, 'Accept');
   }
 }
 
@@ -1113,7 +1123,9 @@ async function dismissTask(taskId) {
   try {
     const r = await post({ action: 'dismiss_task', task_id: taskId });
     if (r.status === 'ok') {
-      allTasks = allTasks.filter(x => String(x.task_id) !== String(taskId));
+      const res = (r && r.result) || {};
+      allTasks = allTasks.filter(x => String(x.task_id) !==
+        (res.task_id != null ? String(res.task_id) : String(taskId)));
       showToast('Dismissed', '');
       renderTasks();
     } else {
@@ -1122,7 +1134,7 @@ async function dismissTask(taskId) {
     }
   } catch(e) {
     if (card) card.style.opacity = '';
-    showToast('Failed — check connection', 'error');
+    reportWriteFailure(e, 'Dismiss');
   }
 }
 
@@ -1166,6 +1178,19 @@ function showNotice(msg, type) {
 function hideNotice() {
   const n = document.getElementById('notice');
   if (n) n.className = 'notice';
+}
+
+// Every task write now goes through a SQL function that refuses an unattributed
+// or impossible edit and says why (MVF01 gone, MVF02 wrong state, MVF03 could
+// not tell who you are, MVF04 bad value) — a 409 carrying the database's own
+// sentence. "Save failed" throws that away; a sticky notice keeps it on screen
+// past the next tap, which is when it matters.
+function reportWriteFailure(e, what) {
+  showToast(what + ' failed', 'error');
+  showNotice(e && e.serverMessage
+    ? 'Nothing was saved: ' + e.serverMessage
+    : 'Nothing was saved — could not reach the server. Check Tailscale, then refresh.',
+    'error');
 }
 
 function showToast(msg, type) {
@@ -1235,7 +1260,7 @@ async function setArea(taskId, areaId) {
       renderTasks();
       showToast('Saved ✓', 'success');
     } else { showToast('Save failed', 'error'); }
-  } catch (e) { showToast('Save failed', 'error'); }
+  } catch (e) { reportWriteFailure(e, 'Save'); }
 }
 async function setAssignee(taskId, slug) {
   showToast('Saving…', '');
@@ -1247,7 +1272,7 @@ async function setAssignee(taskId, slug) {
       renderTasks();
       showToast(slug ? 'Assigned to ' + userLabel(slug) + ' ✓' : 'Unassigned ✓', 'success');
     } else { showToast('Save failed', 'error'); }
-  } catch (e) { showToast('Save failed', 'error'); }
+  } catch (e) { reportWriteFailure(e, 'Save'); }
 }
 
 async function setWorkLocation(taskId, loc) {
@@ -1265,7 +1290,7 @@ async function setWorkLocation(taskId, loc) {
       showToast('Save failed', 'error');
     }
   } catch (e) {
-    showToast('Save failed', 'error');
+    reportWriteFailure(e, 'Save');
   }
 }
 

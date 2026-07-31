@@ -272,7 +272,15 @@
       });
     } else if (btn.dataset.cancel) {
       if (confirm('Cancel this task? (It is removed, not completed.)')) {
-        post({ action: 'cancel', task_id: parseInt(btn.dataset.cancel, 10) }, btn);
+        // user_id is required now: cancel goes through tasks.archive_task, which
+        // refuses an unattributed write. It used to be a raw UPDATE and the
+        // history recorded it as nursery/direct-update (V015). Same as complete,
+        // the server names the row it actually closed.
+        post({ action: 'cancel', task_id: parseInt(btn.dataset.cancel, 10), user_id: me() }, btn)
+          .then(function (j) {
+            if (!j || !j.result) return;
+            banner('Cancelled “' + j.result.title + '”', 'ok');
+          });
       }
     }
   });
