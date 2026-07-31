@@ -1139,16 +1139,16 @@ async function dismissTask(taskId) {
 }
 
 // ── UTILS ─────────────────────────────────────────────────
-// Escape single quotes for n8n's raw SQL interpolation
-function sqlEsc(s) { return (s || '').replace(/'/g, "''"); }
-
+// Send text exactly as typed. This used to double every ' before POSTing,
+// on top of the workflow doing the same thing to each value it interpolates —
+// so "Ian's" left here as "Ian''s", reached SQL as "Ian''''s", and Postgres
+// stored "Ian''s". Escaping belongs to whoever builds the statement, and that
+// is the workflow; a second layer here cannot make the SQL safer, it can only
+// corrupt the text. (Tasks 56/64/65 carry the damage from before this fix.)
+// The GET path has always sent device_token unescaped and is fine.
 async function post(body) {
   // Every POST carries the device token so the server can resolve who acted.
   const safe = { ...body, device_token: localStorage.getItem('mvfn_device_token') || '' };
-  // Sanitize string fields that land in n8n SQL templates
-  ['description', 'notes', 'task_id', 'area_id', 'assignee_slug', 'category_id', 'device_token'].forEach(k => {
-    if (typeof safe[k] === 'string') safe[k] = sqlEsc(safe[k]);
-  });
   const r = await fetch(WEBHOOK_POST, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
