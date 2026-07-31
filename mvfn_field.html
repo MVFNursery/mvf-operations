@@ -172,6 +172,9 @@
   .badge { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 500; }
   .badge-category { background: rgba(126,207,79,0.12); color: var(--green); }
   .badge-effort { background: rgba(240,184,64,0.12); color: var(--amber); }
+  /* Recurring tasks are the ones a mis-tap damages: completing one advances a
+     schedule (often a statutory deadline). Mark them on the row. */
+  .badge-recur { background: rgba(167,139,250,0.16); color: #c4b5fd; }
   .badge-loc { background: rgba(96,165,250,0.14); color: #93c5fd; }
   .badge-area { background: rgba(196,132,252,0.14); color: #d8b4fe; }
   .badge-assignee { background: rgba(255,255,255,0.08); color: var(--text2); }
@@ -298,6 +301,28 @@
   }
   .archive-cancel-btn:active { opacity: 0.7; }
 
+  /* COMPLETE CONFIRM — recurring tasks only: closing one moves a schedule */
+  .confirm-go-btn {
+    flex: 1; height: 46px; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
+    background: var(--green-dim); color: var(--green);
+  }
+  .confirm-go-btn:active { opacity: 0.8; }
+  .confirm-meta { font-size: 12.5px; color: var(--text3); margin: -14px 0 20px; line-height: 1.5; }
+
+  /* STICKY NOTICE — a failure or a completion receipt stays until dismissed.
+     The toast is 2.4s and easy to miss mid-tap; anything that changed (or
+     failed to change) the database says so here until it is read. */
+  .notice { display: none; margin: 0 0 10px; padding: 10px 12px; border-radius: 10px;
+    font-size: 13px; line-height: 1.45; border: 1px solid var(--border2);
+    background: var(--bg3); color: var(--text2); }
+  .notice.show { display: flex; gap: 10px; align-items: flex-start; }
+  .notice.error { border-color: var(--red); color: var(--red); }
+  .notice.ok { border-color: var(--green-dim); color: var(--green); }
+  .notice-x { margin-left: auto; background: none; border: none; color: inherit;
+    font-size: 16px; line-height: 1; cursor: pointer; font-family: inherit;
+    padding: 2px 4px; flex-shrink: 0; }
+
   /* TOAST */
   .toast {
     position: fixed; bottom: calc(var(--footer) + 10px); left: 50%;
@@ -331,6 +356,9 @@
 <div class="transcript-bar" id="transcriptBar"></div>
 
 <div class="main" id="main">
+  <div class="task-list" style="padding-bottom:0">
+    <div class="notice" id="notice"></div>
+  </div>
   <div id="taskList" class="task-list">
     <div class="loading"><div class="spinner"></div>Loading…</div>
   </div>
@@ -373,6 +401,20 @@
   </div>
 </div>
 
+<!-- Recurring completions are confirmed BY NAME: the row under your finger can
+     have moved (score ties, a re-render), so the task is named before it closes. -->
+<div class="archive-overlay" id="completeOverlay" onclick="cancelComplete(event)">
+  <div class="archive-sheet">
+    <div class="archive-sheet-title">Complete this repeating task?</div>
+    <div class="archive-sheet-desc" id="completeDesc"></div>
+    <div class="confirm-meta" id="completeMeta"></div>
+    <div class="archive-sheet-btns">
+      <button class="confirm-go-btn" onclick="confirmComplete()">Complete it</button>
+      <button class="archive-cancel-btn" onclick="cancelComplete()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="archive-overlay" id="archiveOverlay" onclick="cancelArchive(event)">
   <div class="archive-sheet">
     <div class="archive-sheet-title">Archive task?</div>
@@ -403,6 +445,7 @@ let expandedId = null;
 
 // ── LOAD ──────────────────────────────────────────────────
 async function loadTasks() {
+  hideNotice();  // receipts and failures are about the list you were looking at
   document.getElementById('taskList').innerHTML =
     '<div class="loading"><div class="spinner"></div>Loading…</div>';
   try {
@@ -508,7 +551,12 @@ function renderTasks() {
     const sa = a.score == null ? -Infinity : Number(a.score);
     const sb = b.score == null ? -Infinity : Number(b.score);
     if (sa !== sb) return sb - sa;
-    return (a.created_date || '').localeCompare(b.created_date || '');
+    const cd = (a.created_date || '').localeCompare(b.created_date || '');
+    if (cd) return cd;
+    // Total order, matching the server's ORDER BY. Score+date ties used to fall
+    // through to whatever order the planner returned, so the same task sat on a
+    // different row from one refresh to the next — the list moved under the user.
+    return Number(a.task_id) - Number(b.task_id);
   });
   const done = allTasks
     .filter(t => t.status === 'done' && matchesFilter(t))
@@ -602,6 +650,7 @@ function card(t, rank) {
           ${t.assignee?`<span class="badge badge-assignee">👤 ${escH(userLabel(t.assignee))}</span>`:''}
           ${(!t.assignee && t.suggested_assignee)?`<span class="badge badge-suggest">💡 ${escH(userLabel(t.suggested_assignee))}?</span>`:''}
           ${t.effort_minutes?`<span class="badge badge-effort">${escH(fmtEffort(t.effort_minutes))}</span>`:''}
+          ${t.recur_interval?`<span class="badge badge-recur">↻ ${escH(fmtRecur(t.recur_interval))}</span>`:''}
           ${locBadge(t.work_location)}
         </div>
       </div>
@@ -622,28 +671,92 @@ function card(t, rank) {
 }
 
 // ── ACTIONS ───────────────────────────────────────────────
-async function completeTask(taskId) {
+// "6 months" / "1 year" out of a Postgres interval ("6 mons", "1 year").
+function fmtRecur(iv) {
+  return String(iv || '').replace(/mons?\b/, 'months').replace(/\s+/g, ' ').trim();
+}
+
+let _pendingCompleteId = null;
+
+// Completing a recurring task is not an undoable tick: it closes THIS occurrence
+// and schedules the next one, moving the deadline out of view. Confirm by name —
+// the row under the finger is not proof of which task it is.
+function completeTask(taskId) {
+  const card = document.getElementById('card-' + taskId);
+  if (!card) {
+    // Stale handler against a row that is no longer rendered: say so rather than
+    // swallowing the tap (a tap that does nothing at all reads as "it worked").
+    showNotice('That task is no longer on this list — refresh before completing it.', 'error');
+    return;
+  }
+  if (card.classList.contains('done')) return;  // already struck through on screen
+  const t = taskById(taskId);
+  if (t && t.recur_interval) {
+    _pendingCompleteId = taskId;
+    document.getElementById('completeDesc').textContent = t.title || ('task ' + taskId);
+    document.getElementById('completeMeta').textContent =
+      (t.due_date ? 'Due ' + t.due_date + '. ' : '')
+      + 'Repeats every ' + fmtRecur(t.recur_interval)
+      + ' — completing it schedules the next one.';
+    document.getElementById('completeOverlay').classList.add('show');
+    return;
+  }
+  doComplete(taskId);
+}
+
+function cancelComplete(e) {
+  if (e && e.target !== document.getElementById('completeOverlay')) return;
+  document.getElementById('completeOverlay').classList.remove('show');
+  _pendingCompleteId = null;
+}
+
+function confirmComplete() {
+  const taskId = _pendingCompleteId;
+  document.getElementById('completeOverlay').classList.remove('show');
+  _pendingCompleteId = null;
+  if (taskId) doComplete(taskId);
+}
+
+async function doComplete(taskId) {
   const card = document.getElementById('card-' + taskId);
   if (!card || card.classList.contains('done')) return;
   card.classList.add('done');
   showToast('Marking done…', '');
   try {
     const r = await post({ action: 'complete_task', task_id: taskId });
-    if (r.status === 'ok') {
-      const t = taskById(taskId);
-      if (t) {
-        t.status = 'done';
-        t.completed_date = new Date().toISOString().split('T')[0];
-      }
-      showToast('Done ✓', 'success');
-      setTimeout(renderTasks, 600);
-    } else {
-      card.classList.remove('done');
-      showToast('Failed', 'error');
+    // The server reports what the DATABASE closed. Never re-derive it from the
+    // request: an "ok" that names a different task is the bug we are hunting.
+    const res = (r && r.result) || {};
+    const doneId = res.task_id != null ? String(res.task_id) : String(taskId);
+    const t = taskById(doneId);
+    if (t) {
+      t.status = 'done';
+      t.completed_date = new Date().toISOString().split('T')[0];
     }
+    const title = res.title || (t && t.title) || ('task ' + doneId);
+    showToast('Done ✓', 'success');
+    let msg = 'Completed “' + title + '”.';
+    if (res.next_due_date) msg += ' Next one is now due ' + res.next_due_date + '.';
+    if (doneId !== String(taskId)) {
+      msg = 'Closed task ' + doneId + ' (“' + title + '”) — you tapped ' + taskId
+          + '. Refresh and check before tapping again.';
+      showNotice(msg, 'error');
+    } else {
+      showNotice(msg, res.next_due_date ? 'ok' : '');
+    }
+    // Deliberately NOT re-rendering: the completed row stays exactly where it was
+    // struck through. Re-sorting under a user mid-tap is how the wrong row gets
+    // tapped next. The list re-orders on the next explicit refresh.
+    const badge = document.getElementById('countBadge');
+    const open = allTasks.filter(x => (x.status === 'open' || x.status === 'blocked') && matchesFilter(x));
+    if (badge) badge.textContent = open.length + ' open';
   } catch(e) {
     card.classList.remove('done');
-    showToast('Failed — check connection', 'error');
+    showToast('Not completed', 'error');
+    showNotice(e && e.serverMessage
+      ? 'Nothing was completed: ' + e.serverMessage
+      : 'Nothing was completed — could not reach the server. Check Tailscale, then refresh.',
+      'error');
   }
 }
 
@@ -757,7 +870,9 @@ function toggleExpand(id) {
   if (expandedId) {
     setTimeout(() => {
       const el = document.getElementById('card-' + id);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // 'auto', not 'smooth': an animated scroll keeps the rows moving for another
+      // ~400ms, so the next tap can land on a row that was not there when aimed.
+      if (el) el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
     }, 40);
   }
 }
@@ -1027,7 +1142,30 @@ async function post(body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(safe)
   });
-  return r.json();
+  let data = null;
+  try { data = await r.json(); } catch (e) { data = null; }
+  // A non-2xx used to fall through as a body without status:'ok' — indistinguishable
+  // from a network hiccup, and the reason the server sent never reached the user.
+  if (!r.ok || (data && data.status === 'error')) {
+    const err = new Error((data && data.message) || ('HTTP ' + r.status));
+    err.serverMessage = (data && data.message) || ('server said HTTP ' + r.status);
+    throw err;
+  }
+  return data || {};
+}
+
+// Sticky counterpart to the toast: stays until dismissed or replaced, so a
+// failure (or a receipt naming what closed) survives a fast run of taps.
+function showNotice(msg, type) {
+  const n = document.getElementById('notice');
+  if (!n) return;
+  n.innerHTML = '<span></span><button class="notice-x" onclick="hideNotice()" aria-label="Dismiss">✕</button>';
+  n.firstChild.textContent = msg;
+  n.className = 'notice show' + (type ? ' ' + type : '');
+}
+function hideNotice() {
+  const n = document.getElementById('notice');
+  if (n) n.className = 'notice';
 }
 
 function showToast(msg, type) {

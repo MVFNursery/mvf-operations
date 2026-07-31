@@ -18,6 +18,8 @@
   header select { border:0; border-radius:6px; padding:4px 6px; font-family:inherit; background:var(--paper); color:var(--ink); }
   main { max-width:560px; margin:0 auto; padding:12px 12px 60px; }
   .banner { display:none; background:var(--red); color:#fff; padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:.85rem; }
+  /* Receipts share the banner slot — a completion says WHICH task it closed. */
+  .banner.ok { background:var(--ink); }
   details.add { background:var(--paper); border-radius:12px; padding:10px 14px; margin-bottom:14px; }
   details.add summary { font-weight:700; color:var(--ink); cursor:pointer; padding:4px 0; }
   .add label { display:block; font-size:.72rem; color:var(--moss); margin:8px 0 2px; text-transform:uppercase; letter-spacing:.04em; }
@@ -113,9 +115,10 @@
   var $ = function (id) { return document.getElementById(id); };
   var state = { users: [], categories: [], tasks: [] };
 
-  function banner(msg) {
+  function banner(msg, kind) {
     var b = $('banner');
     b.textContent = msg || '';
+    b.className = 'banner' + (kind ? ' ' + kind : '');
     b.style.display = msg ? 'block' : 'none';
   }
   function me() { return localStorage.getItem(ME_KEY) || 'ian'; }
@@ -201,10 +204,16 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }).then(function (r) {
-      if (!r.ok) return r.text().then(function (tx) { throw new Error('HTTP ' + r.status + ': ' + tx.slice(0, 160)); });
-      return r.json();
-    }).then(function () { load(); })
-      .catch(function (e) { banner(String(e.message || e)); })
+      return r.json().catch(function () { return null; }).then(function (j) {
+        if (!r.ok || (j && j.status === 'error')) {
+          throw new Error((j && j.message) || ('HTTP ' + r.status));
+        }
+        return j || {};
+      });
+    }).then(function (j) { load(); return j; })
+      // null = the write did NOT happen; callers must not treat it as success
+      // (the add form used to clear itself after a failed save).
+      .catch(function (e) { banner(String(e.message || e)); return null; })
       .finally(function () { if (btn) btn.disabled = false; });
   }
 
@@ -236,7 +245,8 @@
       weather_rule: $('f_wx').value,
       visibility: $('f_priv').checked ? 'private' : 'shared',
       recur_interval: $('f_recur').value,
-    }, $('f_go')).then(function () {
+    }, $('f_go')).then(function (j) {
+      if (!j) return;  // save failed — keep what was typed
       ['f_title', 'f_due', 'f_nb', 'f_effort', 'f_detail'].forEach(function (id) { $(id).value = ''; });
       $('f_hard').checked = false; $('f_priv').checked = false;
       $('f_wx').value = 'none'; $('f_recur').value = '';
@@ -247,7 +257,19 @@
     var btn = e.target.closest('button');
     if (!btn) return;
     if (btn.dataset.done) {
-      post({ action: 'complete', task_id: parseInt(btn.dataset.done, 10), user_id: me() }, btn);
+      var id = parseInt(btn.dataset.done, 10);
+      var task = state.tasks.filter(function (t) { return String(t.task_id) === String(id); })[0];
+      // Completing a repeating task schedules the next occurrence and moves the
+      // deadline out of view — name it before closing it, don't trust the row.
+      if (task && task.recur_interval
+          && !confirm('Complete “' + task.title + '”?\n\nIt repeats every '
+                      + String(task.recur_interval).replace(/mons?\b/, 'months')
+                      + ', so the next one will be scheduled.')) return;
+      post({ action: 'complete', task_id: id, user_id: me() }, btn).then(function (j) {
+        if (!j || !j.result) return;
+        banner('Completed “' + j.result.title + '”'
+               + (j.result.next_due_date ? ' — next one due ' + j.result.next_due_date : ''), 'ok');
+      });
     } else if (btn.dataset.cancel) {
       if (confirm('Cancel this task? (It is removed, not completed.)')) {
         post({ action: 'cancel', task_id: parseInt(btn.dataset.cancel, 10) }, btn);
