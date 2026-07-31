@@ -312,10 +312,22 @@
 
   /* STICKY NOTICE — a failure or a completion receipt stays until dismissed.
      The toast is 2.4s and easy to miss mid-tap; anything that changed (or
-     failed to change) the database says so here until it is read. */
-  .notice { display: none; margin: 0 0 10px; padding: 10px 12px; border-radius: 10px;
+     failed to change) the database says so here until it is read.
+
+     FIXED, not in flow. It used to sit at the top of the task list, so tapping
+     a card halfway down a scrolled list rendered the message off-screen above
+     you: the toast ("Not completed") was all you ever saw, and the database's
+     actual sentence was written into a div nobody could see. Pinned under the
+     bars it is visible from any scroll position, like the toast it explains. */
+  .notice { display: none; position: fixed; z-index: 150;
+    top: calc(var(--header) + var(--filter) + 8px); left: 8px; right: 8px;
+    margin: 0; padding: 10px 12px; border-radius: 10px;
+    max-height: 40vh; overflow-y: auto;
     font-size: 13px; line-height: 1.45; border: 1px solid var(--border2);
-    background: var(--bg3); color: var(--text2); }
+    background: var(--bg3); color: var(--text2);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+  /* The transcript bar pushes everything down; the notice has to follow it. */
+  .main.with-transcript .notice { top: calc(var(--header) + var(--filter) + 38px + 8px); }
   .notice.show { display: flex; gap: 10px; align-items: flex-start; }
   .notice.error { border-color: var(--red); color: var(--red); }
   .notice.ok { border-color: var(--green-dim); color: var(--green); }
