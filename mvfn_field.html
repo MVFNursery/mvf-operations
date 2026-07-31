@@ -108,6 +108,39 @@
   }
   .dismiss-btn:active { opacity: 0.7; }
 
+  /* CLOSED CARD (done / cancelled, server-backed — see renderTasks) */
+  .closed-header {
+    display: flex; align-items: center; gap: 6px; width: 100%;
+    background: none; border: none; font-family: inherit; cursor: pointer;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text3); padding: 14px 12px 6px;
+  }
+  .closed-header:active { opacity: 0.6; }
+  .closed-chevron { font-size: 9px; }
+  .task-card.closed { background: var(--done-bg); border-color: rgba(255,255,255,0.04); opacity: 0.6; }
+  .task-card.closed .task-desc { color: var(--done-text); text-decoration: line-through; text-decoration-color: var(--done-text); }
+  .closed-mark {
+    width: 56px; min-height: 56px; display: flex; align-items: center;
+    justify-content: center; font-size: 15px; flex-shrink: 0; color: var(--text3);
+  }
+  .badge-closed { background: rgba(255,255,255,0.05); color: var(--text3); }
+  .reopen-btn {
+    align-self: center; margin-right: 12px; flex-shrink: 0;
+    height: 30px; padding: 0 12px; border-radius: 8px;
+    border: 1px solid var(--border2); background: transparent;
+    color: var(--text2); font-size: 12px; font-weight: 600;
+    font-family: inherit; cursor: pointer; white-space: nowrap;
+  }
+  .reopen-btn:active { opacity: 0.7; }
+  /* A recurring task's completion already scheduled its successor, and nothing
+     in the app can identify that row — so it says why instead of offering a
+     button the database will refuse (V018). */
+  .closed-recur-note {
+    align-self: center; margin-right: 12px; flex-shrink: 0; max-width: 108px;
+    font-size: 10.5px; line-height: 1.3; color: var(--text3); text-align: right;
+  }
+  .closed-more { font-size: 11.5px; color: var(--text3); padding: 8px 12px 2px; }
+
   /* VOICE TRANSCRIPT BAR */
   .transcript-bar {
     position: fixed; top: calc(var(--header) + var(--filter)); left: 0; right: 0;
@@ -427,6 +460,20 @@
   </div>
 </div>
 
+<!-- Reopens are confirmed BY NAME for the same reason completions are: the closed
+     list re-sorts on every load, so the row under your finger can have moved. -->
+<div class="archive-overlay" id="reopenOverlay" onclick="cancelReopen(event)">
+  <div class="archive-sheet">
+    <div class="archive-sheet-title">Put this back on the list?</div>
+    <div class="archive-sheet-desc" id="reopenDesc"></div>
+    <div class="confirm-meta" id="reopenMeta"></div>
+    <div class="archive-sheet-btns">
+      <button class="confirm-go-btn" onclick="confirmReopen()">Reopen it</button>
+      <button class="archive-cancel-btn" onclick="cancelReopen()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="archive-overlay" id="archiveOverlay" onclick="cancelArchive(event)">
   <div class="archive-sheet">
     <div class="archive-sheet-title">Archive task?</div>
@@ -454,6 +501,11 @@ let householdCategories = []; // household capture options [{category_id, label}
 let me = null;                // my slug, resolved server-side from device_token
 let activeFilter = 'All';
 let expandedId = null;
+let closedExpanded = false;   // "Recently closed" starts collapsed; see renderTasks
+// A hard cap on rendered closed rows. The server window is 14 days, which is a
+// bounded but not small number (26 rows on the day this shipped), and a phone
+// list that runs off the bottom is not a feature.
+const CLOSED_RENDER_CAP = 20;
 
 // ── LOAD ──────────────────────────────────────────────────
 async function loadTasks() {
@@ -570,25 +622,113 @@ function renderTasks() {
     // different row from one refresh to the next — the list moved under the user.
     return Number(a.task_id) - Number(b.task_id);
   });
-  const done = allTasks
-    .filter(t => t.status === 'done' && matchesFilter(t))
-    .sort((a, b) => (b.completed_date || '').localeCompare(a.completed_date || ''))
-    .slice(0, 5);
+  // Closed rows are SERVER data now (V018 widened the GET to a 14-day window).
+  // This section used to render only what you closed in the current browser
+  // session, sorted by a completed_date the query never returned — it looked
+  // like history and was really just an undo buffer that emptied on refresh.
+  // closed_at arrives as nursery-local naive ISO, so a plain string sort is
+  // chronological and needs no Date parsing.
+  const closed = allTasks
+    .filter(t => (t.status === 'done' || t.status === 'cancelled') && matchesFilter(t))
+    .sort((a, b) => (b.closed_at || '').localeCompare(a.closed_at || ''));
 
   document.getElementById('countBadge').textContent = open.length + ' open';
 
-  if (!open.length && !done.length) {
+  if (!open.length && !closed.length) {
     list.innerHTML = '<div class="empty">No tasks.</div>';
     return;
   }
 
   let html = '';
   open.forEach((t, i) => { html += card(t, i); });
-  if (done.length) {
-    html += '<div class="section-label">Recently Done</div>';
-    done.forEach(t => { html += card(t, null); });
+  if (closed.length) {
+    // Collapsed by default: two weeks of closures is routinely 20+ rows (26 on
+    // the business DB the day this shipped), and the open list is what the
+    // phone is for. It auto-opens the moment you close something, which is the
+    // case that actually wants it — see markClosedLocally.
+    html += '<button class="closed-header" onclick="toggleClosed()">'
+          + '<span class="closed-chevron">' + (closedExpanded ? '▼' : '▶') + '</span>'
+          + 'Recently closed (' + closed.length + ')</button>';
+    if (closedExpanded) {
+      const shown = closed.slice(0, CLOSED_RENDER_CAP);
+      shown.forEach(t => { html += closedCard(t); });
+      if (closed.length > shown.length) {
+        html += '<div class="closed-more">' + (closed.length - shown.length)
+              + ' older not shown.</div>';
+      }
+    }
   }
   list.innerHTML = html;
+}
+
+function toggleClosed() {
+  closedExpanded = !closedExpanded;
+  renderTasks();
+}
+
+// Move a row into the closed section in place, instead of deleting it from
+// allTasks the way archive and dismiss used to. Deleting it was what made a
+// mis-tap unrecoverable without a refresh: the row was simply gone, and there
+// was nothing left to offer a reopen on.
+function markClosedLocally(taskId, status) {
+  const t = taskById(taskId);
+  if (!t) return;
+  t.status = status;
+  t.closed_at = localNowISO();
+  closedExpanded = true;
+}
+
+function localNowISO() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+       + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
+// " · today" / " · yesterday" / " · Jul 28". The server already converted to
+// nursery-local time, and the phone is in that timezone, so this is plain
+// string work — no Date parsing, no UTC offset to get wrong.
+function closedWhen(t) {
+  const s = t.closed_at || '';
+  if (!s) return '';
+  const d = s.slice(0, 10);
+  const p = n => String(n).padStart(2, '0');
+  const iso = dt => dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate());
+  const now = new Date();
+  if (d === iso(now)) return ' · today';
+  const y = new Date(now); y.setDate(y.getDate() - 1);
+  if (d === iso(y)) return ' · yesterday';
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const parts = d.split('-');
+  return ' · ' + MON[Number(parts[1]) - 1] + ' ' + Number(parts[2]);
+}
+
+// A closed row: no swipe, no editors, no complete button — the only thing you
+// can do to it is put it back.
+function closedCard(t) {
+  const id = t.task_id != null ? String(t.task_id) : '';
+  const cancelled = t.status === 'cancelled';
+  const recurring = !!t.recur_interval;
+  return `
+  <div class="task-card-wrap" id="wrap-${esc(id)}">
+    <div class="task-card closed" id="card-${esc(id)}">
+      <div class="task-main">
+        <div class="closed-mark">${cancelled ? '✕' : '✓'}</div>
+        <div class="task-content">
+          <div class="task-desc">${escH(t.title||'(no title)')}</div>
+          <div class="task-meta">
+            <span class="badge badge-closed">${cancelled ? 'Cancelled' : 'Done'}${escH(closedWhen(t))}</span>
+            ${(!cancelled && t.completed_by)?`<span class="badge badge-assignee">👤 ${escH(userLabel(t.completed_by))}</span>`:''}
+            ${t.category_label?`<span class="badge badge-category">${escH(t.category_label)}</span>`:''}
+            ${recurring?`<span class="badge badge-recur">↻ ${escH(fmtRecur(t.recur_interval))}</span>`:''}
+          </div>
+        </div>
+        ${recurring
+          ? `<div class="closed-recur-note">repeats — reopen via Claude</div>`
+          : `<button class="reopen-btn" onclick="reopenTask('${esc(id)}')">Reopen</button>`}
+      </div>
+    </div>
+  </div>`;
 }
 
 function taskById(taskId) {
@@ -683,9 +823,15 @@ function card(t, rank) {
 }
 
 // ── ACTIONS ───────────────────────────────────────────────
-// "6 months" / "1 year" out of a Postgres interval ("6 mons", "1 year").
+// "6 months" / "1 month" / "1 year" out of a Postgres interval ("6 mons",
+// "1 mon", "1 year"). The singular case has to be matched BEFORE the plural
+// rule can widen it: "1 mon" was rendering as "1 months", which only became
+// visible once closed recurring rows started showing this badge (V018).
 function fmtRecur(iv) {
-  return String(iv || '').replace(/mons?\b/, 'months').replace(/\s+/g, ' ').trim();
+  return String(iv || '')
+    .replace(/\bmons\b/, 'months')
+    .replace(/\bmon\b/, 'month')
+    .replace(/\s+/g, ' ').trim();
 }
 
 let _pendingCompleteId = null;
@@ -742,8 +888,11 @@ async function doComplete(taskId) {
     const doneId = res.task_id != null ? String(res.task_id) : String(taskId);
     const t = taskById(doneId);
     if (t) {
-      t.status = 'done';
-      t.completed_date = new Date().toISOString().split('T')[0];
+      // completed_date was a field the GET never returned; closed_at is the
+      // real one (V018), and stamping it locally keeps this row sorted with the
+      // server's on the next render.
+      markClosedLocally(doneId, 'done');
+      t.completed_by = me || t.completed_by;
     }
     const title = res.title || (t && t.title) || ('task ' + doneId);
     showToast('Done ✓', 'success');
@@ -1085,10 +1234,15 @@ async function confirmArchive() {
       const res = (r && r.result) || {};
       const goneId = res.task_id != null ? String(res.task_id) : String(taskId);
       const title = res.title || (taskById(goneId) || {}).title || ('task ' + goneId);
-      allTasks = allTasks.filter(x => String(x.task_id) !== goneId);
+      // Kept, not deleted: it moves to "Recently closed" where it can be put
+      // back. Dropping it from allTasks is what made a mis-aimed archive
+      // unrecoverable without going through Claude.
+      markClosedLocally(goneId, 'cancelled');
+      if (card) card.style.opacity = '';
       renderTasks();
       showToast('Archived', 'success');
-      showNotice('Archived “' + title + '”.', goneId === String(taskId) ? '' : 'error');
+      showNotice('Archived “' + title + '” — it is under Recently closed if you '
+                 + 'need it back.', goneId === String(taskId) ? '' : 'error');
     } else {
       if (card) card.style.opacity = '';
       showToast('Archive failed', 'error');
@@ -1096,6 +1250,75 @@ async function confirmArchive() {
   } catch(e) {
     if (card) card.style.opacity = '';
     reportWriteFailure(e, 'Archive');
+  }
+}
+
+// ── REOPEN ───────────────────────────────────────────────
+let _pendingReopenId = null;
+
+function reopenTask(taskId) {
+  const t = taskById(taskId);
+  if (!t) return;
+  _pendingReopenId = taskId;
+  document.getElementById('reopenDesc').textContent = t.title || ('task ' + taskId);
+  const was = (t.status === 'cancelled' ? 'Cancelled' : 'Completed')
+            + (closedWhen(t) || '').replace(' ·', '');
+  document.getElementById('reopenMeta').textContent =
+    was + '. It goes back on the open list'
+    + (t.due_date ? ', still due ' + t.due_date : '') + '.';
+  document.getElementById('reopenOverlay').classList.add('show');
+}
+
+function cancelReopen(e) {
+  if (e && e.target !== document.getElementById('reopenOverlay')) return;
+  document.getElementById('reopenOverlay').classList.remove('show');
+  _pendingReopenId = null;
+}
+
+function confirmReopen() {
+  const taskId = _pendingReopenId;
+  document.getElementById('reopenOverlay').classList.remove('show');
+  _pendingReopenId = null;
+  if (taskId) doReopen(taskId);
+}
+
+async function doReopen(taskId) {
+  showToast('Reopening…', '');
+  try {
+    const r = await post({ action: 'reopen_task', task_id: taskId });
+    // Same rule as completion and archive: name what the DATABASE reopened, not
+    // what the request asked for.
+    const res = (r && r.result) || {};
+    const backId = res.task_id != null ? String(res.task_id) : String(taskId);
+    const t = taskById(backId);
+    if (t) {
+      t.status = 'open';
+      t.closed_at = null;
+      t.completed_by = null;
+    }
+    const title = res.title || (t && t.title) || ('task ' + backId);
+    showToast('Reopened ✓', 'success');
+    if (backId !== String(taskId)) {
+      showNotice('Reopened task ' + backId + ' (“' + title + '”) — you tapped '
+                 + taskId + '. Refresh and check before tapping again.', 'error');
+    } else {
+      // Unlike a completion, re-rendering here is right: the row has to leave
+      // the closed section, and there is no adjacent-row hazard because the
+      // user is finished with it. It sorts to the bottom of the open list until
+      // the next refresh — the server only scores rows that were open when the
+      // GET ran — so say so rather than let it look lost.
+      showNotice('Reopened “' + title + '” — back on the open list, scored on the '
+                 + 'next refresh.', 'ok');
+    }
+    renderTasks();
+  } catch(e) {
+    showToast('Not reopened', 'error');
+    // The V016 envelope carries the database's own sentence, which for a
+    // recurring task is the MVF06 explanation of why this is refused here.
+    showNotice(e && e.serverMessage
+      ? 'Nothing was reopened: ' + e.serverMessage
+      : 'Nothing was reopened — could not reach the server. Check Tailscale, then refresh.',
+      'error');
   }
 }
 
@@ -1136,8 +1359,13 @@ async function dismissTask(taskId) {
     const r = await post({ action: 'dismiss_task', task_id: taskId });
     if (r.status === 'ok') {
       const res = (r && r.result) || {};
-      allTasks = allTasks.filter(x => String(x.task_id) !==
-        (res.task_id != null ? String(res.task_id) : String(taskId)));
+      // Kept like an archive, for the same reason. Note the asymmetry the
+      // database enforces (V018): reopening a dismissed proposal makes it a
+      // real OPEN task — there is no path back to 'proposed', and it does not
+      // pick up suggested_assignee the way Accept does.
+      markClosedLocally(res.task_id != null ? String(res.task_id) : String(taskId),
+                        'cancelled');
+      if (card) card.style.opacity = '';
       showToast('Dismissed', '');
       renderTasks();
     } else {
