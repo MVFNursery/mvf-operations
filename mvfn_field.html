@@ -248,6 +248,27 @@
   }
   .note-save-btn:active { opacity: 0.8; }
 
+  /* ARCHIVE (expanded card). Swipe-left was the only way in, so on a desktop
+     browser Archive did not exist at all. This is the reachable-everywhere
+     control; the swipe still works and both land on the same confirm sheet.
+
+     Deliberately kept AWAY from Save: it writes status -> cancelled, and Save
+     is tapped constantly. So it gets its own row, a divider, no fill, and the
+     opposite end of the row from the Save button — a thumb overshooting Save
+     downward lands on empty space, not on this. */
+  .archive-row {
+    display: flex; justify-content: flex-start;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
+  }
+  .archive-row-btn {
+    height: 34px; padding: 0 14px; border-radius: 8px;
+    border: 1px solid var(--border2); background: transparent;
+    color: var(--text3); font-size: 12px; font-weight: 600;
+    font-family: inherit; cursor: pointer; white-space: nowrap;
+  }
+  .archive-row-btn:hover { color: var(--text2); border-color: var(--text2); }
+  .archive-row-btn:active { opacity: 0.7; }
+
   /* SECTION LABEL */
   .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); padding: 14px 12px 6px; }
 
@@ -816,6 +837,9 @@ function card(t, rank) {
       <div class="note-row">
         <textarea class="note-input" id="note-${esc(id)}" placeholder="Add note…" rows="1"></textarea>
         <button class="note-save-btn" onclick="saveNote('${esc(id)}')">Save</button>
+      </div>
+      <div class="archive-row">
+        <button class="archive-row-btn" onclick="showArchiveConfirm('${esc(id)}')">Archive task</button>
       </div>
     </div>
   </div>
