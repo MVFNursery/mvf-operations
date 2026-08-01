@@ -89,6 +89,16 @@
   .toast.show { opacity: 1; }
   .toast.err { background: #9b2c1f; }
   .loading { text-align: center; color: #5a6b2d; padding: 40px 0; }
+
+  .card.steps { border-color: #2d5016; background: #f2f7e8; }
+  .steps ol { margin: 6px 0 0 22px; }
+  .steps li { font-size: .85rem; margin: 8px 0; }
+  .steps li a { color: #2d5016; }
+  .steps li.alldone { list-style: none; margin-left: -22px; font-family: 'Fraunces', serif; font-weight: 600; }
+  .steps .stepbtn { margin-left: 8px; }
+  .uploaderrs { border: 1px solid #9b2c1f; background: #fdf1ef; border-radius: 8px;
+    padding: 10px 12px; margin-top: 10px; font-size: .75rem; color: #9b2c1f; }
+  .uploaderrs div { margin: 2px 0; }
 </style>
 </head>
 <body>
@@ -185,6 +195,46 @@
     const items = D.checklist.filter(c => c.phase === phase);
     const done = items.filter(c => c.done_at).length;
     return `<span class="prog">${done}/${items.length}</span>`;
+  }
+
+  // ── "What's left" — the directed step list for this month ─────────────────
+  function nextSteps() {
+    const s = [];
+    const closed = D.run && D.run.closed_at;
+    if (closed) {
+      s.push({ t: `${D.period.label} is closed${D.run.closed_by ? ' (by ' + esc(D.run.closed_by) + ')' : ''}. Nothing owed — reopen below if something changed.`, done: true });
+      return s;
+    }
+    const unc = D.uncategorized;
+    const uncCredit = unc.reduce((x, r) => x + Number(r.credit || 0), 0);
+    const uncDebit = unc.reduce((x, r) => x + Number(r.debit || 0), 0);
+    const expRows = unc.filter(r => r.debit != null).length;
+    const cash = D.accounts.find(a => a.account === 'Cash on Hand');
+    const item = k => D.checklist.find(c => c.item_key === k);
+    const open = D.checklist.filter(c => !c.done_at);
+    if (!D.import) {
+      s.push({ t: `In Wave, run <b>Reports &rarr; Account Transactions</b> for ${esc(D.period.label)} (cash basis), export the CSV, and upload it here.`, act: 'upload' });
+    } else {
+      if (uncCredit > 0) s.push({ t: `Reclass <b>${money(uncCredit)}</b> of Uncategorized Income in Wave. For Square deposits the split is: plant-sale income + PA sales-tax liability + card-fee expense &mdash; pull the month's tax and fee totals from the Square dashboard; one summary JE is fine. Then re-export + upload again.`, a: '#ph1' });
+      if (uncDebit > 0) s.push({ t: `Categorize <b>${money(uncDebit)}</b> of Uncategorized Expense in Wave (${expRows} row${expRows === 1 ? '' : 's'} &mdash; list in Phase 1). Then re-export + upload again.`, a: '#ph1' });
+      if (cash && item('p1_balances') && !item('p1_balances').done_at)
+        s.push({ t: `Count the drawer against Cash on Hand <b>${money(cash.ending_balance)}</b>; check M1st + the card against statements.`, a: '#ph1' });
+    }
+    if (Number(D.scorecard.untyped_accounts) > 0)
+      s.push({ t: `Type <b>${D.scorecard.untyped_accounts} account${Number(D.scorecard.untyped_accounts) === 1 ? '' : 's'}</b> in the Accounts table &mdash; unlocks computed income + the liability panel.`, a: '#accounts' });
+    if (open.length)
+      s.push({ t: `Work the checklist: <b>${open.length} of ${D.checklist.length}</b> steps open (next: &ldquo;${esc(open[0].label)}&rdquo;).`, a: '#ph' + Math.min(open[0].phase, 5) });
+    if (D.import && !unc.length && !open.length)
+      s.push({ t: `Everything's green &mdash; <b>close ${esc(D.period.label)}</b>.`, a: '#closeout' });
+    return s;
+  }
+
+  function stepsHTML() {
+    const s = nextSteps();
+    const items = s.map(x => x.done
+      ? `<li class="alldone">&#10003; ${x.t}</li>`
+      : `<li>${x.t}${x.act === 'upload' ? '<button class="small stepbtn" data-upload>Upload CSV</button>' : ''}${x.a ? ` <a href="${x.a}">&darr; go</a>` : ''}</li>`).join('');
+    return `<div class="card steps"><h2>What's left &mdash; ${esc(D.period.label)}</h2><ol>${items}</ol></div>`;
   }
 
   function render() {
@@ -299,25 +349,30 @@
     <div class="hint">typing accounts is what unlocks computed income + liability panels. Types are yours to confirm &mdash; nothing guesses them.</div>`;
 
     $('app').innerHTML = `
-      <div class="card"><h2>Phase 1 &mdash; Books (Wave) ${prog(1)}</h2>
+      ${stepsHTML()}
+      <div class="card" id="ph1"><h2>Phase 1 &mdash; Books (Wave) ${prog(1)}</h2>
         <div class="sub">get the books current, categorized, and imported</div>
         <div class="tiles">${importTile}${uncTile}</div>
+        <input type="file" id="csvFile" accept=".csv,text/csv" style="display:none">
+        <button class="small" data-upload>${D.import ? 'Re-upload Wave CSV (a re-export supersedes)' : 'Upload Wave CSV'}</button>
+        <div id="uploadErrs"></div>
         ${uncRows}${balances}${checklistHTML(1)}</div>
-      <div class="card"><h2>Phase 2 &mdash; Reconciliation ${prog(2)}</h2>
+      <div class="card" id="ph2"><h2>Phase 2 &mdash; Reconciliation ${prog(2)}</h2>
         <div class="sub">books vs Square channel vs inventory</div>
         ${tieout}${checklistHTML(2)}</div>
-      <div class="card"><h2>Phase 3 &mdash; Scorecard ${prog(3)}</h2>
+      <div class="card" id="ph3"><h2>Phase 3 &mdash; Scorecard ${prog(3)}</h2>
         <div class="sub">what the month actually did</div>
         ${scorecard}${checklistHTML(3)}</div>
-      <div class="card"><h2>Phase 4 &mdash; Tax &amp; compliance ${prog(4)}</h2>
+      <div class="card" id="ph4"><h2>Phase 4 &mdash; Tax &amp; compliance ${prog(4)}</h2>
         ${liab}${tasks}${checklistHTML(4)}</div>
-      <div class="card"><h2>Accounts</h2>
+      <div class="card" id="accounts"><h2>Accounts</h2>
         <div class="sub">Wave chart of accounts seen in imports</div>${registry}</div>
-      <div class="card"><h2>Close out ${prog(5)}</h2>
+      <div class="card" id="ph5"><h2>Close out ${prog(5)}</h2>
         ${checklistHTML(5)}
         <label class="hint" for="runNotes">month notes</label>
         <textarea id="runNotes" placeholder="anything unusual this month&hellip;">${esc(D.run ? D.run.notes : '')}</textarea>
         <button class="small" id="saveNotes">Save notes</button>
+        <span id="closeout"></span>
         <button class="primary ${closed ? 'warn' : ''}" id="closeBtn">${closed ? 'Reopen month' : 'Close ' + esc(D.period.label)}</button>
       </div>`;
 
@@ -330,9 +385,58 @@
     return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '% vs ' + prior.month;
   }
 
+  // ── CSV upload ─────────────────────────────────────────────────────────────
+
+  async function uploadCsv(file) {
+    const errBox = $('uploadErrs');
+    errBox.innerHTML = '';
+    document.querySelectorAll('[data-upload]').forEach(b => {
+      b.dataset.label = b.textContent; b.disabled = true; b.textContent = 'Validating + importing…'; });
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < buf.length; i += 0x8000)
+        bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+      const res = await fetch(`${N8N_BASE}/mvfn-close-upload`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, content_b64: btoa(bin) }),
+      });
+      const out = await res.json().catch(() => ({ status: 'error', errors: ['Bad response from server'] }));
+      if (res.ok && out.status === 'ok') {
+        const r = out.result;
+        if (r.outcome === 'noop') {
+          toast('That exact file is already imported — no changes.');
+        } else {
+          toast(`Imported ${r.rows} rows (import #${r.import_id})`);
+        }
+        // jump to the month the file actually covers
+        const m = r.summary && r.summary.period_start ? r.summary.period_start.slice(0, 7) : month;
+        await load(m, true);
+      } else {
+        const errs = out.errors || [out.message || 'Upload failed'];
+        toast('Validation failed — nothing imported', true);
+        if ($('uploadErrs')) $('uploadErrs').innerHTML =
+          `<div class="uploaderrs"><b>${esc(file.name)}: nothing imported.</b>` +
+          errs.slice(0, 12).map(e => `<div>${esc(e)}</div>`).join('') +
+          (errs.length > 12 ? `<div>&hellip; ${errs.length - 12} more</div>` : '') + '</div>';
+      }
+    } catch (e) {
+      toast('Network error — nothing imported', true);
+    }
+    document.querySelectorAll('[data-upload]').forEach(b => {
+      b.disabled = false; if (b.dataset.label) b.textContent = b.dataset.label; });
+  }
+
   // ── event wiring ───────────────────────────────────────────────────────────
 
   function wire() {
+    const fileInput = $('csvFile');
+    document.querySelectorAll('[data-upload]').forEach(b =>
+      b.addEventListener('click', () => fileInput.click()));
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files && fileInput.files[0]) uploadCsv(fileInput.files[0]);
+      fileInput.value = '';
+    });
     document.querySelectorAll('.check input[type="checkbox"]').forEach(cb => {
       cb.addEventListener('change', async () => {
         cb.disabled = true;
