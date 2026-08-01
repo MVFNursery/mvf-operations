@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Month Close">
+<meta name="theme-color" content="#2d3319">
+<link rel="manifest" href="close-manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-close.svg">
+<title>MVFN Month Close</title>
+<script src="mvfn-auth.js" data-validate-url="https://megamachine.taile865b6.ts.net:5678/webhook/mvfn-close-get"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Mono', monospace; background: #f5f5f0; color: #2d3319; min-height: 100vh; }
+  h1, h2, h3 { font-family: 'Fraunces', serif; }
+  .container { max-width: 920px; margin: 0 auto; padding: 16px 16px 60px; }
+  header { text-align: center; padding: 16px 0 6px; }
+  header h1 { font-size: 1.7rem; font-weight: 700; }
+  .monthbar { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 10px 0 4px; }
+  .monthbar button { border: 2px solid #5a6b2d; background: #fbfbf6; color: #2d5016; border-radius: 8px;
+    width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer; }
+  .monthbar .label { font-family: 'Fraunces', serif; font-size: 1.35rem; font-weight: 700; min-width: 12ch; text-align: center; }
+  .statusline { text-align: center; font-size: .78rem; color: #5a6b2d; min-height: 1.2em; }
+  .closedbadge { display: inline-block; background: #2d5016; color: #fff; border-radius: 6px;
+    padding: 2px 10px; font-size: .75rem; }
+  .actorbar { text-align: center; margin-top: 6px; font-size: .75rem; color: #8a8a70; }
+  .actorbar select { font-family: 'DM Mono', monospace; font-size: .8rem; padding: 2px 6px;
+    border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #2d3319; }
+
+  .card { background: #fbfbf6; border: 2px solid #5a6b2d; border-radius: 10px; padding: 14px 16px 16px; margin: 16px 0 0; }
+  .card > h2 { font-size: 1.05rem; margin-bottom: 4px; display: flex; align-items: baseline; gap: 10px; }
+  .card > h2 .prog { font-family: 'DM Mono', monospace; font-size: .72rem; color: #8a8a70; font-weight: 400; }
+  .card .sub { font-size: .72rem; color: #8a8a70; margin-bottom: 10px; }
+
+  .tiles { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 4px; }
+  .tile { flex: 1 1 150px; border-radius: 8px; padding: 10px 12px; border: 1px solid #e2e2d5; background: #fff; }
+  .tile .t-label { font-size: .68rem; color: #8a8a70; text-transform: uppercase; letter-spacing: .04em; }
+  .tile .t-value { font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 700; margin-top: 2px; }
+  .tile .t-note { font-size: .68rem; color: #8a8a70; margin-top: 2px; }
+  .tile.good { border-color: #5a6b2d; background: #f2f7e8; }
+  .tile.bad { border-color: #9b2c1f; background: #fdf1ef; }
+  .tile.bad .t-value { color: #9b2c1f; }
+  .tile.dim .t-value { color: #8a8a70; font-size: .95rem; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .78rem; margin: 6px 0; }
+  th { text-align: left; color: #8a8a70; font-weight: 400; font-size: .68rem; text-transform: uppercase;
+    letter-spacing: .04em; padding: 4px 8px 4px 0; border-bottom: 1px solid #e2e2d5; }
+  td { padding: 5px 8px 5px 0; border-bottom: 1px solid #f0f0e6; vertical-align: top; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .neg { color: #9b2c1f; }
+  .scrollwrap { overflow-x: auto; }
+
+  .check { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f0f0e6; align-items: flex-start; }
+  .check:last-child { border-bottom: 0; }
+  .check input[type="checkbox"] { width: 20px; height: 20px; margin-top: 1px; accent-color: #2d5016; flex: none; cursor: pointer; }
+  .check .c-label { font-size: .85rem; }
+  .check .c-detail { font-size: .7rem; color: #8a8a70; margin-top: 2px; }
+  .check .c-meta { font-size: .66rem; color: #5a6b2d; margin-top: 2px; }
+  .check.done .c-label { color: #5a6b2d; text-decoration: line-through; text-decoration-thickness: 1px; }
+
+  details { margin: 4px 0; }
+  summary { cursor: pointer; font-size: .75rem; color: #2d5016; }
+  .hint { font-size: .72rem; color: #8a8a70; margin: 6px 0; }
+  .chip { display: inline-block; background: #eee8d5; border-radius: 5px; padding: 1px 7px; font-size: .68rem; color: #5a6b2d; }
+
+  select.acctype { font-family: 'DM Mono', monospace; font-size: .75rem; padding: 3px 4px;
+    border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #2d3319; }
+  select.acctype.untyped { border-color: #c98a00; background: #fdf6e3; }
+
+  textarea { width: 100%; padding: 10px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: .85rem; background: #fff; color: #2d3319;
+    resize: vertical; min-height: 60px; }
+  textarea:focus { outline: none; border-color: #5a6b2d; }
+  button.primary { display: block; width: 100%; margin-top: 12px; padding: 13px; border: 0; border-radius: 8px;
+    background: #2d5016; color: #fff; font-family: 'Fraunces', serif; font-size: 1rem; font-weight: 700; cursor: pointer; }
+  button.primary.warn { background: #7a5a00; }
+  button.primary:disabled { opacity: .5; cursor: default; }
+  button.small { padding: 6px 12px; border: 1px solid #5a6b2d; border-radius: 6px; background: #fbfbf6;
+    color: #2d5016; font-family: 'DM Mono', monospace; font-size: .75rem; cursor: pointer; margin-top: 6px; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #2d5016; color: #fff;
+    padding: 12px 20px; border-radius: 8px; font-size: .9rem; box-shadow: 0 6px 20px rgba(0,0,0,.3);
+    opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; text-align: center; z-index: 50; }
+  .toast.show { opacity: 1; }
+  .toast.err { background: #9b2c1f; }
+  .loading { text-align: center; color: #5a6b2d; padding: 40px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Month Close</h1>
+    <div class="monthbar">
+      <button id="prevBtn" aria-label="previous month">&lsaquo;</button>
+      <div class="label" id="monthLabel">&hellip;</div>
+      <button id="nextBtn" aria-label="next month">&rsaquo;</button>
+    </div>
+    <div class="statusline" id="statusLine"></div>
+    <div class="actorbar">acting as
+      <select id="actorSel"><option>ian</option><option>kerri</option></select>
+    </div>
+  </header>
+  <div id="app"><div class="loading">Loading&hellip;</div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  const N8N_BASE = 'https://megamachine.taile865b6.ts.net:5678/webhook';
+  const $ = (id) => document.getElementById(id);
+  const TYPES = ['', 'asset', 'liability', 'equity', 'income', 'expense'];
+
+  let month = null;      // 'YYYY-MM' currently shown
+  let D = null;          // last GET payload
+
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function money(n) {
+    if (n == null) return '—';
+    const v = Number(n);
+    const s = '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return v < 0 ? '−' + s : s;
+  }
+  function toast(msg, isErr) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    setTimeout(() => { t.className = 'toast'; }, isErr ? 4000 : 2200);
+  }
+  function actor() { return localStorage.getItem('mvfn_close_actor') || 'ian'; }
+  function curMonth() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function stepMonth(m, delta) {
+    const [y, mo] = m.split('-').map(Number);
+    const d = new Date(y, mo - 1 + delta, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  async function post(body) {
+    const res = await fetch(`${N8N_BASE}/mvfn-close`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const out = await res.json().catch(() => ({ status: 'error', message: 'Bad response' }));
+    if (!res.ok || out.status !== 'ok') throw new Error(out.message || ('HTTP ' + res.status));
+    return out.result;
+  }
+
+  async function load(m, quiet) {
+    if (!quiet) $('app').innerHTML = '<div class="loading">Loading&hellip;</div>';
+    try {
+      const res = await fetch(`${N8N_BASE}/mvfn-close-get?month=${encodeURIComponent(m || '')}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      D = await res.json();
+      month = D.period.month;
+      render();
+    } catch (e) {
+      $('app').innerHTML = '<div class="loading">Could not load. Check Tailscale + retry.</div>';
+    }
+  }
+
+  // ── rendering ──────────────────────────────────────────────────────────────
+
+  function checklistHTML(phase) {
+    const items = D.checklist.filter(c => c.phase === phase);
+    return items.map(c => {
+      const done = !!c.done_at;
+      return `<div class="check ${done ? 'done' : ''}">
+        <input type="checkbox" data-item="${esc(c.item_key)}" ${done ? 'checked' : ''}>
+        <div>
+          <div class="c-label">${esc(c.label)}</div>
+          ${c.detail ? `<div class="c-detail">${esc(c.detail)}</div>` : ''}
+          ${done ? `<div class="c-meta">done by ${esc(c.done_by || '?')} &middot; ${esc((c.done_at || '').slice(0, 16))}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function prog(phase) {
+    const items = D.checklist.filter(c => c.phase === phase);
+    const done = items.filter(c => c.done_at).length;
+    return `<span class="prog">${done}/${items.length}</span>`;
+  }
+
+  function render() {
+    const sc = D.scorecard, sq = D.square, comp = D.compliance;
+    $('monthLabel').textContent = D.period.label;
+    const closed = D.run && D.run.closed_at;
+    $('statusLine').innerHTML = closed
+      ? `<span class="closedbadge">CLOSED ${esc(D.run.closed_at.slice(0, 10))} by ${esc(D.run.closed_by || '?')}</span>`
+      : (D.run ? 'close in progress' : '');
+    $('actorSel').value = actor();
+
+    // Phase 1 computed tiles
+    const unc = D.uncategorized;
+    const uncDebit = unc.reduce((s, r) => s + Number(r.debit || 0), 0);
+    const uncCredit = unc.reduce((s, r) => s + Number(r.credit || 0), 0);
+    const importTile = D.import
+      ? `<div class="tile good"><div class="t-label">Wave import</div>
+           <div class="t-value">${D.import.line_count} rows</div>
+           <div class="t-note">import #${D.import.import_id} &middot; ${esc(D.import.imported_at.slice(0, 16))} &middot; ${esc(D.import.report_basis)}</div></div>`
+      : `<div class="tile bad"><div class="t-label">Wave import</div>
+           <div class="t-value">none</div>
+           <div class="t-note">export Account Transactions for ${esc(D.period.label)} &rarr; run the importer on the VM</div></div>`;
+    const uncTile = !D.import
+      ? `<div class="tile dim"><div class="t-label">Uncategorized</div><div class="t-value">needs import</div></div>`
+      : (unc.length === 0
+        ? `<div class="tile good"><div class="t-label">Uncategorized</div><div class="t-value">$0.00</div><div class="t-note">clean</div></div>`
+        : `<div class="tile bad"><div class="t-label">Uncategorized</div>
+             <div class="t-value">${money(uncDebit + uncCredit)}</div>
+             <div class="t-note">${unc.length} rows &middot; income ${money(uncCredit)} / expense ${money(uncDebit)}</div></div>`);
+
+    const uncRows = unc.length ? `<details><summary>uncategorized rows (${unc.length})</summary>
+      <div class="scrollwrap"><table><tr><th>date</th><th>account</th><th>description</th><th class="num">amount</th></tr>
+      ${unc.map(r => `<tr><td>${esc(r.txn_date)}</td><td>${esc(r.account)}</td><td>${esc(r.description)}</td>
+        <td class="num">${money(r.debit != null ? r.debit : r.credit)}</td></tr>`).join('')}
+      </table></div></details>` : '';
+
+    const balances = D.accounts.length ? `<details><summary>ending balances (reconcile against reality)</summary>
+      <div class="scrollwrap"><table><tr><th>account</th><th class="num">start</th><th class="num">debits</th><th class="num">credits</th><th class="num">ending</th></tr>
+      ${D.accounts.map(a => `<tr><td>${esc(a.account)}</td><td class="num">${money(a.starting_balance)}</td>
+        <td class="num">${money(a.total_debit)}</td><td class="num">${money(a.total_credit)}</td>
+        <td class="num">${money(a.ending_balance)}</td></tr>`).join('')}
+      </table></div></details>` : '';
+
+    // Phase 2 tie-out
+    const waveDep = sq.wave_deposits;
+    const waveTotal = waveDep.reduce((s, r) => s + Number(r.debit || 0), 0);
+    const inv = sq.inventory;
+    const tieout = `<div class="tiles">
+      <div class="tile"><div class="t-label">Wave &middot; Square deposits</div>
+        <div class="t-value">${money(waveTotal)}</div><div class="t-note">${waveDep.length} deposits (gross incl. tax, net of fees)</div></div>
+      <div class="tile"><div class="t-label">nursery_intel sales</div>
+        <div class="t-value">${money(inv.amount)}</div><div class="t-note">${inv.lines} lines &middot; ${inv.units} units (pre-tax, plants only)</div></div>
+      <div class="tile"><div class="t-label">Square orders applied</div>
+        <div class="t-value">${sq.orders}</div><div class="t-note">via square_applied_orders</div></div>
+    </div>
+    <div class="hint">bridge between the two figures = sales tax + card fees + excluded non-plant SKUs + settlement timing</div>
+    ${waveDep.length ? `<details><summary>wave deposit rows (${waveDep.length})</summary>
+      <div class="scrollwrap"><table><tr><th>date</th><th>description</th><th class="num">amount</th></tr>
+      ${waveDep.map(r => `<tr><td>${esc(r.txn_date)}</td><td>${esc(r.description)}</td><td class="num">${money(r.debit)}</td></tr>`).join('')}
+      </table></div></details>` : ''}`;
+
+    // Phase 3 scorecard
+    const ibm = sc.income_by_month;
+    const incomeRow = ibm.find(r => r.month === month);
+    const priorRow = ibm.find(r => r.month === stepMonth(month, -12));
+    const untyped = Number(sc.untyped_accounts);
+    const incomeTile = untyped > 0 && !incomeRow
+      ? `<div class="tile dim"><div class="t-label">Income (books)</div><div class="t-value">locked</div>
+           <div class="t-note">${untyped} accounts untyped &mdash; classify them below to compute income</div></div>`
+      : `<div class="tile"><div class="t-label">Income (books)</div>
+           <div class="t-value">${incomeRow ? money(incomeRow.income) : '—'}</div>
+           <div class="t-note">${priorRow ? 'YoY ' + yoy(incomeRow, priorRow) : 'no prior-year import for YoY'}</div></div>`;
+    const scorecard = `<div class="tiles">
+      ${incomeTile}
+      <div class="tile"><div class="t-label">Owner investment added</div>
+        <div class="t-value">${sc.owner_investment_change == null ? '—' : money(sc.owner_investment_change)}</div>
+        <div class="t-note">trend toward $0</div></div>
+      <div class="tile"><div class="t-label">Units / orders</div>
+        <div class="t-value">${sc.units_sold} / ${sc.orders}</div>
+        <div class="t-note">avg ticket ${sc.orders > 0 ? money(Number(sc.sales_amount) / Number(sc.orders)) : '—'} (Square channel)</div></div>
+      <div class="tile ${Number(sc.cull_units) > 0 ? '' : 'good'}"><div class="t-label">Culls (net)</div>
+        <div class="t-value">${sc.cull_units}</div><div class="t-note">units, from count deltas</div></div>
+    </div>
+    ${ibm.length ? `<details><summary>income by month (imported + typed only)</summary>
+      <div class="scrollwrap"><table><tr><th>month</th><th class="num">income</th></tr>
+      ${ibm.map(r => `<tr><td>${esc(r.month)}</td><td class="num">${money(r.income)}</td></tr>`).join('')}
+      </table></div></details>` : ''}`;
+
+    // Phase 4 compliance
+    const liab = comp.liabilities.length
+      ? `<div class="scrollwrap"><table><tr><th>liability account</th><th class="num">start</th><th class="num">ending</th></tr>
+         ${comp.liabilities.map(l => `<tr><td>${esc(l.account)}</td><td class="num">${money(l.starting_balance)}</td>
+           <td class="num">${money(l.ending_balance)}</td></tr>`).join('')}</table></div>`
+      : `<div class="hint">no liability-typed accounts yet &mdash; classify accounts below and book balances will appear here</div>`;
+    const tasks = comp.due_tasks.length
+      ? `<div class="scrollwrap"><table><tr><th>due</th><th>task</th><th></th></tr>
+         ${comp.due_tasks.map(t => `<tr><td class="${t.due_date < D.period.end ? 'neg' : ''}">${esc(t.due_date)}</td>
+           <td>#${t.task_id} ${esc(t.title)}</td>
+           <td>${t.hard_deadline ? '<span class="chip">hard</span>' : ''} ${t.assigned_to ? '<span class="chip">' + esc(t.assigned_to) + '</span>' : ''}</td></tr>`).join('')}
+         </table></div>`
+      : `<div class="hint">no open tasks due within 60 days of month end</div>`;
+
+    // registry
+    const registry = `<div class="scrollwrap"><table>
+      <tr><th>account</th><th class="num">activity</th><th>type</th></tr>
+      ${D.accounts.map(a => `<tr><td>${esc(a.account)}</td>
+        <td class="num">${a.txn_count} txns</td>
+        <td><select class="acctype ${a.account_type ? '' : 'untyped'}" data-account="${esc(a.account)}">
+          ${TYPES.map(t => `<option value="${t}" ${(a.account_type || '') === t ? 'selected' : ''}>${t || '— untyped —'}</option>`).join('')}
+        </select></td></tr>`).join('')}
+    </table></div>
+    <div class="hint">typing accounts is what unlocks computed income + liability panels. Types are yours to confirm &mdash; nothing guesses them.</div>`;
+
+    $('app').innerHTML = `
+      <div class="card"><h2>Phase 1 &mdash; Books (Wave) ${prog(1)}</h2>
+        <div class="sub">get the books current, categorized, and imported</div>
+        <div class="tiles">${importTile}${uncTile}</div>
+        ${uncRows}${balances}${checklistHTML(1)}</div>
+      <div class="card"><h2>Phase 2 &mdash; Reconciliation ${prog(2)}</h2>
+        <div class="sub">books vs Square channel vs inventory</div>
+        ${tieout}${checklistHTML(2)}</div>
+      <div class="card"><h2>Phase 3 &mdash; Scorecard ${prog(3)}</h2>
+        <div class="sub">what the month actually did</div>
+        ${scorecard}${checklistHTML(3)}</div>
+      <div class="card"><h2>Phase 4 &mdash; Tax &amp; compliance ${prog(4)}</h2>
+        ${liab}${tasks}${checklistHTML(4)}</div>
+      <div class="card"><h2>Accounts</h2>
+        <div class="sub">Wave chart of accounts seen in imports</div>${registry}</div>
+      <div class="card"><h2>Close out ${prog(5)}</h2>
+        ${checklistHTML(5)}
+        <label class="hint" for="runNotes">month notes</label>
+        <textarea id="runNotes" placeholder="anything unusual this month&hellip;">${esc(D.run ? D.run.notes : '')}</textarea>
+        <button class="small" id="saveNotes">Save notes</button>
+        <button class="primary ${closed ? 'warn' : ''}" id="closeBtn">${closed ? 'Reopen month' : 'Close ' + esc(D.period.label)}</button>
+      </div>`;
+
+    wire();
+  }
+
+  function yoy(cur, prior) {
+    if (!cur || !prior || !Number(prior.income)) return '';
+    const pct = (Number(cur.income) - Number(prior.income)) / Math.abs(Number(prior.income)) * 100;
+    return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '% vs ' + prior.month;
+  }
+
+  // ── event wiring ───────────────────────────────────────────────────────────
+
+  function wire() {
+    document.querySelectorAll('.check input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', async () => {
+        cb.disabled = true;
+        try {
+          await post({ action: 'set_item', month, item_key: cb.dataset.item, done: cb.checked, actor: actor() });
+          await load(month, true);
+        } catch (e) { toast(e.message, true); cb.checked = !cb.checked; }
+        cb.disabled = false;
+      });
+    });
+    document.querySelectorAll('select.acctype').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        sel.disabled = true;
+        try {
+          await post({ action: 'set_account_type', account: sel.dataset.account, account_type: sel.value, actor: actor() });
+          toast(`${sel.dataset.account} → ${sel.value || 'untyped'}`);
+          await load(month, true);
+        } catch (e) { toast(e.message, true); }
+        sel.disabled = false;
+      });
+    });
+    $('saveNotes').addEventListener('click', async () => {
+      try {
+        await post({ action: 'set_run', month, op: 'note', notes: $('runNotes').value.trim(), actor: actor() });
+        toast('Notes saved');
+      } catch (e) { toast(e.message, true); }
+    });
+    $('closeBtn').addEventListener('click', async () => {
+      const closed = D.run && D.run.closed_at;
+      const openItems = D.checklist.filter(c => !c.done_at).length;
+      if (!closed && openItems > 0 && !confirm(`${openItems} checklist item(s) still open. Close ${D.period.label} anyway?`)) return;
+      if (closed && !confirm(`Reopen ${D.period.label}?`)) return;
+      try {
+        await post({ action: 'set_run', month, op: closed ? 'reopen' : 'close', actor: actor(), notes: $('runNotes').value.trim() });
+        toast(closed ? 'Month reopened' : 'Month closed');
+        await load(month, true);
+      } catch (e) { toast(e.message, true); }
+    });
+  }
+
+  $('prevBtn').addEventListener('click', () => load(stepMonth(month, -1)));
+  $('nextBtn').addEventListener('click', () => load(stepMonth(month, 1)));
+  $('actorSel').addEventListener('change', () => localStorage.setItem('mvfn_close_actor', $('actorSel').value));
+
+  load(curMonth());
+</script>
+</body>
+</html>
