@@ -215,7 +215,19 @@
     if (!D.import) {
       s.push({ t: `In Wave, run <b>Reports &rarr; Account Transactions</b> for ${esc(D.period.label)} (cash basis), export the CSV, and upload it here.`, act: 'upload' });
     } else {
-      if (uncCredit > 0) s.push({ t: `Reclass <b>${money(uncCredit)}</b> of Uncategorized Income in Wave. For Square deposits the split is: plant-sale income + PA sales-tax liability + card-fee expense &mdash; pull the month's tax and fee totals from the Square dashboard; one summary JE is fine. Then re-export + upload again.`, a: '#ph1' });
+      if (uncCredit > 0) {
+        // The Square split is measured nightly (books.square_order_money via the
+        // sales-decrement sync) — print the actual JE numbers when we have them.
+        const m = (D.square && D.square.money) || null;
+        if (m && Number(m.orders) > 0) {
+          const inc = (Number(m.gross_cents) - Number(m.tax_cents)) / 100;
+          const nMiss = Number(m.orders_missing_fee);
+          const feeWarn = nMiss > 0 ? ` (${nMiss} order${nMiss === 1 ? '' : 's'} awaiting posted card fees &mdash; fee total may still move)` : '';
+          s.push({ t: `Reclass <b>${money(uncCredit)}</b> of Uncategorized Income in Wave. Square's month (${m.orders} orders, gross ${money(Number(m.gross_cents) / 100)}) splits: <b>${money(inc)}</b> plant-sale income + <b>${money(Number(m.tax_cents) / 100)}</b> PA sales-tax liability + <b>${money(Number(m.fee_cents) / 100)}</b> card-fee expense${feeWarn}; one summary JE is fine. Then re-export + upload again.`, a: '#ph1' });
+        } else {
+          s.push({ t: `Reclass <b>${money(uncCredit)}</b> of Uncategorized Income in Wave. For Square deposits the split is: plant-sale income + PA sales-tax liability + card-fee expense &mdash; pull the month's tax and fee totals from the Square dashboard; one summary JE is fine. Then re-export + upload again.`, a: '#ph1' });
+        }
+      }
       if (uncDebit > 0) s.push({ t: `Categorize <b>${money(uncDebit)}</b> of Uncategorized Expense in Wave (${expRows} row${expRows === 1 ? '' : 's'} &mdash; list in Phase 1). Then re-export + upload again.`, a: '#ph1' });
       if (cash && item('p1_balances') && !item('p1_balances').done_at)
         s.push({ t: `Count the drawer against Cash on Hand <b>${money(cash.ending_balance)}</b>; check M1st + the card against statements.`, a: '#ph1' });
@@ -282,15 +294,23 @@
     const waveDep = sq.wave_deposits;
     const waveTotal = waveDep.reduce((s, r) => s + Number(r.debit || 0), 0);
     const inv = sq.inventory;
+    const sqm = sq.money || null;
+    const sqmTile = sqm && Number(sqm.orders) > 0
+      ? `<div class="tile"><div class="t-label">Square money (API)</div>
+           <div class="t-value">${money(Number(sqm.gross_cents) / 100)}</div>
+           <div class="t-note">tax ${money(Number(sqm.tax_cents) / 100)} &middot; fees ${money(Number(sqm.fee_cents) / 100)}${Number(sqm.orders_missing_fee) > 0 ? ' (+' + sqm.orders_missing_fee + ' pending)' : ''} &middot; ${sqm.orders} orders</div></div>`
+      : `<div class="tile dim"><div class="t-label">Square money (API)</div>
+           <div class="t-value">&mdash;</div><div class="t-note">no measured orders this month (backfill or wait for the nightly sync)</div></div>`;
     const tieout = `<div class="tiles">
       <div class="tile"><div class="t-label">Wave &middot; Square deposits</div>
         <div class="t-value">${money(waveTotal)}</div><div class="t-note">${waveDep.length} deposits (gross incl. tax, net of fees)</div></div>
+      ${sqmTile}
       <div class="tile"><div class="t-label">nursery_intel sales</div>
         <div class="t-value">${money(inv.amount)}</div><div class="t-note">${inv.lines} lines &middot; ${inv.units} units (pre-tax, plants only)</div></div>
       <div class="tile"><div class="t-label">Square orders applied</div>
         <div class="t-value">${sq.orders}</div><div class="t-note">via square_applied_orders</div></div>
     </div>
-    <div class="hint">bridge between the two figures = sales tax + card fees + excluded non-plant SKUs + settlement timing</div>
+    <div class="hint">tax + card fees are measured nightly from Square's API (books.square_order_money); remaining bridge between Wave and nursery_intel = excluded non-plant SKUs + settlement timing</div>
     ${waveDep.length ? `<details><summary>wave deposit rows (${waveDep.length})</summary>
       <div class="scrollwrap"><table><tr><th>date</th><th>description</th><th class="num">amount</th></tr>
       ${waveDep.map(r => `<tr><td>${esc(r.txn_date)}</td><td>${esc(r.description)}</td><td class="num">${money(r.debit)}</td></tr>`).join('')}
