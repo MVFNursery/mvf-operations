@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Potting">
+<meta name="theme-color" content="#2d3319">
+<link rel="manifest" href="potting-manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-potting.png">
+<title>MVFN Potting Bench</title>
+<script src="mvfn-auth.js" data-token-key="mvfn_device_token" data-validate-url="https://megamachine.taile865b6.ts.net:5678/webhook/mvfn-get-potting"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Mono', monospace; background: #f5f5f0; color: #2d3319; min-height: 100vh; }
+  h1, h2, h3 { font-family: 'Fraunces', serif; }
+
+  .container { max-width: 640px; margin: 0 auto; padding: 20px 16px 80px; }
+  header { text-align: center; padding: 18px 0 6px; }
+  header h1 { font-size: 1.9rem; font-weight: 700; }
+  header .subtitle { font-size: 0.82rem; color: #5a6b2d; margin-top: 4px; }
+
+  .lockbar { display: flex; align-items: center; justify-content: center; gap: 8px;
+    flex-wrap: wrap; font-size: 0.78rem; margin: 6px 0 14px; }
+  .lockbar button { padding: 7px 14px; border: 2px solid #2d3319; background: white; color: #2d3319;
+    border-radius: 999px; font-family: 'Fraunces', serif; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+
+  .tabs { display: flex; gap: 0; margin-bottom: 14px; border: 2px solid #2d3319;
+    border-radius: 999px; overflow: hidden; }
+  .tabs button { flex: 1 1 0; padding: 10px 8px; border: 0; background: white; color: #2d3319;
+    font-family: 'Fraunces', serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+  .tabs button + button { border-left: 2px solid #2d3319; }
+  .tabs button.on { background: #2d3319; color: #f5f5f0; }
+  .tabs button .n { font-family: 'DM Mono', monospace; font-weight: 400; opacity: .7;
+    font-size: 0.76rem; margin-left: 5px; }
+
+  .search { width: 100%; padding: 12px 14px; border: 2px solid #2d3319; border-radius: 10px;
+    font-family: 'DM Mono', monospace; font-size: 0.95rem; background: white; margin-bottom: 12px; }
+
+  .card { background: white; border: 2px solid #2d3319; border-radius: 12px;
+    padding: 15px 16px; margin-bottom: 12px; }
+  .card h3 { font-size: 1.05rem; font-weight: 600; line-height: 1.25; }
+  .sci { font-family: 'Fraunces', serif; font-style: italic; font-size: 0.8rem;
+    color: #6b7280; display: block; font-weight: 400; }
+
+  .sp-row { display: flex; align-items: center; gap: 8px; padding: 11px 12px;
+    background: white; border: 2px solid #d1d5db; border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+  .sp-row:active { border-color: #2d3319; }
+  .sp-row .nm { flex: 1 1 auto; font-size: 0.9rem; }
+  .sp-row .qty { font-size: 0.72rem; color: #6b7280; white-space: nowrap; }
+
+  .tag { font-size: 0.62rem; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
+  .tag.exception { background: #fbeccd; color: #8a5a12; }
+  .tag.default   { background: #eceff0; color: #6b7280; }
+  .tag.low       { background: #fadcd6; color: #9e3b2c; }
+  .tag.uncounted { background: #eceff0; color: #6b7280; }
+  .tag.ok        { background: #dcefd6; color: #2f6b28; }
+  .tag.task      { background: #dde6ef; color: #2f4a6b; }
+
+  .backlink { display: inline-block; margin-bottom: 10px; font-size: 0.8rem;
+    color: #5a6b2d; cursor: pointer; text-decoration: underline; }
+
+  .gline { display: flex; gap: 8px; margin-top: 10px; font-size: 0.82rem; line-height: 1.55; }
+  .gline .k { flex: 0 0 74px; color: #9ca3af; font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: .08em; padding-top: 2px; }
+  .gline .v { flex: 1 1 auto; }
+  .gline .v b { font-weight: 500; }
+  .exc { background: #fdf6e7; border-left: 3px solid #8a5a12; padding: 8px 10px;
+    border-radius: 4px; color: #7a4f10; }
+  .recipe { font-size: 0.73rem; color: #6b7280; margin-top: 3px; }
+
+  .prog-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .prog-chips span { padding: 4px 9px; border: 1.5px solid #d1d5db; border-radius: 999px;
+    font-size: 0.74rem; color: #6b7280; }
+  .prog-chips span.next { border-color: #2d3319; color: #2d3319; font-weight: 500; background: #f2f5ec; }
+
+  .editlink { font-size: 0.74rem; color: #5a6b2d; text-decoration: underline; cursor: pointer;
+    display: inline-block; margin-top: 10px; }
+
+  .group { margin-top: 13px; }
+  .group .label { font-size: 0.7rem; letter-spacing: .1em; text-transform: uppercase;
+    color: #6b7280; margin-bottom: 6px; }
+  select, input[type=text], input[type=number], input[type=date] {
+    width: 100%; padding: 10px 11px; border: 2px solid #d1d5db; border-radius: 8px;
+    font-family: 'DM Mono', monospace; font-size: 0.85rem; background: white; color: #2d3319; }
+  .half { display: flex; gap: 8px; }
+  .half > div { flex: 1 1 0; }
+
+  .preflight { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { padding: 7px 11px; border-radius: 8px; font-size: 0.76rem; line-height: 1.4; }
+  .chip.ok        { background: #dcefd6; color: #2f6b28; }
+  .chip.short     { background: #fadcd6; color: #9e3b2c; font-weight: 500; }
+  .chip.uncounted { background: #eceff0; color: #6b7280; }
+
+  .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .actions button { padding: 12px 16px; border-radius: 999px; cursor: pointer;
+    font-family: 'Fraunces', serif; font-size: 0.9rem; font-weight: 600; border: 2px solid #2d3319; }
+  .btn-primary { background: #2d3319; color: #f5f5f0; flex: 1 1 auto; }
+  .btn-primary:disabled { opacity: .55; }
+  .btn-plain { background: white; color: #2d3319; }
+  .btn-danger { background: white; color: #9e3b2c; border-color: #9e3b2c; }
+
+  .result { background: #f2f5ec; border: 2px solid #5a6b2d; border-radius: 12px;
+    padding: 15px 16px; margin-bottom: 12px; }
+  .result h3 { color: #4b6b1f; margin-bottom: 8px; }
+  .result .line { font-size: 0.82rem; margin-top: 5px; line-height: 1.5; }
+  .result .warn { color: #8a5a12; }
+  .result .task { color: #2f4a6b; }
+
+  .sup-row { background: white; border: 2px solid #d1d5db; border-radius: 10px;
+    padding: 11px 12px; margin-bottom: 8px; }
+  .sup-row.low { border-color: #9e3b2c; }
+  .sup-row .top { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .sup-row .nm { flex: 1 1 auto; font-size: 0.86rem; }
+  .sup-row .cnt { font-size: 0.86rem; white-space: nowrap; }
+  .sup-row .cnt small { color: #9ca3af; font-size: 0.7rem; }
+  .sup-edit { margin-top: 10px; border-top: 1.5px dashed #d1d5db; padding-top: 10px; }
+  .sup-edit .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .sup-edit .row label { flex: 0 0 92px; font-size: 0.72rem; color: #6b7280;
+    text-transform: uppercase; letter-spacing: .06em; }
+  .sup-edit .row input { flex: 1 1 auto; }
+  .sup-edit .row button { padding: 9px 14px; border-radius: 8px; border: 2px solid #2d3319;
+    background: #2d3319; color: #f5f5f0; font-family: 'Fraunces', serif; font-size: 0.8rem;
+    font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .kindhead { font-family: 'Fraunces', serif; font-size: 0.95rem; font-weight: 600;
+    margin: 16px 0 8px; }
+
+  .msg { text-align: center; padding: 26px 10px; color: #6b7280; font-size: 0.85rem; }
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px;
+    background: #2d3319; color: #f5f5f0; padding: 11px 18px; border-radius: 999px;
+    font-size: 0.8rem; opacity: 0; pointer-events: none; transition: opacity .25s ease;
+    z-index: 50; max-width: 90vw; }
+  .toast.show { opacity: 1; }
+  .toast.err { background: #9e3b2c; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Potting Bench</h1>
+    <div class="subtitle">Guidance, supplies, and the record — one stop</div>
+  </header>
+
+  <div class="lockbar">
+    <span id="lockstate"></span>
+    <button type="button" onclick="window.mvfnLock()">Lock</button>
+    <button type="button" onclick="window.appLoad()">Reload</button>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div id="tab-pot"></div>
+  <div id="tab-supplies" style="display:none"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  const N8N_BASE = 'https://megamachine.taile865b6.ts.net:5678/webhook';
+  const ME = 'ian';
+
+  const state = {
+    data: null,          // GET payload
+    tab: 'pot',
+    speciesId: null,
+    editGuidance: false,
+    form: {},            // batch form values
+    result: null,        // last record_pot_up result
+    expanded: null,      // expanded supply row id
+    addingItem: false,
+    search: ''
+  };
+
+  const $ = id => document.getElementById(id);
+  const trim = v => (v == null ? '' : String(v)).trim();
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g,
+      ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  }
+
+  function toast(text, isErr) {
+    const t = $('toast');
+    t.textContent = text;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    setTimeout(() => { t.className = 'toast'; }, isErr ? 3500 : 2000);
+  }
+
+  // ── data access ────────────────────────────────────────────────────────────
+  const speciesById = id => (state.data.species || []).find(s => s.species_id === id);
+  const guidanceOf = id => (state.data.guidance || []).find(g => g.species_id === id);
+  const stockOf = id => (state.data.stock || []).filter(s => s.species_id === id);
+  const supplyByContainer = cid => (state.data.supplies || []).find(s => s.container_id === cid);
+  const supplyBySpecies = sid => (state.data.supplies || []).find(s => s.species_id === sid);
+
+  // ── network ────────────────────────────────────────────────────────────────
+  async function postAction(payload) {
+    const res = await fetch(N8N_BASE + '/mvfn-potting', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+    if (!res.ok) {
+      const msg = (data && ((data.result && data.result.message) || data.message)) ||
+                  ('server error ' + res.status);
+      throw new Error(msg);
+    }
+    if (data === null) throw new Error('empty response — the save may have failed; check and retry');
+    return data;
+  }
+
+  async function load(quiet) {
+    if (!quiet) {
+      $('tab-pot').innerHTML = '<div class="msg">Loading…</div>';
+      $('tab-supplies').innerHTML = '';
+    }
+    try {
+      const res = await fetch(N8N_BASE + '/mvfn-get-potting');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      state.data = await res.json();
+      $('lockstate').textContent = 'unlocked';
+      render();
+    } catch (e) {
+      if (!quiet) {
+        $('tab-pot').innerHTML = '<div class="msg">Couldn’t reach the bench (' +
+          esc(e.message) + ').<br>Check your Tailscale connection.</div>';
+      }
+    }
+  }
+
+  // ── tabs ───────────────────────────────────────────────────────────────────
+  function renderTabs() {
+    const low = (state.data.supplies || []).filter(s => s.below_reorder).length;
+    $('tabs').innerHTML =
+      '<button type="button" data-t="pot"' + (state.tab === 'pot' ? ' class="on"' : '') + '>Pot Up</button>' +
+      '<button type="button" data-t="supplies"' + (state.tab === 'supplies' ? ' class="on"' : '') + '>Supplies' +
+      (low ? '<span class="n">' + low + ' low</span>' : '') + '</button>';
+    $('tabs').querySelectorAll('button').forEach(b => {
+      b.onclick = () => { state.tab = b.getAttribute('data-t'); render(); };
+    });
+  }
+
+  // ── species picker ─────────────────────────────────────────────────────────
+  function speciesListHtml() {
+    const q = state.search.toLowerCase();
+    const withStock = {};
+    (state.data.stock || []).forEach(s => {
+      withStock[s.species_id] = (withStock[s.species_id] || 0) + (s.quantity || 0);
+    });
+    let rows = (state.data.species || []).filter(s => {
+      if (!q) return true;
+      return (s.common_name || '').toLowerCase().includes(q) ||
+             (s.scientific_name || '').toLowerCase().includes(q) ||
+             s.species_id.toLowerCase().includes(q);
+    });
+    // stocked species first — that's what's on the bench
+    rows.sort((a, b) => ((withStock[b.species_id] || 0) - (withStock[a.species_id] || 0)) ||
+                        (a.common_name || a.species_id).localeCompare(b.common_name || b.species_id));
+    if (!q) rows = rows.slice(0, 40);
+    if (!rows.length) return '<div class="msg">No species match.</div>';
+    return rows.map(s => {
+      const g = guidanceOf(s.species_id);
+      const qty = withStock[s.species_id];
+      return '<div class="sp-row" data-sp="' + esc(s.species_id) + '">' +
+        '<div class="nm">' + esc(s.common_name || s.species_id) +
+        '<span class="sci">' + esc(s.scientific_name || '') + '</span></div>' +
+        (qty ? '<span class="qty">' + qty + ' in stock</span>' : '') +
+        (g ? '<span class="tag exception">exceptions</span>' : '') +
+        '</div>';
+    }).join('');
+  }
+
+  // ── guidance card ──────────────────────────────────────────────────────────
+  function resolvedMix(sid) {
+    const g = guidanceOf(sid);
+    const d = state.data.defaults || {};
+    if (g && g.mix_material_id) {
+      const m = (state.data.materials || []).find(x => x.material_id === g.mix_material_id);
+      return { id: g.mix_material_id, label: m ? m.product_name : g.mix_material_id,
+               notes: m ? m.notes : '', isException: true };
+    }
+    return { id: d.mix_material_id, label: d.mix_product || 'house mix',
+             notes: d.mix_notes || '', isException: false };
+  }
+
+  function guidanceHtml(sid) {
+    const g = guidanceOf(sid);
+    const d = state.data.defaults || {};
+    const mix = resolvedMix(sid);
+    let h = '';
+    h += '<div class="gline"><div class="k">Mix</div><div class="v">' +
+      (mix.isException
+        ? '<div class="exc"><b>' + esc(mix.label) + '</b> — species exception, not the house mix.' +
+          (mix.notes ? '<div class="recipe">' + esc(mix.notes) + '</div>' : '') + '</div>'
+        : '<b>' + esc(mix.label) + '</b> (house default)' +
+          (mix.notes ? '<div class="recipe">' + esc(mix.notes) + '</div>' : '')) +
+      '</div></div>';
+    h += '<div class="gline"><div class="k">Fertilizer</div><div class="v">' +
+      (g && g.fert_note
+        ? '<div class="exc">' + esc(g.fert_note) + '</div>'
+        : esc(d.fert_note || '—')) +
+      '</div></div>';
+    if (g && g.container_progression && g.container_progression.length) {
+      const next = suggestedNext(sid);
+      h += '<div class="gline"><div class="k">Pots</div><div class="v"><div class="prog-chips">' +
+        g.container_progression.map(c =>
+          '<span' + (c === next ? ' class="next"' : '') + '>' + esc(c) + '</span>'
+        ).join('') + '</div></div></div>';
+    }
+    if (g && g.season_note) {
+      h += '<div class="gline"><div class="k">Season</div><div class="v">' + esc(g.season_note) + '</div></div>';
+    }
+    if (g && g.note) {
+      h += '<div class="gline"><div class="k">Note</div><div class="v">' + esc(g.note) + '</div></div>';
+    }
+    if (g) {
+      h += '<div class="gline"><div class="k"></div><div class="v" style="font-size:.72rem;color:#6b7280">' +
+        'Confirmed by ' + esc(g.confirmed_by) +
+        (g.confirmed_at ? ' · ' + esc(String(g.confirmed_at).slice(0, 10)) : '') + '</div></div>';
+    }
+    h += '<span class="editlink" id="edit-guidance">' +
+         (g ? 'Edit exceptions' : 'Add a species exception') + '</span>';
+    return h;
+  }
+
+  function guidanceEditHtml(sid) {
+    const g = guidanceOf(sid) || {};
+    const mats = state.data.materials || [];
+    let h = '<div class="group"><div class="label">Mix override (blank = house mix)</div>' +
+      '<select id="ge-mix"><option value="">house mix (default)</option>' +
+      mats.map(m => '<option value="' + esc(m.material_id) + '"' +
+        (g.mix_material_id === m.material_id ? ' selected' : '') + '>' +
+        esc(m.product_name) + '</option>').join('') + '</select></div>';
+    h += '<div class="group"><div class="label">Fertilizer exception (blank = default regimen)</div>' +
+      '<input type="text" id="ge-fert" placeholder="e.g. No Multicote top-dress" value="' +
+      esc(g.fert_note || '') + '"></div>';
+    h += '<div class="group"><div class="label">Pot progression, comma-separated container codes</div>' +
+      '<input type="text" id="ge-prog" placeholder="e.g. NSC300, NSC1000" value="' +
+      esc((g.container_progression || []).join(', ')) + '"></div>';
+    h += '<div class="group"><div class="label">Season note</div>' +
+      '<input type="text" id="ge-season" placeholder="e.g. bump in spring only" value="' +
+      esc(g.season_note || '') + '"></div>';
+    h += '<div class="group"><div class="label">Other note</div>' +
+      '<input type="text" id="ge-note" value="' + esc(g.note || '') + '"></div>';
+    h += '<div class="actions">' +
+      '<button type="button" class="btn-primary" id="ge-save">Save exceptions</button>' +
+      (guidanceOf(sid) ? '<button type="button" class="btn-danger" id="ge-clear">Remove all</button>' : '') +
+      '<button type="button" class="btn-plain" id="ge-cancel">Cancel</button></div>';
+    return h;
+  }
+
+  function suggestedNext(sid) {
+    const g = guidanceOf(sid);
+    if (!g || !g.container_progression || !g.container_progression.length) return null;
+    const prog = g.container_progression;
+    const fromId = state.form.from_stock_id;
+    if (fromId) {
+      const src = (state.data.stock || []).find(s => s.stock_id === Number(fromId));
+      if (src && src.container_id) {
+        const i = prog.indexOf(src.container_id);
+        if (i >= 0 && i + 1 < prog.length) return prog[i + 1];
+        if (i === prog.length - 1) return null;
+      }
+    }
+    return prog[0];
+  }
+
+  // ── batch form ─────────────────────────────────────────────────────────────
+  function batchFormHtml(sid) {
+    const rows = stockOf(sid);
+    const f = state.form;
+    const containers = state.data.containers || [];
+    let h = '<div class="group"><div class="label">Potting from</div><select id="bf-from">' +
+      '<option value=""' + (!f.from_stock_id ? ' selected' : '') +
+      '>Not in stock — prop tray / other</option>' +
+      rows.map(s =>
+        '<option value="' + s.stock_id + '"' +
+        (String(f.from_stock_id) === String(s.stock_id) ? ' selected' : '') + '>' +
+        esc((s.container_id || s.container_size || '?') + ' · ' + s.quantity + ' on hand · ' +
+            s.status + (s.location ? ' · ' + s.location : '')) +
+        '</option>').join('') + '</select></div>';
+    if (!f.from_stock_id) {
+      h += '<div class="group"><div class="label">Source note</div>' +
+        '<input type="text" id="bf-fromnote" placeholder="e.g. prop tray A" value="' +
+        esc(f.from_note || '') + '"></div>';
+    }
+    h += '<div class="group"><div class="label">Into container</div><select id="bf-to">' +
+      '<option value="">pick…</option>' +
+      containers.map(c => '<option value="' + esc(c.container_id) + '"' +
+        (f.to_container_id === c.container_id ? ' selected' : '') + '>' +
+        esc(c.container_id + (c.label && c.label !== c.container_id ? ' — ' + c.label : '')) +
+        '</option>').join('') + '</select></div>';
+    h += '<div class="half">' +
+      '<div class="group"><div class="label">Plants</div>' +
+      '<input type="number" id="bf-qty" min="1" inputmode="numeric" value="' + esc(f.qty || '') + '"></div>' +
+      '<div class="group"><div class="label">Tags used</div>' +
+      '<input type="number" id="bf-tags" min="0" inputmode="numeric" placeholder="= plants" value="' +
+      esc(f.tags_used == null ? '' : f.tags_used) + '"></div></div>';
+    h += '<div class="group"><div class="label">Location (optional)</div>' +
+      '<input type="text" id="bf-loc" placeholder="e.g. nursery rows" value="' + esc(f.location || '') + '"></div>';
+    h += '<div class="group"><div class="label">Note (optional)</div>' +
+      '<input type="text" id="bf-note" value="' + esc(f.note || '') + '"></div>';
+    h += '<div class="preflight" id="preflight"></div>';
+    h += '<div class="actions"><button type="button" class="btn-primary" id="bf-save">Record batch</button></div>';
+    return h;
+  }
+
+  function preflightHtml(sid) {
+    const f = state.form;
+    const qty = parseInt(f.qty, 10) || 0;
+    const tags = f.tags_used === '' || f.tags_used == null ? qty : (parseInt(f.tags_used, 10) || 0);
+    if (!f.to_container_id || !qty) return '';
+    const chips = [];
+    const pot = supplyByContainer(f.to_container_id);
+    if (!pot || pot.on_hand == null) {
+      chips.push('<span class="chip uncounted">Pots ' + esc(f.to_container_id) + ': uncounted</span>');
+    } else if (pot.on_hand < qty) {
+      chips.push('<span class="chip short">Pots ' + esc(f.to_container_id) + ': need ' + qty +
+        ', have ' + pot.on_hand + ' — SHORT ' + (qty - pot.on_hand) + '</span>');
+    } else {
+      chips.push('<span class="chip ok">Pots ' + esc(f.to_container_id) + ': ' + pot.on_hand +
+        ' on hand</span>');
+    }
+    if (tags > 0) {
+      const tag = supplyBySpecies(sid);
+      if (!tag || tag.on_hand == null) {
+        chips.push('<span class="chip uncounted">Tags: uncounted</span>');
+      } else if (tag.on_hand < tags) {
+        chips.push('<span class="chip short">Tags: need ' + tags + ', have ' + tag.on_hand +
+          ' — SHORT ' + (tags - tag.on_hand) + '</span>');
+      } else {
+        chips.push('<span class="chip ok">Tags: ' + tag.on_hand + ' on hand</span>');
+      }
+    }
+    if ((parseInt(f.from_stock_id, 10) || 0) > 0) {
+      const src = (state.data.stock || []).find(s => s.stock_id === Number(f.from_stock_id));
+      if (src && qty > src.quantity) {
+        chips.push('<span class="chip short">Source has only ' + src.quantity + '</span>');
+      }
+    }
+    return chips.join('');
+  }
+
+  function resultHtml(r) {
+    let h = '<div class="result"><h3>Batch recorded</h3>';
+    h += '<div class="line">' + r.to_quantity + ' now in stock row #' + r.to_stock_id +
+      (r.to_merged ? ' (merged into today’s row)' : ' (new row)') + '.</div>';
+    if (r.from_stock) {
+      h += '<div class="line">Source row #' + r.from_stock.stock_id + ' down to ' +
+        r.from_stock.quantity + '.</div>';
+    }
+    (r.supplies || []).forEach(s => {
+      h += '<div class="line">' + esc(s.supply_id) + ': ' + s.qty_delta + ' → ' +
+        (s.on_hand == null ? 'uncounted' : s.on_hand + ' left') + '</div>';
+    });
+    (r.tasks_created || []).forEach(t => {
+      h += '<div class="line task">Task proposed: ' + esc(t.title) + '</div>';
+    });
+    (r.warnings || []).forEach(w => {
+      h += '<div class="line warn">' + esc(w) + '</div>';
+    });
+    h += '<div class="actions">' +
+      '<button type="button" class="btn-primary" id="res-again">Pot another batch</button>' +
+      '<button type="button" class="btn-plain" id="res-done">Done</button></div></div>';
+    return h;
+  }
+
+  // ── pot tab ────────────────────────────────────────────────────────────────
+  function renderPot() {
+    const el = $('tab-pot');
+    if (!state.speciesId) {
+      el.innerHTML =
+        '<input class="search" id="sp-search" type="text" placeholder="Search species…" value="' +
+        esc(state.search) + '">' + '<div id="sp-list">' + speciesListHtml() + '</div>';
+      const inp = $('sp-search');
+      inp.oninput = () => {
+        state.search = inp.value;
+        $('sp-list').innerHTML = speciesListHtml();
+        wireSpeciesRows();
+      };
+      wireSpeciesRows();
+      return;
+    }
+
+    const s = speciesById(state.speciesId);
+    let h = '<span class="backlink" id="back">&larr; all species</span>';
+    h += '<div class="card"><h3>' + esc(s.common_name || s.species_id) +
+      '<span class="sci">' + esc(s.scientific_name || '') + '</span></h3>' +
+      (state.editGuidance ? guidanceEditHtml(s.species_id) : guidanceHtml(s.species_id)) + '</div>';
+    if (state.result) {
+      h += resultHtml(state.result);
+    } else {
+      h += '<div class="card">' + batchFormHtml(s.species_id) + '</div>';
+    }
+    el.innerHTML = h;
+
+    $('back').onclick = () => {
+      state.speciesId = null; state.result = null; state.form = {}; state.editGuidance = false;
+      render();
+    };
+    if (state.editGuidance) wireGuidanceEdit(s.species_id);
+    else {
+      const e = $('edit-guidance');
+      if (e) e.onclick = () => { state.editGuidance = true; render(); };
+    }
+    if (state.result) {
+      $('res-again').onclick = () => {
+        state.result = null;
+        state.form.qty = ''; state.form.tags_used = null; state.form.note = '';
+        render();
+      };
+      $('res-done').onclick = () => {
+        state.speciesId = null; state.result = null; state.form = {};
+        render();
+      };
+    } else {
+      wireBatchForm(s.species_id);
+    }
+  }
+
+  function wireSpeciesRows() {
+    document.querySelectorAll('.sp-row').forEach(row => {
+      row.onclick = () => {
+        state.speciesId = row.getAttribute('data-sp');
+        state.form = {};
+        state.result = null;
+        state.editGuidance = false;
+        // preselect the biggest stock row as the likely source
+        const rows = stockOf(state.speciesId).slice()
+          .sort((a, b) => (b.quantity || 0) - (a.quantity || 0));
+        if (rows.length) {
+          state.form.from_stock_id = String(rows[0].stock_id);
+          if (rows[0].location) state.form.location = rows[0].location;
+        }
+        const nxt = suggestedNext(state.speciesId);
+        if (nxt) state.form.to_container_id = nxt;
+        render();
+      };
+    });
+  }
+
+  function readBatchForm() {
+    const f = state.form;
+    f.from_stock_id = $('bf-from') ? $('bf-from').value : f.from_stock_id;
+    if ($('bf-fromnote')) f.from_note = $('bf-fromnote').value;
+    f.to_container_id = $('bf-to') ? $('bf-to').value : f.to_container_id;
+    f.qty = $('bf-qty') ? $('bf-qty').value : f.qty;
+    f.tags_used = $('bf-tags') ? ($('bf-tags').value === '' ? null : $('bf-tags').value) : f.tags_used;
+    f.location = $('bf-loc') ? $('bf-loc').value : f.location;
+    f.note = $('bf-note') ? $('bf-note').value : f.note;
+  }
+
+  function wireBatchForm(sid) {
+    const refresh = () => { $('preflight').innerHTML = preflightHtml(sid); };
+    $('bf-from').onchange = () => {
+      readBatchForm();
+      const nxt = suggestedNext(sid);
+      if (nxt) state.form.to_container_id = nxt;
+      render();
+    };
+    $('bf-to').onchange = () => { readBatchForm(); refresh(); };
+    $('bf-qty').oninput = () => { readBatchForm(); refresh(); };
+    $('bf-tags').oninput = () => { readBatchForm(); refresh(); };
+    if ($('bf-fromnote')) $('bf-fromnote').oninput = () => readBatchForm();
+    $('bf-loc').oninput = () => readBatchForm();
+    $('bf-note').oninput = () => readBatchForm();
+    refresh();
+
+    $('bf-save').onclick = async () => {
+      readBatchForm();
+      const f = state.form;
+      const qty = parseInt(f.qty, 10) || 0;
+      if (!f.to_container_id) { toast('Pick the destination container', true); return; }
+      if (qty <= 0) { toast('How many plants?', true); return; }
+      if (!f.from_stock_id && !trim(f.from_note)) {
+        toast('Name the source — a stock row or a note', true); return;
+      }
+      const btn = $('bf-save');
+      btn.disabled = true; btn.textContent = 'Recording…';
+      const payload = {
+        action: 'record_pot_up',
+        species_id: state.speciesId,
+        to_container_id: f.to_container_id,
+        qty: String(qty),
+        performed_by: ME,
+        from_stock_id: f.from_stock_id ? String(f.from_stock_id) : '',
+        from_note: trim(f.from_note),
+        mix_material_id: '',
+        tags_used: f.tags_used == null ? '' : String(parseInt(f.tags_used, 10) || 0),
+        to_status: 'growing',
+        location: trim(f.location),
+        note: trim(f.note)
+      };
+      try {
+        const data = await postAction(payload);
+        state.result = data.result || data;
+        toast('Batch recorded');
+        render();
+        load(true);   // resync counts + stock quietly
+      } catch (e) {
+        btn.disabled = false; btn.textContent = 'Record batch';
+        toast('Not recorded: ' + e.message, true);
+      }
+    };
+  }
+
+  function wireGuidanceEdit(sid) {
+    $('ge-cancel').onclick = () => { state.editGuidance = false; render(); };
+    $('ge-save').onclick = async () => {
+      const btn = $('ge-save');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        const data = await postAction({
+          action: 'upsert_guidance',
+          species_id: sid,
+          mix_material_id: trim($('ge-mix').value),
+          fert_note: trim($('ge-fert').value),
+          container_progression: trim($('ge-prog').value),
+          season_note: trim($('ge-season').value),
+          note: trim($('ge-note').value),
+          confirmed_by: ME
+        });
+        const r = data.result || {};
+        if (r.status === 'error') throw new Error(r.message || r.code);
+        toast('Exceptions saved');
+        state.editGuidance = false;
+        await load(true);
+        render();
+      } catch (e) {
+        btn.disabled = false; btn.textContent = 'Save exceptions';
+        toast('Not saved: ' + e.message, true);
+      }
+    };
+    const clr = $('ge-clear');
+    if (clr) clr.onclick = async () => {
+      clr.disabled = true;
+      try {
+        await postAction({ action: 'clear_guidance', species_id: sid, confirmed_by: ME });
+        toast('Back to house default');
+        state.editGuidance = false;
+        await load(true);
+        render();
+      } catch (e) {
+        clr.disabled = false;
+        toast('Not cleared: ' + e.message, true);
+      }
+    };
+  }
+
+  // ── supplies tab ───────────────────────────────────────────────────────────
+  function supplyRowHtml(s) {
+    const chips = [];
+    if (s.below_reorder) chips.push('<span class="tag low">low</span>');
+    if (s.uncounted) chips.push('<span class="tag uncounted">uncounted</span>');
+    if (s.open_task_id) chips.push('<span class="tag task">task #' + s.open_task_id + '</span>');
+    let h = '<div class="sup-row' + (s.below_reorder ? ' low' : '') + '" data-sup="' + esc(s.supply_id) + '">';
+    h += '<div class="top"><div class="nm">' + esc(s.label) +
+      (s.species_common_name && s.item_kind === 'tag'
+        ? '<span class="sci">' + esc(s.species_common_name) + '</span>' : '') +
+      '</div>' + chips.join('') +
+      '<div class="cnt">' + (s.on_hand == null ? '—' : s.on_hand) +
+      ' <small>' + esc(s.unit) +
+      (s.reorder_point != null ? ' · reorder at ' + s.reorder_point : '') + '</small></div></div>';
+    if (state.expanded === s.supply_id) {
+      h += '<div class="sup-edit">' +
+        '<div class="row"><label>Recount to</label><input type="number" min="0" inputmode="numeric" id="se-count">' +
+        '<button type="button" id="se-recount">Save count</button></div>' +
+        '<div class="row"><label>Received</label><input type="number" min="1" inputmode="numeric" id="se-recv">' +
+        '<button type="button" id="se-receive">Add</button></div>' +
+        '<div class="row"><label>Reorder at</label><input type="number" min="0" inputmode="numeric" id="se-rp" value="' +
+        (s.reorder_point == null ? '' : s.reorder_point) + '">' +
+        '<button type="button" id="se-setrp">Set</button></div></div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  function renderSupplies() {
+    const el = $('tab-supplies');
+    const sup = (state.data.supplies || []).slice();
+    if (!sup.length) { el.innerHTML = '<div class="msg">No supplies yet.</div>'; return; }
+    const low = sup.filter(s => s.below_reorder);
+    const uncounted = sup.filter(s => !s.below_reorder && s.uncounted);
+    const rest = sup.filter(s => !s.below_reorder && !s.uncounted);
+    const byKind = { pot: [], media: [], tag: [] };
+    rest.forEach(s => (byKind[s.item_kind] = byKind[s.item_kind] || []).push(s));
+    let h = '';
+    if (low.length) h += '<div class="kindhead">Below reorder point</div>' + low.map(supplyRowHtml).join('');
+    if (uncounted.length) h += '<div class="kindhead">Uncounted — tap to count</div>' + uncounted.map(supplyRowHtml).join('');
+    [['pot', 'Pots'], ['media', 'Media'], ['tag', 'Tags']].forEach(([k, label]) => {
+      if (byKind[k] && byKind[k].length) h += '<div class="kindhead">' + label + '</div>' + byKind[k].map(supplyRowHtml).join('');
+    });
+    h += '<div class="actions"><button type="button" class="btn-plain" id="sup-add">Add a supply item</button></div>';
+    if (state.addingItem) h += addItemHtml();
+    el.innerHTML = h;
+
+    el.querySelectorAll('.sup-row .top').forEach(top => {
+      top.onclick = () => {
+        const id = top.parentNode.getAttribute('data-sup');
+        state.expanded = state.expanded === id ? null : id;
+        render();
+      };
+    });
+    if (state.expanded) wireSupplyEdit(state.expanded);
+    $('sup-add').onclick = () => { state.addingItem = !state.addingItem; render(); };
+    if (state.addingItem) wireAddItem();
+  }
+
+  function wireSupplyEdit(supplyId) {
+    const doPost = async (payload, okMsg) => {
+      try {
+        const data = await postAction(payload);
+        const r = data.result || {};
+        if (r.status === 'error') throw new Error(r.message || r.code);
+        toast(okMsg);
+        state.expanded = null;
+        await load(true);
+        render();
+      } catch (e) { toast('Failed: ' + e.message, true); }
+    };
+    $('se-recount').onclick = () => {
+      const v = $('se-count').value;
+      if (v === '' || Number(v) < 0) { toast('Enter the count you see', true); return; }
+      doPost({ action: 'recount_supply', supply_id: supplyId, new_on_hand: String(parseInt(v, 10)),
+               actor: ME }, 'Count saved');
+    };
+    $('se-receive').onclick = () => {
+      const v = parseInt($('se-recv').value, 10) || 0;
+      if (v <= 0) { toast('How many came in?', true); return; }
+      doPost({ action: 'receive_supply', supply_id: supplyId, qty_delta: String(v), actor: ME },
+             'Received +' + v);
+    };
+    $('se-setrp').onclick = () => {
+      const v = $('se-rp').value;
+      doPost({ action: 'set_reorder_point', supply_id: supplyId,
+               reorder_point: v === '' ? '' : String(parseInt(v, 10)), actor: ME },
+             v === '' ? 'Reorder tracking off' : 'Reorder point set');
+    };
+  }
+
+  function addItemHtml() {
+    const containers = state.data.containers || [];
+    const mats = state.data.materials || [];
+    const species = state.data.species || [];
+    return '<div class="card" id="add-item">' +
+      '<h3 style="margin-bottom:8px">New supply item</h3>' +
+      '<div class="group"><div class="label">Kind</div><select id="ai-kind">' +
+      '<option value="pot">Pots (a container type)</option>' +
+      '<option value="media">Media (a registered material)</option>' +
+      '<option value="tag">Tags (a species)</option></select></div>' +
+      '<div class="group" id="ai-wrap-pot"><div class="label">Container</div><select id="ai-container">' +
+      containers.map(c => '<option value="' + esc(c.container_id) + '">' + esc(c.container_id) + '</option>').join('') +
+      '</select></div>' +
+      '<div class="group" id="ai-wrap-media" style="display:none"><div class="label">Material</div><select id="ai-material">' +
+      mats.map(m => '<option value="' + esc(m.material_id) + '">' + esc(m.product_name) + '</option>').join('') +
+      '</select></div>' +
+      '<div class="group" id="ai-wrap-tag" style="display:none"><div class="label">Species</div><select id="ai-species">' +
+      species.map(s => '<option value="' + esc(s.species_id) + '">' + esc(s.common_name || s.species_id) + '</option>').join('') +
+      '</select></div>' +
+      '<div class="half">' +
+      '<div class="group"><div class="label">Unit</div><input type="text" id="ai-unit" value="each"></div>' +
+      '<div class="group"><div class="label">Reorder at (optional)</div>' +
+      '<input type="number" id="ai-rp" min="0" inputmode="numeric"></div></div>' +
+      '<div class="actions"><button type="button" class="btn-primary" id="ai-save">Add item</button></div></div>';
+  }
+
+  function wireAddItem() {
+    $('ai-kind').onchange = () => {
+      const k = $('ai-kind').value;
+      $('ai-wrap-pot').style.display = k === 'pot' ? '' : 'none';
+      $('ai-wrap-media').style.display = k === 'media' ? '' : 'none';
+      $('ai-wrap-tag').style.display = k === 'tag' ? '' : 'none';
+    };
+    $('ai-save').onclick = async () => {
+      const k = $('ai-kind').value;
+      const payload = {
+        action: 'add_supply_item', item_kind: k,
+        container_id: k === 'pot' ? $('ai-container').value : '',
+        material_id: k === 'media' ? $('ai-material').value : '',
+        species_id: k === 'tag' ? $('ai-species').value : '',
+        unit: trim($('ai-unit').value) || 'each',
+        reorder_point: $('ai-rp').value === '' ? '' : String(parseInt($('ai-rp').value, 10)),
+        actor: ME
+      };
+      try {
+        const data = await postAction(payload);
+        const r = data.result || {};
+        if (r.status === 'error') throw new Error(r.message || r.code);
+        toast('Item added');
+        state.addingItem = false;
+        await load(true);
+        render();
+      } catch (e) { toast('Not added: ' + e.message, true); }
+    };
+  }
+
+  // ── root render ────────────────────────────────────────────────────────────
+  function render() {
+    if (!state.data) return;
+    renderTabs();
+    $('tab-pot').style.display = state.tab === 'pot' ? '' : 'none';
+    $('tab-supplies').style.display = state.tab === 'supplies' ? '' : 'none';
+    if (state.tab === 'pot') renderPot();
+    else renderSupplies();
+  }
+
+  window.appLoad = () => load(false);
+  load(false);
+})();
+</script>
+</body>
+</html>

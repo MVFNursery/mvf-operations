@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="20" fill="#2d3319"/>
+  <!-- sprout -->
+  <path d="M50 46 V30" stroke="#b8c4a0" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <path d="M50 34 C46 26 38 24 32 26 C34 34 42 38 50 34 Z" fill="#8faa5e"/>
+  <path d="M50 30 C54 22 62 20 68 22 C66 30 58 34 50 30 Z" fill="#b8c4a0"/>
+  <!-- pot -->
+  <path d="M28 48 h44 l-3 8 h-38 Z" fill="#c77b46"/>
+  <path d="M33 58 h34 l-5 24 h-24 Z" fill="#a9622f"/>
+</svg>

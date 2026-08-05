@@ -1,0 +1,22 @@
+{
+  "id": "/mvf-operations/potting",
+  "name": "MVFN Potting Bench",
+  "short_name": "Potting",
+  "description": "Potting-up guidance, supply counts, and batch recording",
+  "start_url": "/mvf-operations/mvfn_potting.html",
+  "scope": "/mvf-operations/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f5f0",
+  "theme_color": "#2d3319",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/mvf-operations/icon-potting.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"]
+}
