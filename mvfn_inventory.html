@@ -66,6 +66,31 @@
   .addform .speciesnote { font-size: 0.72rem; min-height: 1em; margin: 0 0 8px; }
   .addform .speciesnote.match { color: #047857; }
   .addform .speciesnote.new { color: #b45309; }
+
+  /* Species typeahead. A <datalist> can't do this: it can only offer strings,
+     with no way to show provenance or to carry the master's ids back. */
+  .addform .tawrap { position: relative; }
+  .addform .taresults {
+    display: none; position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 2px);
+    max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: white; border: 2px solid #5a6b2d; border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.14);
+  }
+  .addform .taresults.show { display: block; }
+  .addform .taitem {
+    padding: 10px 12px; border-bottom: 1px solid #eceade; cursor: pointer; line-height: 1.35;
+  }
+  .addform .taitem:last-child { border-bottom: none; }
+  .addform .taitem.active { background: #f2f5e6; }
+  .addform .taitem .taname { font-size: 0.86rem; color: #2d3319; }
+  .addform .taitem .tasci { font-size: 0.74rem; color: #6b7280; font-style: italic; }
+  .addform .tabadge {
+    display: inline-block; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 1px 6px; border-radius: 10px; margin-left: 6px; vertical-align: 1px;
+  }
+  .addform .tabadge.carried { background: #dcf0e2; color: #047857; }
+  .addform .tabadge.master  { background: #e8e6f5; color: #5b4b9a; }
+  .addform .taempty { padding: 10px 12px; font-size: 0.78rem; color: #8a8a7a; }
   .addform .newspecies { display: none; }
   .addform .newspecies.show { display: block; }
   .addform .nativechk { display: flex; align-items: center; gap: 6px; font-size: 0.8rem;
@@ -242,9 +267,10 @@
     <button class="addbtn" id="addBtn" type="button">+ Add Stock</button>
     <div class="addform" id="addForm">
       <h2>Add Stock</h2>
-      <div class="row">
-        <input list="speciesList" id="addSpecies" placeholder="Species (type to search)" autocomplete="off">
-        <datalist id="speciesList"></datalist>
+      <div class="row tawrap">
+        <input id="addSpecies" placeholder="Species (type to search)" autocomplete="off"
+               autocorrect="off" autocapitalize="none" spellcheck="false">
+        <div class="taresults" id="speciesResults"></div>
       </div>
       <div class="speciesnote" id="speciesNote"></div>
       <div class="newspecies" id="newSpecies">
@@ -313,6 +339,17 @@
   let speciesList = [];
   let containerList = [];
 
+  // The curated PA-native master (species_ref.species, ~1749 rows / ~271 kB).
+  // Fetched lazily on first open of the Add Stock form, never on app load — it is
+  // only needed while adding, and it is ~4x the size of everything else combined.
+  let refSpecies = [];
+  let refState = 'idle';   // idle | loading | ready | failed
+  // The row the user actually picked, if any. Free-typed text leaves this null,
+  // which is what distinguishes "chose a known plant" from "invented a name".
+  let pickedSpecies = null;
+  let taMatches = [];
+  let taActive = -1;
+
   const $ = id => document.getElementById(id);
 
   function speciesKey(v) { return v == null ? '' : String(v); }
@@ -328,7 +365,6 @@
       speciesList = (data.species || []).slice();
       speciesList.forEach(sp => { speciesById[speciesKey(sp.species_id)] = sp; });
       containerList = (data.containers || []).slice();
-      buildSpeciesDatalist();
       buildContainerDatalist();
       $('controls').style.display = 'flex';
       $('updated').textContent = 'Updated ' + new Date().toLocaleString();
@@ -358,14 +394,21 @@
     return data;
   }
 
-  function buildSpeciesDatalist() {
-    $('speciesList').innerHTML = speciesList
-      .slice()
-      .sort((a, b) => (a.common_name || '').localeCompare(b.common_name || ''))
-      .map(sp => {
-        const label = `${sp.common_name || sp.species_id}${sp.scientific_name ? ' — ' + sp.scientific_name : ''}`;
-        return `<option value="${esc(label)}" data-id="${esc(sp.species_id)}"></option>`;
-      }).join('');
+  // Pull the curated master once per session. Failure is not fatal: the form
+  // still works against what we carry, it just can't offer anything new.
+  async function ensureRefSpecies() {
+    if (refState === 'ready' || refState === 'loading') return;
+    refState = 'loading';
+    onSpeciesInput();
+    try {
+      const data = await postAction({ action: 'list_ref_species' });
+      const rows = (data && data.result && data.result.ref_species) || [];
+      refSpecies = Array.isArray(rows) ? rows : [];
+      refState = refSpecies.length ? 'ready' : 'failed';
+    } catch (err) {
+      refState = 'failed';
+    }
+    onSpeciesInput();
   }
 
   // Canonical containers from inventory.container -> shared datalist (add form + cards).
@@ -586,19 +629,6 @@
   }
 
   // ---- Add Stock ----
-  function resolveSpeciesId(typed) {
-    const val = typed.trim();
-    if (!val) return '';
-    // datalist option value is "Common — Scientific"; match it, else match common/sci/id directly.
-    const opt = Array.from($('speciesList').options).find(o => o.value === val);
-    if (opt) return opt.getAttribute('data-id');
-    const low = val.toLowerCase();
-    const hit = speciesList.find(sp =>
-      (sp.common_name || '').toLowerCase() === low ||
-      (sp.scientific_name || '').toLowerCase() === low ||
-      speciesKey(sp.species_id).toLowerCase() === low);
-    return hit ? hit.species_id : '';
-  }
 
   // "Chester Thornless Blackberry" -> "chester-thornless-blackberry"
   function slugify(s) {
@@ -606,20 +636,169 @@
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
 
-  // Live feedback as the species field changes: matched existing vs. new-to-create.
-  function onSpeciesInput() {
+  function taNorm(s) {
+    return String(s == null ? '' : s).toLowerCase()
+      .replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  // One search row per candidate. `carried` rows are what we already stock;
+  // `master` rows are the curated PA-native list. A carried row that is linked to
+  // the master is emitted once, as carried, so the same plant never appears twice.
+  function taCandidates() {
+    const out = [];
+    const linkedRefIds = new Set();
+    speciesList.forEach(sp => {
+      if (sp.species_ref_id) linkedRefIds.add(String(sp.species_ref_id));
+      out.push({
+        source: 'carried',
+        species_id: sp.species_id,
+        species_ref_id: sp.species_ref_id || '',
+        common_name: sp.common_name || '',
+        scientific_name: sp.scientific_name || '',
+        alternate_names: '',
+        is_true_native: sp.is_true_native === true,
+      });
+    });
+    refSpecies.forEach(r => {
+      // Already carried under this exact key, or linked to from a carried row.
+      if (linkedRefIds.has(String(r.species_id))) return;
+      if (speciesById[speciesKey(r.species_id)]) return;
+      out.push({
+        source: 'master',
+        species_id: r.species_id,
+        species_ref_id: r.species_id,
+        common_name: r.common_name || '',
+        scientific_name: r.scientific_name || '',
+        alternate_names: r.alternate_names || '',
+        is_true_native: r.is_true_native === true,
+      });
+    });
+    return out;
+  }
+
+  // Rank: exact name beats prefix beats substring; within a tier, what we already
+  // carry sorts first, because the overwhelmingly common case is restocking.
+  // alternate_names is searched but scored lowest — it is how "tamarack" reaches
+  // Larix laricina, and how a tag name reaches the ERA master's preferred name.
+  function taSearch(query) {
+    const q = taNorm(query);
+    if (q.length < 2) return [];
+    const scored = [];
+    taCandidates().forEach(c => {
+      const common = taNorm(c.common_name);
+      const sci = taNorm(c.scientific_name);
+      const slug = taNorm(c.species_id).replace(/-/g, ' ');
+      const alts = (c.alternate_names || '').split(';').map(taNorm).filter(Boolean);
+      // In a botanical common name the head noun is last and the modifiers lead:
+      // "Common Buttonbush" is a buttonbush, "buttonbush dodder" is a dodder. So a
+      // match on the trailing word outranks a match on a leading one — otherwise
+      // searching "buttonbush" puts a parasitic vine above the shrub you meant.
+      const headMatch = common === q || common.endsWith(' ' + q);
+      let score = -1;
+      if (common === q || sci === q) score = 100;
+      else if (headMatch) score = 85;
+      else if (common.startsWith(q) || sci.startsWith(q)) score = 80;
+      else if (alts.some(a => a === q)) score = 70;
+      else if (common.includes(q) || sci.includes(q)) score = 50;
+      else if (slug.startsWith(q)) score = 45;
+      else if (alts.some(a => a.startsWith(q))) score = 40;
+      else if (alts.some(a => a.includes(q))) score = 25;
+      if (score < 0) return;
+      if (c.source === 'carried') score += 8;
+      scored.push({ c, score });
+    });
+    scored.sort((a, b) =>
+      b.score - a.score ||
+      (a.c.common_name || a.c.scientific_name).localeCompare(b.c.common_name || b.c.scientific_name));
+    return scored.slice(0, 25).map(x => x.c);
+  }
+
+  function renderTaResults() {
+    const box = $('speciesResults');
+    if (!taMatches.length) { box.classList.remove('show'); box.innerHTML = ''; return; }
+    box.innerHTML = taMatches.map((c, i) => {
+      const badge = c.source === 'carried'
+        ? '<span class="tabadge carried">in stock</span>'
+        : '<span class="tabadge master">curated</span>';
+      const sci = c.scientific_name ? `<div class="tasci">${esc(c.scientific_name)}</div>` : '';
+      return `<div class="taitem${i === taActive ? ' active' : ''}" data-i="${i}">
+        <div class="taname">${esc(c.common_name || c.species_id)}${badge}</div>${sci}</div>`;
+    }).join('');
+    box.classList.add('show');
+  }
+
+  function hideTaResults() {
+    taMatches = []; taActive = -1;
+    $('speciesResults').classList.remove('show');
+    $('speciesResults').innerHTML = '';
+  }
+
+  // Choosing from the list is what carries the master's identity across. Free
+  // typing still works, but only a pick can set species_ref_id — which is the
+  // whole point: an unlinked species should be a deliberate act, not the default.
+  function pickSpecies(c) {
+    pickedSpecies = c;
+    $('addSpecies').value = c.common_name || c.scientific_name || c.species_id;
+    $('addSci').value = c.scientific_name || '';
+    $('addNative').checked = !!c.is_true_native;
+    hideTaResults();
+    updateSpeciesNote();
+  }
+
+  function updateSpeciesNote() {
     const typed = $('addSpecies').value.trim();
     const note = $('speciesNote');
     const block = $('newSpecies');
-    if (!typed) { note.textContent = ''; note.className = 'speciesnote'; block.classList.remove('show'); return; }
-    if (resolveSpeciesId(typed)) {
-      note.textContent = '✓ existing species';
-      note.className = 'speciesnote match';
-      block.classList.remove('show');
-    } else {
-      note.textContent = `✚ new species — will be created as “${typed}” (${slugify(typed)})`;
-      note.className = 'speciesnote new';
-      block.classList.add('show');
+    const set = (txt, cls, showNew) => {
+      note.textContent = txt;
+      note.className = 'speciesnote' + (cls ? ' ' + cls : '');
+      block.classList.toggle('show', showNew);
+    };
+
+    if (!typed) { set('', '', false); return; }
+
+    if (pickedSpecies && pickedSpecies.source === 'carried') {
+      set('✓ already in stock — adding another container/batch', 'match', false);
+      return;
+    }
+    if (pickedSpecies && pickedSpecies.source === 'master') {
+      set(`✚ new to us — will be created as ${pickedSpecies.species_id}, linked to the curated master`, 'match', true);
+      return;
+    }
+    if (refState === 'loading') { set('Loading the curated species list…', '', false); return; }
+    if (refState === 'failed') {
+      set(`⚠ curated list unavailable — “${typed}” will be created unlinked (${slugify(typed)})`, 'new', true);
+      return;
+    }
+    set(`⚠ no match in the curated list — “${typed}” will be created unlinked (${slugify(typed)}). Pick from the list if you can.`, 'new', true);
+  }
+
+  function onSpeciesInput() {
+    // Any keystroke invalidates a previous pick — otherwise editing the text
+    // after choosing would silently keep the old plant's identity.
+    pickedSpecies = null;
+    const typed = $('addSpecies').value;
+    taMatches = taSearch(typed);
+    taActive = -1;
+    renderTaResults();
+    updateSpeciesNote();
+  }
+
+  function onSpeciesKeydown(e) {
+    if (!taMatches.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      taActive += (e.key === 'ArrowDown' ? 1 : -1);
+      if (taActive < 0) taActive = taMatches.length - 1;
+      if (taActive >= taMatches.length) taActive = 0;
+      renderTaResults();
+      const el = $('speciesResults').querySelector('.taitem.active');
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && taActive >= 0) {
+      e.preventDefault();
+      pickSpecies(taMatches[taActive]);
+    } else if (e.key === 'Escape') {
+      hideTaResults();
     }
   }
 
@@ -629,6 +808,8 @@
     $('addMsg').textContent = '';
     $('speciesNote').textContent = ''; $('speciesNote').className = 'speciesnote';
     $('newSpecies').classList.remove('show');
+    pickedSpecies = null;
+    hideTaResults();
   }
 
   async function submitAddStock() {
@@ -639,9 +820,22 @@
     const qty = qtyRaw === '' ? 0 : parseInt(qtyRaw, 10);
     if (isNaN(qty) || qty < 0) { addMsg.textContent = 'Qty must be ≥ 0.'; return; }
 
-    let speciesId = resolveSpeciesId(typed);
-    const isNew = !speciesId;
-    if (isNew) speciesId = slugify(typed);
+    // Three cases, in order of preference:
+    //   carried  -> reuse the existing inventory key, create nothing.
+    //   master   -> create using the SCIENTIFIC slug and carry species_ref_id, so
+    //               the row is born linked. This is the case that was impossible
+    //               before and that produced the 2026-08-04 orphans.
+    //   free text-> last resort; slugify the typed name and create it unlinked.
+    let speciesId, speciesRefId = '';
+    if (pickedSpecies && pickedSpecies.source === 'carried') {
+      speciesId = pickedSpecies.species_id;
+    } else if (pickedSpecies && pickedSpecies.source === 'master') {
+      speciesId = pickedSpecies.species_id;
+      speciesRefId = pickedSpecies.species_ref_id || '';
+    } else {
+      speciesId = slugify(typed);
+    }
+    const isNew = !speciesById[speciesKey(speciesId)];
     if (!speciesId) { addMsg.textContent = 'Species name needs at least one letter or number.'; return; }
 
     const btn = $('addSave'); btn.disabled = true;
@@ -651,9 +845,12 @@
         await postAction({
           action: 'add_species',
           species_id: speciesId,
-          common_name: typed,
+          // Keep the master's common name when one was picked; it is the curated
+          // label, and the typed text may be a synonym or a tag name.
+          common_name: (pickedSpecies && pickedSpecies.common_name) || typed,
           scientific_name: $('addSci').value.trim(),
           is_true_native: $('addNative').checked ? 'true' : '',
+          species_ref_id: speciesRefId,
         });
       }
       addMsg.textContent = 'Adding stock…';
@@ -837,9 +1034,26 @@
     if (e.target.closest('.editor')) return;
     card.classList.toggle('editing');
   });
-  $('addBtn').addEventListener('click', () => $('addForm').classList.toggle('open'));
+  // Opening the form is the trigger for pulling the curated master — early enough
+  // that it is loaded before the first keystroke lands, late enough that browsing
+  // stock never pays for it.
+  $('addBtn').addEventListener('click', () => {
+    const open = $('addForm').classList.toggle('open');
+    if (open) ensureRefSpecies();
+  });
   $('addCancel').addEventListener('click', () => { $('addForm').classList.remove('open'); resetAddForm(); });
   $('addSpecies').addEventListener('input', onSpeciesInput);
+  $('addSpecies').addEventListener('keydown', onSpeciesKeydown);
+  $('addSpecies').addEventListener('focus', () => { ensureRefSpecies(); onSpeciesInput(); });
+  // mousedown, not click: it fires before the input's blur, so the pick isn't
+  // cancelled by the list closing out from under the tap.
+  $('speciesResults').addEventListener('mousedown', e => {
+    const item = e.target.closest('.taitem');
+    if (!item) return;
+    e.preventDefault();
+    pickSpecies(taMatches[Number(item.dataset.i)]);
+  });
+  $('addSpecies').addEventListener('blur', () => setTimeout(hideTaResults, 150));
   $('addStatus').addEventListener('change', () => {
     if ($('addStatus').value === 'for-sale' && !$('addLocation').value.trim()) $('addLocation').value = 'retail';
   });
