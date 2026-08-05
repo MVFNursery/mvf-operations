@@ -91,6 +91,13 @@
   .addform .tabadge.carried { background: #dcf0e2; color: #047857; }
   .addform .tabadge.master  { background: #e8e6f5; color: #5b4b9a; }
   .addform .taempty { padding: 10px 12px; font-size: 0.78rem; color: #8a8a7a; }
+  /* The results list overlays .speciesnote, so an ambiguity warning has to live
+     inside the list or the user never sees the one message that matters. */
+  .addform .tawarn {
+    padding: 8px 12px; font-size: 0.72rem; line-height: 1.35;
+    background: #fdf3e3; color: #92400e; border-bottom: 2px solid #f0c98a;
+    position: sticky; top: 0;
+  }
   .addform .newspecies { display: none; }
   .addform .newspecies.show { display: block; }
   .addform .nativechk { display: flex; align-items: center; gap: 6px; font-size: 0.8rem;
@@ -344,6 +351,11 @@
   // only needed while adding, and it is ~4x the size of everything else combined.
   let refSpecies = [];
   let refState = 'idle';   // idle | loading | ready | failed
+  // Normalised common names that resolve to MORE THAN ONE species. GBIF lists
+  // "Juniper" as a vernacular for Larix laricina, and Juniperus communis is in
+  // the master too -- so a picker that auto-resolved "juniper" would quietly
+  // book a larch. These names must be disambiguated by hand, never guessed.
+  let ambiguousNames = new Set();
   // The row the user actually picked, if any. Free-typed text leaves this null,
   // which is what distinguishes "chose a known plant" from "invented a name".
   let pickedSpecies = null;
@@ -402,8 +414,10 @@
     onSpeciesInput();
     try {
       const data = await postAction({ action: 'list_ref_species' });
-      const rows = (data && data.result && data.result.ref_species) || [];
+      const res = (data && data.result) || {};
+      const rows = res.ref_species || [];
       refSpecies = Array.isArray(rows) ? rows : [];
+      ambiguousNames = new Set(Array.isArray(res.ambiguous_names) ? res.ambiguous_names : []);
       refState = refSpecies.length ? 'ready' : 'failed';
     } catch (err) {
       refState = 'failed';
@@ -636,9 +650,15 @@
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
 
+  // Must mirror species_ref.norm_common_name() — the app and the DB have to
+  // agree on what "the same name" is, or the ambiguity list won't match.
   function taNorm(s) {
     return String(s == null ? '' : s).toLowerCase()
       .replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function isAmbiguousName(typed) {
+    return ambiguousNames.has(taNorm(typed));
   }
 
   // One search row per candidate. `carried` rows are what we already stock;
@@ -647,15 +667,25 @@
   function taCandidates() {
     const out = [];
     const linkedRefIds = new Set();
+    const refById = {};
+    refSpecies.forEach(r => { refById[String(r.species_id)] = r; });
     speciesList.forEach(sp => {
       if (sp.species_ref_id) linkedRefIds.add(String(sp.species_ref_id));
+      // A carried row that is linked to the master inherits the master's synonyms.
+      // Without this the plants we actually stock are the ONLY ones with no
+      // synonym search, because they get deduped out of the master list below --
+      // "Tamarack" would fail to find the Larix laricina sitting in the yard.
+      const ref = refById[String(sp.species_ref_id || sp.species_id)];
       out.push({
         source: 'carried',
         species_id: sp.species_id,
         species_ref_id: sp.species_ref_id || '',
         common_name: sp.common_name || '',
-        scientific_name: sp.scientific_name || '',
-        alternate_names: '',
+        scientific_name: sp.scientific_name || (ref ? ref.scientific_name : '') || '',
+        alternate_names: (ref && ref.alternate_names) || '',
+        // The master's own common name is a synonym too when our retail label
+        // differs from it ("Larch" here, "Tamarack" there).
+        extra_name: (ref && ref.common_name) || '',
         is_true_native: sp.is_true_native === true,
       });
     });
@@ -688,7 +718,8 @@
       const common = taNorm(c.common_name);
       const sci = taNorm(c.scientific_name);
       const slug = taNorm(c.species_id).replace(/-/g, ' ');
-      const alts = (c.alternate_names || '').split(';').map(taNorm).filter(Boolean);
+      const alts = ((c.alternate_names || '') + ';' + (c.extra_name || ''))
+        .split(';').map(taNorm).filter(Boolean).filter(a => a !== common);
       // In a botanical common name the head noun is last and the modifiers lead:
       // "Common Buttonbush" is a buttonbush, "buttonbush dodder" is a dodder. So a
       // match on the trailing word outranks a match on a leading one — otherwise
@@ -716,7 +747,11 @@
   function renderTaResults() {
     const box = $('speciesResults');
     if (!taMatches.length) { box.classList.remove('show'); box.innerHTML = ''; return; }
-    box.innerHTML = taMatches.map((c, i) => {
+    const typed = $('addSpecies').value.trim();
+    const warn = isAmbiguousName(typed)
+      ? `<div class="tawarn">⚠ “${esc(typed)}” is used for more than one plant — check the botanical name before picking.</div>`
+      : '';
+    box.innerHTML = warn + taMatches.map((c, i) => {
       const badge = c.source === 'carried'
         ? '<span class="tabadge carried">in stock</span>'
         : '<span class="tabadge master">curated</span>';
@@ -768,6 +803,13 @@
     if (refState === 'loading') { set('Loading the curated species list…', '', false); return; }
     if (refState === 'failed') {
       set(`⚠ curated list unavailable — “${typed}” will be created unlinked (${slugify(typed)})`, 'new', true);
+      return;
+    }
+    // The typed name is a real name, but it means more than one plant. Refuse to
+    // guess -- show it and make the choice explicit.
+    if (isAmbiguousName(typed)) {
+      const n = taSearch(typed).length;
+      set(`⚠ “${typed}” is used for more than one plant${n ? ` (${n} matches)` : ''} — pick the one you mean from the list`, 'new', false);
       return;
     }
     set(`⚠ no match in the curated list — “${typed}” will be created unlinked (${slugify(typed)}). Pick from the list if you can.`, 'new', true);
@@ -833,6 +875,14 @@
       speciesId = pickedSpecies.species_id;
       speciesRefId = pickedSpecies.species_ref_id || '';
     } else {
+      // Free text that happens to be a name shared by several plants is the one
+      // case worth blocking outright: slugifying it would mint a species whose
+      // name does not identify what is actually in the pot.
+      if (isAmbiguousName(typed)) {
+        addMsg.textContent = `“${typed}” means more than one plant — pick the one you mean from the list.`;
+        onSpeciesInput();
+        return;
+      }
       speciesId = slugify(typed);
     }
     const isNew = !speciesById[speciesKey(speciesId)];
