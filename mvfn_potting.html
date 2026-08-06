@@ -265,10 +265,9 @@
              (s.scientific_name || '').toLowerCase().includes(q) ||
              s.species_id.toLowerCase().includes(q);
     });
-    // stocked species first — that's what's on the bench
-    rows.sort((a, b) => ((withStock[b.species_id] || 0) - (withStock[a.species_id] || 0)) ||
-                        (a.common_name || a.species_id).localeCompare(b.common_name || b.species_id));
-    if (!q) rows = rows.slice(0, 40);
+    // alphabetical by common name — matches what's written on a prop-flat tag
+    rows.sort((a, b) =>
+      (a.common_name || a.species_id).localeCompare(b.common_name || b.species_id));
     if (!rows.length) return '<div class="msg">No species match.</div>';
     return rows.map(s => {
       const g = guidanceOf(s.species_id);
@@ -302,10 +301,8 @@
     let h = '';
     h += '<div class="gline"><div class="k">Mix</div><div class="v">' +
       (mix.isException
-        ? '<div class="exc"><b>' + esc(mix.label) + '</b> — species exception, not the house mix.' +
-          (mix.notes ? '<div class="recipe">' + esc(mix.notes) + '</div>' : '') + '</div>'
-        : '<b>' + esc(mix.label) + '</b> (house default)' +
-          (mix.notes ? '<div class="recipe">' + esc(mix.notes) + '</div>' : '')) +
+        ? '<div class="exc"><b>' + esc(mix.label) + '</b> — species exception, not the house mix.</div>'
+        : '<b>' + esc(mix.label) + '</b> (house default)') +
       '</div></div>';
     h += '<div class="gline"><div class="k">Fertilizer</div><div class="v">' +
       (g && g.fert_note
@@ -337,7 +334,10 @@
 
   function guidanceEditHtml(sid) {
     const g = guidanceOf(sid) || {};
-    const mats = state.data.materials || [];
+    // the house mix is already the "(default)" option — listing its material
+    // again would look like a second house mix
+    const houseMix = (state.data.defaults || {}).mix_material_id;
+    const mats = (state.data.materials || []).filter(m => m.material_id !== houseMix);
     let h = '<div class="group"><div class="label">Mix override (blank = house mix)</div>' +
       '<select id="ge-mix"><option value="">house mix (default)</option>' +
       mats.map(m => '<option value="' + esc(m.material_id) + '"' +
