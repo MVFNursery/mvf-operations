@@ -200,6 +200,7 @@
   /* TASK CONTENT */
   .task-content { flex: 1; padding: 12px 8px 12px 0; min-width: 0; cursor: pointer; }
   .task-desc { font-size: 14px; line-height: 1.4; color: var(--text); word-break: break-word; }
+  .task-id { font-size: 11px; font-weight: 400; color: var(--text2); margin-left: 6px; white-space: nowrap; text-decoration: none; display: inline-block; }
   .task-card.done .task-desc { color: var(--done-text); text-decoration: line-through; text-decoration-color: var(--done-text); }
   .task-meta { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
   .badge { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 500; }
@@ -736,7 +737,7 @@ function closedCard(t) {
       <div class="task-main">
         <div class="closed-mark">${cancelled ? '✕' : '✓'}</div>
         <div class="task-content">
-          <div class="task-desc">${escH(t.title||'(no title)')}</div>
+          <div class="task-desc">${escH(t.title||'(no title)')}${id?` <span class="task-id">#${esc(id)}</span>`:''}</div>
           <div class="task-meta">
             <span class="badge badge-closed">${cancelled ? 'Cancelled' : 'Done'}${escH(closedWhen(t))}</span>
             ${(!cancelled && t.completed_by)?`<span class="badge badge-assignee">👤 ${escH(userLabel(t.completed_by))}</span>`:''}
@@ -779,7 +780,7 @@ function proposedCard(t) {
       <div class="task-main">
         <div style="width:56px;min-height:64px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💡</div>
         <div class="task-content" onclick="toggleExpand('${esc(id)}')">
-          <div class="task-desc">${escH(t.title||'(no title)')}</div>
+          <div class="task-desc">${escH(t.title||'(no title)')}${id?` <span class="task-id">#${esc(id)}</span>`:''}</div>
           <div class="task-meta">
             ${t.category_label?`<span class="badge badge-category">${escH(t.category_label)}</span>`:''}
             ${t.suggested_assignee?`<span class="badge badge-suggest">💡 ${escH(userLabel(t.suggested_assignee))}?</span>`:''}
@@ -814,7 +815,7 @@ function card(t, rank) {
         </div>
       </button>
       <div class="task-content" onclick="toggleExpand('${esc(id)}')">
-        <div class="task-desc">${escH(t.title||'(no title)')}</div>
+        <div class="task-desc">${escH(t.title||'(no title)')}${id?` <span class="task-id">#${esc(id)}</span>`:''}</div>
         ${(!isDone && reason)?`<div class="task-reason">${escH(reason)}</div>`:''}
         <div class="task-meta">
           ${(!isDone && t.score!=null)?`<span class="badge badge-score${(rank!=null && rank<3)?' top':''}">★ ${Math.round(Number(t.score))}</span>`:''}
