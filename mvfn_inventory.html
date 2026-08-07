@@ -90,6 +90,7 @@
     padding: 1px 6px; border-radius: 10px; margin-left: 6px; vertical-align: 1px;
   }
   .addform .tabadge.carried { background: #dcf0e2; color: #047857; }
+  .addform .tabadge.onfile  { background: #eceade; color: #6b6b52; }
   .addform .tabadge.master  { background: #e8e6f5; color: #5b4b9a; }
   .addform .taempty { padding: 10px 12px; font-size: 0.78rem; color: #8a8a7a; }
   /* The results list overlays .speciesnote, so an ambiguity warning has to live
@@ -662,13 +663,18 @@
     return ambiguousNames.has(taNorm(typed));
   }
 
-  // One search row per candidate. `carried` rows are what we already stock;
-  // `master` rows are the curated PA-native list. A carried row that is linked to
-  // the master is emitted once, as carried, so the same plant never appears twice.
+  // One search row per candidate. `carried` rows have an inventory.species
+  // record (with or without live stock — has_stock says which); `master` rows
+  // are the curated PA-native list. A carried row that is linked to the master
+  // is emitted once, as carried, so the same plant never appears twice.
   function taCandidates() {
     const out = [];
     const linkedRefIds = new Set();
     const refById = {};
+    // A species row can exist with no live stock (the 4/11 bulk seed, or sold
+    // out) — the badge must not say "in stock" for those, so carry the truth.
+    const stocked = new Set();
+    stock.forEach(r => { if (Number(r.quantity) > 0) stocked.add(speciesKey(r.species_id)); });
     refSpecies.forEach(r => { refById[String(r.species_id)] = r; });
     speciesList.forEach(sp => {
       if (sp.species_ref_id) linkedRefIds.add(String(sp.species_ref_id));
@@ -679,6 +685,7 @@
       const ref = refById[String(sp.species_ref_id || sp.species_id)];
       out.push({
         source: 'carried',
+        has_stock: stocked.has(speciesKey(sp.species_id)),
         species_id: sp.species_id,
         species_ref_id: sp.species_ref_id || '',
         common_name: sp.common_name || '',
@@ -759,9 +766,13 @@
       ? `<div class="tawarn">⚠ “${esc(typed)}” is used for more than one plant — check the botanical name before picking.</div>`
       : '';
     box.innerHTML = warn + taMatches.map((c, i) => {
-      const badge = c.source === 'carried'
-        ? '<span class="tabadge carried">in stock</span>'
-        : '<span class="tabadge master">curated</span>';
+      // Three states: live stock, known-but-empty, master-only. `carried` alone
+      // is NOT "in stock" — 43 of the seeded species have never had a stock row.
+      const badge = c.source !== 'carried'
+        ? '<span class="tabadge master">curated</span>'
+        : c.has_stock
+          ? '<span class="tabadge carried">in stock</span>'
+          : '<span class="tabadge onfile">on file</span>';
       const sci = c.scientific_name ? `<div class="tasci">${esc(c.scientific_name)}</div>` : '';
       // Only when the hit came from a synonym rather than the name on screen.
       const via = c.matched ? `<div class="tavia">matched “${esc(c.matched)}”</div>` : '';
@@ -802,7 +813,10 @@
     if (!typed) { set('', '', false); return; }
 
     if (pickedSpecies && pickedSpecies.source === 'carried') {
-      set('✓ already in stock — adding another container/batch', 'match', false);
+      set(pickedSpecies.has_stock
+        ? '✓ already in stock — adding another container/batch'
+        : '✓ on file (no live stock) — adding will reuse the existing record',
+        'match', false);
       return;
     }
     if (pickedSpecies && pickedSpecies.source === 'master') {
