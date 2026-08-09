@@ -1,0 +1,11 @@
+{
+  "name": "Driving Log",
+  "short_name": "Driving",
+  "start_url": "hh_driving.html",
+  "display": "standalone",
+  "background_color": "#14263d",
+  "theme_color": "#1f3a5f",
+  "icons": [
+    { "src": "icon-hh-driving.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

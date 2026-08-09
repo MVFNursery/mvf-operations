@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3a5f">
+<link rel="manifest" href="hh-driving-manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-hh-driving.png">
+<title>Driving Log</title>
+<script src="mvfn-auth.js"
+        data-token-key="mvfn_household_token"
+        data-validate-url="https://megamachine.taile865b6.ts.net:5680/webhook/hh-driving"></script>
+<style>
+  :root { --ink:#1f3a5f; --slate:#4a6584; --paper:#eef1f5; --card:#fbfcfe;
+          --red:#9b2c1f; --green:#2d6a3f; --amber:#9a6b1f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#14263d; font-family:Georgia,serif; color:#222; }
+  header { background:var(--ink); color:#fff; padding:14px 16px 12px; display:flex; align-items:baseline; gap:10px; }
+  header h1 { font-size:1.15rem; margin:0; flex:1; }
+  header button { border:0; border-radius:6px; padding:5px 10px; font-family:inherit; font-size:.78rem;
+    background:var(--paper); color:var(--ink); cursor:pointer; }
+  main { max-width:560px; margin:0 auto; padding:12px 12px 60px; }
+  .banner { display:none; background:var(--red); color:#fff; padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:.85rem; }
+  .banner.ok { background:var(--ink); }
+  .card { background:var(--card); border-radius:12px; padding:12px 14px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.25); }
+  .card h2 { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--slate); margin:0 0 8px; }
+
+  /* dashboard */
+  .goalrow { margin-bottom:12px; }
+  .goalrow .lbl { display:flex; justify-content:space-between; font-size:.85rem; font-weight:700; color:var(--ink); }
+  .goalrow .lbl .nums { font-weight:400; color:#444; }
+  .bar { position:relative; height:14px; background:#dfe5ec; border-radius:7px; margin:4px 0 3px; overflow:hidden; }
+  .bar .fill { position:absolute; inset:0 auto 0 0; background:var(--green); border-radius:7px; }
+  .bar .fill.behind { background:var(--amber); }
+  .bar .tick { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--ink); }
+  .goalrow .pace { font-size:.75rem; color:#555; }
+  .goalrow .pace .ahead { color:var(--green); font-weight:700; }
+  .goalrow .pace .behind { color:var(--red); font-weight:700; }
+  .daysleft { font-size:.8rem; color:var(--slate); text-align:center; margin-top:4px; }
+
+  /* timer */
+  .timerbox { text-align:center; }
+  .timerbox button.big { width:100%; padding:16px; border:0; border-radius:10px; font-family:inherit;
+    font-size:1.2rem; font-weight:700; cursor:pointer; background:var(--ink); color:#fff; }
+  .timerbox button.big.stop { background:var(--red); }
+  .timerbox .elapsed { font-size:2rem; font-weight:700; color:var(--ink); margin:6px 0 2px; font-variant-numeric:tabular-nums; }
+  .timerbox .tsub { font-size:.8rem; color:var(--slate); margin-bottom:8px; }
+
+  /* forecast */
+  .fc { font-size:.85rem; }
+  .fc .fcrow { padding:6px 0; border-bottom:1px solid #e4e9ef; }
+  .fc .fcrow:last-child { border-bottom:0; }
+  .fc .combo { color:var(--ink); font-weight:700; }
+  .fc .dim { color:#777; font-size:.78rem; }
+
+  /* form */
+  details.add { background:var(--paper); border-radius:12px; padding:10px 14px; margin-bottom:14px; }
+  details.add summary { font-weight:700; color:var(--ink); cursor:pointer; padding:4px 0; }
+  .add label { display:block; font-size:.72rem; color:var(--slate); margin:8px 0 2px; text-transform:uppercase; letter-spacing:.04em; }
+  .add input, .add select, .add textarea {
+    width:100%; padding:9px 10px; border:1.5px solid var(--slate); border-radius:8px;
+    font-family:inherit; font-size:.95rem; background:#fff; }
+  .add textarea { min-height:48px; resize:vertical; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row3 { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:10px; }
+  .checks { display:flex; gap:16px; margin-top:10px; font-size:.85rem; color:var(--ink); flex-wrap:wrap; }
+  .checks label { display:flex; align-items:center; gap:5px; margin:0; text-transform:none; font-size:.85rem; color:var(--ink); }
+  .preview { margin-top:8px; font-size:.82rem; color:var(--ink); background:#e3ecf5; border-radius:8px; padding:7px 10px; }
+  .add .btnrow { display:flex; gap:8px; }
+  .add .btnrow button { margin-top:12px; flex:1; padding:12px; border:0; border-radius:8px;
+    background:var(--ink); color:#fff; font-family:inherit; font-size:1rem; font-weight:700; cursor:pointer; }
+  .add .btnrow button.ghost { background:#cfd8e2; color:var(--ink); }
+  .add .btnrow button:disabled { opacity:.5; }
+
+  /* drive list */
+  .drive { background:var(--card); border-radius:12px; padding:10px 13px; margin-bottom:8px; box-shadow:0 1px 4px rgba(0,0,0,.25); }
+  .drive .t { font-weight:700; color:var(--ink); font-size:.95rem; display:flex; justify-content:space-between; }
+  .drive .t .dur { font-variant-numeric:tabular-nums; }
+  .drive .sub { font-size:.75rem; color:#666; margin-top:1px; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+  .chip { font-size:.68rem; background:#dde5ee; color:#2a4663; border-radius:999px; padding:2px 8px; }
+  .chip.night { background:#1f3a5f; color:#fff; }
+  .chip.adv { background:var(--red); color:#fff; }
+  .chip.imp { background:#c9cfd6; color:#555; }
+  .actions { display:flex; gap:8px; margin-top:8px; }
+  .actions button { flex:1; padding:7px; border:0; border-radius:8px; font-family:inherit; font-weight:700; cursor:pointer; font-size:.8rem; }
+  .edit-btn { background:var(--paper); color:var(--ink); }
+  .del-btn { background:#e7dcd9; color:var(--red); }
+  .showall { width:100%; padding:10px; border:0; border-radius:8px; background:#2a4663; color:#fff;
+    font-family:inherit; font-weight:700; cursor:pointer; margin-bottom:12px; }
+  .empty { color:var(--paper); text-align:center; padding:30px 10px; font-size:.9rem; opacity:.85; }
+  .section-h { color:var(--paper); font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; margin:16px 4px 8px; opacity:.8; }
+
+  /* print (DMV log) */
+  #printLog { display:none; }
+  @media print {
+    body > header, body > main { display:none !important; }
+    body { background:#fff; }
+    #printLog { display:block; font-family:Georgia,serif; color:#000; padding:0.2in; }
+    #printLog h1 { font-size:16pt; margin:0 0 4pt; }
+    #printLog .drv { margin:6pt 0 10pt; font-size:11pt; }
+    #printLog table { width:100%; border-collapse:collapse; font-size:9pt; }
+    #printLog th, #printLog td { border:1px solid #444; padding:2pt 5pt; text-align:left; }
+    #printLog .totals { margin-top:8pt; font-size:10pt; font-weight:700; }
+    #printLog .sig { margin-top:22pt; font-size:11pt; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Driving Log</h1>
+  <button id="printBtn" type="button">DMV log</button>
+</header>
+<main>
+  <div class="banner" id="banner"></div>
+
+  <div class="card" id="dash"><h2>Progress · loading…</h2></div>
+
+  <div class="card timerbox" id="timerCard">
+    <h2>Timer</h2>
+    <div id="timerRun" style="display:none">
+      <div class="elapsed" id="tElapsed">0:00</div>
+      <div class="tsub" id="tSub"></div>
+    </div>
+    <button class="big" id="timerBtn" type="button">Start drive</button>
+  </div>
+
+  <div class="card fc" id="fcCard" style="display:none"></div>
+
+  <details class="add" id="addBox">
+    <summary id="formTitle">+ Log a drive</summary>
+    <div id="timeFields">
+      <div class="row3">
+        <div><label>Date</label><input type="date" id="f_date"></div>
+        <div><label>Start</label><input type="time" id="f_start"></div>
+        <div><label>End</label><input type="time" id="f_end"></div>
+      </div>
+      <div class="preview" id="splitPreview" style="display:none"></div>
+      <div class="checks">
+        <label><input type="checkbox" id="f_override"> Set night minutes by hand</label>
+      </div>
+      <div id="overrideRow" style="display:none">
+        <label>Night minutes</label>
+        <input type="number" id="f_nightmin" min="0" inputmode="numeric">
+      </div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="f_adverse"> Adverse weather</label>
+    </div>
+    <div id="advRow" style="display:none">
+      <label>Conditions</label>
+      <input type="text" id="f_anote" placeholder="rain / snow / fog / ice" autocomplete="off">
+    </div>
+    <div class="row2">
+      <div><label>Supervisor</label>
+        <select id="f_sup">
+          <option value="ian">Ian</option>
+          <option value="kerri">Kerri</option>
+        </select></div>
+      <div></div>
+    </div>
+    <label>Notes</label>
+    <textarea id="f_notes"></textarea>
+    <div class="btnrow">
+      <button class="ghost" id="f_cancel" type="button" style="display:none">Cancel</button>
+      <button id="f_go" type="button">Save drive</button>
+    </div>
+  </details>
+
+  <div class="section-h">Drives</div>
+  <div id="list"><div class="empty">Loading…</div></div>
+</main>
+<div id="printLog"></div>
+<script>
+(function () {
+  var API = 'https://megamachine.taile865b6.ts.net:5680/webhook/hh-driving';
+  var TIMER_KEY = 'hh_driving_timer_start';
+  var SUP_KEY = 'hh_driving_supervisor';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { goal: null, totals: null, drives: [], forecast: null };
+  var editId = null, editSource = null, timerTick = null, showAll = false;
+  var pendingSource = 'manual';   // 'timer' when the form was opened by Stop
+
+  // ---- solar: PREVIEW copy of the server's authoritative calc -------------
+  // (infra/n8n-household-workflows/src/driving_api_validate.js is the one
+  // that decides what's stored; keep the two in step when editing either.)
+  var LAT = 40.489629694611, LON = -76.8677117695;
+  function rad(x){ return Math.PI*x/180; } function deg(x){ return 180*x/Math.PI; }
+  function sunEventUT(y, mo, dd, rising) {
+    var N1 = Math.floor(275*mo/9), N2 = Math.floor((mo+9)/12);
+    var K = 1 + Math.floor((y - 4*Math.floor(y/4) + 2)/3);
+    var N = N1 - (N2*K) + dd - 30;
+    var lngHour = LON/15;
+    var tt = N + (((rising ? 6 : 18) - lngHour)/24);
+    var M = (0.9856*tt) - 3.289;
+    var L = M + (1.916*Math.sin(rad(M))) + (0.020*Math.sin(rad(2*M))) + 282.634;
+    L = ((L % 360) + 360) % 360;
+    var RA = deg(Math.atan(0.91764*Math.tan(rad(L))));
+    RA = ((RA % 360) + 360) % 360;
+    RA = (RA + (Math.floor(L/90)*90 - Math.floor(RA/90)*90))/15;
+    var sinDec = 0.39782*Math.sin(rad(L));
+    var cosDec = Math.cos(Math.asin(sinDec));
+    var cosH = (Math.cos(rad(90.833)) - (sinDec*Math.sin(rad(LAT)))) / (cosDec*Math.cos(rad(LAT)));
+    if (cosH > 1 || cosH < -1) return null;
+    var H = (rising ? (360 - deg(Math.acos(cosH))) : deg(Math.acos(cosH)))/15;
+    var T = H + RA - (0.06571*tt) - 6.622;
+    return (((T - lngHour) % 24) + 24) % 24;
+  }
+  function sunTimesLocal(y, mo, dd) {
+    var dayStart = new Date(y, mo-1, dd).getTime();
+    var dayEnd = new Date(y, mo-1, dd+1).getTime();
+    function pin(ut) {
+      if (ut === null) return null;
+      var ms = Date.UTC(y, mo-1, dd) + Math.round(ut*3600000);
+      while (ms < dayStart) ms += 86400000;
+      while (ms >= dayEnd) ms -= 86400000;
+      return ms;
+    }
+    return { riseMs: pin(sunEventUT(y,mo,dd,true)), setMs: pin(sunEventUT(y,mo,dd,false)) };
+  }
+  function splitDayNight(startMs, endMs) {
+    var dayMs = 0, cur = startMs;
+    while (cur < endMs) {
+      var c = new Date(cur);
+      var y = c.getFullYear(), mo = c.getMonth()+1, dd = c.getDate();
+      var segEnd = Math.min(endMs, new Date(y, mo-1, dd+1).getTime());
+      var ev = sunTimesLocal(y, mo, dd);
+      if (ev.riseMs !== null && ev.setMs !== null) {
+        var s = Math.max(cur, ev.riseMs), e = Math.min(segEnd, ev.setMs);
+        if (e > s) dayMs += (e - s);
+      }
+      cur = segEnd;
+    }
+    var totalMin = Math.round((endMs - startMs)/60000);
+    var dayMin = Math.min(totalMin, Math.round(dayMs/60000));
+    return { dayMin: dayMin, nightMin: totalMin - dayMin };
+  }
+  // -------------------------------------------------------------------------
+
+  function banner(msg, kind) {
+    var b = $('banner');
+    b.textContent = msg || '';
+    b.className = 'banner' + (kind ? ' ' + kind : '');
+    b.style.display = msg ? 'block' : 'none';
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
+    });
+  }
+  function fmtHM(min) {
+    min = Math.max(0, Math.round(min));
+    var h = Math.floor(min/60), m = min % 60;
+    if (!h) return m + 'm';
+    return h + 'h ' + (m < 10 ? '0' : '') + m + 'm';
+  }
+  function fmtClock(ms) {
+    var d = new Date(ms), h = d.getHours(), m = d.getMinutes();
+    var ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+    return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap;
+  }
+  function parsePg(ts) {  // "2026-08-09 18:30:00-04" -> ms
+    if (!ts) return null;
+    var s = String(ts).replace(' ', 'T');
+    // PG emits bare-hour offsets ("-04"); Date.parse needs "-04:00".
+    if (/[+-]\d{2}$/.test(s)) s += ':00';
+    var t = Date.parse(s);
+    return Number.isFinite(t) ? t : null;
+  }
+  function dateLabel(iso) {  // "2026-08-09" -> "Sat 8/9"
+    var p = iso.split('-');
+    var d = new Date(+p[0], +p[1]-1, +p[2]);
+    return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()] + ' ' + (+p[1]) + '/' + (+p[2]);
+  }
+  function todayMid() { var n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime(); }
+  function isoDateMs(iso) { var p = iso.split('-'); return new Date(+p[0], +p[1]-1, +p[2]).getTime(); }
+
+  // ---- dashboard ----------------------------------------------------------
+  function renderDash() {
+    var g = state.goal, t = state.totals;
+    if (!g || !t) { $('dash').innerHTML = '<h2>Progress unavailable</h2>'; return; }
+    var start = isoDateMs(g.period_start), target = isoDateMs(g.target_date);
+    var frac = Math.min(1, Math.max(0, (todayMid() - start) / (target - start)));
+    var daysLeft = Math.max(0, Math.round((target - todayMid())/86400000));
+    var weeksLeft = Math.max(daysLeft/7, 1/7);
+    var rows = [
+      { name: 'Total',   have: t.total_min,   goal: g.total_min },
+      { name: 'Night',   have: t.night_min,   goal: g.night_min },
+      { name: 'Adverse', have: t.adverse_min, goal: g.adverse_min },
+    ];
+    var html = '<h2>Progress · target ' + esc(g.target_date) + '</h2>';
+    rows.forEach(function (r) {
+      var expected = r.goal * frac;
+      var delta = r.have - expected;
+      var pct = Math.min(100, 100 * r.have / r.goal);
+      var behind = delta < -1;  // within a minute counts as on pace
+      var remaining = Math.max(0, r.goal - r.have);
+      var perWk = remaining / weeksLeft;
+      var paceTxt = behind
+        ? '<span class="behind">' + fmtHM(-delta) + ' behind pace</span>'
+        : '<span class="ahead">' + (delta > 1 ? fmtHM(delta) + ' ahead of pace' : 'on pace') + '</span>';
+      var needTxt = remaining === 0 ? ' · DONE'
+        : ' · need ' + fmtHM(perWk) + '/wk';
+      html += '<div class="goalrow">'
+        + '<div class="lbl"><span>' + r.name + '</span><span class="nums">'
+        + fmtHM(r.have) + ' / ' + fmtHM(r.goal) + '</span></div>'
+        + '<div class="bar"><div class="fill' + (behind ? ' behind' : '') + '" style="width:' + pct + '%"></div>'
+        + '<div class="tick" style="left:' + (100*frac) + '%"></div></div>'
+        + '<div class="pace">' + paceTxt + needTxt + '</div></div>';
+    });
+    html += '<div class="daysleft">' + daysLeft + ' days to ' + esc(g.target_date)
+      + ' (hard limit ' + esc(g.hard_deadline) + ')</div>';
+    $('dash').innerHTML = html;
+  }
+
+  // ---- forecast -----------------------------------------------------------
+  function renderForecast() {
+    var card = $('fcCard');
+    var n = new Date();
+    var ev = sunTimesLocal(n.getFullYear(), n.getMonth()+1, n.getDate());
+    var sunsetLine = ev.setMs
+      ? '<div class="fcrow dim">Sunset today ' + fmtClock(ev.setMs) + ' — night hours start then.</div>'
+      : '';
+    if (!state.forecast) {
+      card.style.display = 'block';
+      card.innerHTML = '<h2>Adverse-weather windows</h2>' + sunsetLine
+        + '<div class="fcrow dim">Forecast unavailable right now.</div>';
+      return;
+    }
+    var hits = state.forecast.filter(function (f) {
+      return (f.precip_chance != null && +f.precip_chance >= 40)
+        || (f.precip_in != null && +f.precip_in >= 0.05)
+        || (f.evening_precip_chance != null && +f.evening_precip_chance >= 40);
+    });
+    var html = '<h2>Adverse-weather windows · next 7 days</h2>' + sunsetLine;
+    if (!hits.length) {
+      html += '<div class="fcrow dim">No adverse-weather windows in the forecast.</div>';
+    }
+    hits.forEach(function (f) {
+      var p = f.d.split('-');
+      var sev = sunTimesLocal(+p[0], +p[1], +p[2]);
+      var bits = [];
+      if (f.precip_chance != null) bits.push(Math.round(+f.precip_chance) + '% precip');
+      if (f.precip_in != null && +f.precip_in > 0) bits.push((+f.precip_in).toFixed(2) + ' in');
+      var combo = f.evening_precip_chance != null && +f.evening_precip_chance >= 40;
+      html += '<div class="fcrow">' + dateLabel(f.d) + ' · ' + bits.join(' · ')
+        + (combo ? '<div class="combo">Evening ' + Math.round(+f.evening_precip_chance) + '%'
+            + (f.evening_short_forecast ? ' — ' + esc(f.evening_short_forecast) : '')
+            + ' · drive after ' + (sev.setMs ? fmtClock(sev.setMs) : 'sunset')
+            + ' = night + adverse in one drive</div>' : '')
+        + '</div>';
+    });
+    card.style.display = 'block';
+    card.innerHTML = html;
+  }
+
+  // ---- drive list ---------------------------------------------------------
+  function renderList() {
+    var ds = state.drives || [];
+    if (!ds.length) {
+      $('list').innerHTML = '<div class="empty">No drives yet.</div>';
+      return;
+    }
+    var shown = showAll ? ds : ds.slice(0, 12);
+    var html = '';
+    shown.forEach(function (d) {
+      var total = d.day_min + d.night_min;
+      var s = parsePg(d.started_at), e = parsePg(d.ended_at);
+      var sub = s && e ? (fmtClock(s) + ' – ' + fmtClock(e)) : 'from old app (no times)';
+      var chips = [];
+      if (d.day_min > 0) chips.push('<span class="chip">day ' + fmtHM(d.day_min) + '</span>');
+      if (d.night_min > 0) chips.push('<span class="chip night">night ' + fmtHM(d.night_min) + '</span>');
+      if (d.adverse) chips.push('<span class="chip adv">ADVERSE' + (d.adverse_note ? ' · ' + esc(d.adverse_note) : '') + '</span>');
+      if (d.supervisor) chips.push('<span class="chip">@' + esc(d.supervisor) + '</span>');
+      if (d.source === 'import') chips.push('<span class="chip imp">import</span>');
+      html += '<div class="drive">'
+        + '<div class="t"><span>' + dateLabel(d.drive_date) + '</span><span class="dur">' + fmtHM(total) + '</span></div>'
+        + '<div class="sub">' + sub + (d.notes ? ' · ' + esc(d.notes) : '') + '</div>'
+        + '<div class="chips">' + chips.join('') + '</div>'
+        + '<div class="actions">'
+        + '<button class="edit-btn" data-edit="' + d.drive_id + '">Edit</button>'
+        + '<button class="del-btn" data-del="' + d.drive_id + '">Delete</button>'
+        + '</div></div>';
+    });
+    if (!showAll && ds.length > shown.length) {
+      html += '<button class="showall" id="showAllBtn">Show all ' + ds.length + ' drives</button>';
+    }
+    $('list').innerHTML = html;
+    var sa = $('showAllBtn');
+    if (sa) sa.addEventListener('click', function () { showAll = true; renderList(); });
+  }
+
+  // ---- form ---------------------------------------------------------------
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function formWindow() {
+    // null when incomplete; {s,e} epoch ms otherwise. End <= start rolls to
+    // the next day (a 11:45 PM -> 12:30 AM drive).
+    var dt = $('f_date').value, st = $('f_start').value, en = $('f_end').value;
+    if (!dt || !st || !en) return null;
+    var s = new Date(dt + 'T' + st).getTime();
+    var e = new Date(dt + 'T' + en).getTime();
+    if (!Number.isFinite(s) || !Number.isFinite(e)) return null;
+    if (e <= s) e += 86400000;
+    return { s: s, e: e };
+  }
+  function updPreview() {
+    var pv = $('splitPreview');
+    var w = formWindow();
+    if (!w) { pv.style.display = 'none'; return; }
+    var totalMin = Math.round((w.e - w.s)/60000);
+    var sp = splitDayNight(w.s, w.e);
+    var c = new Date(w.s);
+    var ev = sunTimesLocal(c.getFullYear(), c.getMonth()+1, c.getDate());
+    var txt;
+    if ($('f_override').checked) {
+      var n = parseInt($('f_nightmin').value, 10);
+      txt = fmtHM(totalMin) + ' — night set by hand'
+        + (Number.isFinite(n) ? (': ' + fmtHM(Math.min(n, totalMin)) + ' night / ' + fmtHM(Math.max(0, totalMin - n)) + ' day') : '');
+    } else {
+      txt = fmtHM(totalMin) + ' — ' + fmtHM(sp.dayMin) + ' day / ' + fmtHM(sp.nightMin) + ' night'
+        + (ev.setMs ? ' (sunset ' + fmtClock(ev.setMs) + ')' : '');
+    }
+    if (totalMin > 16*60) txt += ' — LONGER THAN 16 H, check the times';
+    pv.textContent = txt;
+    pv.style.display = 'block';
+  }
+
+  function resetForm() {
+    editId = null; editSource = null; pendingSource = 'manual';
+    $('formTitle').textContent = '+ Log a drive';
+    $('timeFields').style.display = '';
+    ['f_date','f_start','f_end','f_nightmin','f_anote','f_notes'].forEach(function (id) { $(id).value = ''; });
+    $('f_override').checked = false; $('overrideRow').style.display = 'none';
+    $('f_adverse').checked = false; $('advRow').style.display = 'none';
+    $('f_sup').value = localStorage.getItem(SUP_KEY) || 'ian';
+    $('f_cancel').style.display = 'none';
+    $('f_go').textContent = 'Save drive';
+    $('splitPreview').style.display = 'none';
+    $('addBox').open = false;
+  }
+
+  function openEdit(d) {
+    resetForm();
+    editId = d.drive_id; editSource = d.source;
+    $('formTitle').textContent = 'Edit drive · ' + dateLabel(d.drive_date);
+    var s = parsePg(d.started_at), e = parsePg(d.ended_at);
+    if (s && e) {
+      var sd = new Date(s);
+      $('f_date').value = sd.getFullYear() + '-' + pad2(sd.getMonth()+1) + '-' + pad2(sd.getDate());
+      $('f_start').value = pad2(sd.getHours()) + ':' + pad2(sd.getMinutes());
+      var ed = new Date(e);
+      $('f_end').value = pad2(ed.getHours()) + ':' + pad2(ed.getMinutes());
+      if (d.night_override) {
+        $('f_override').checked = true; $('overrideRow').style.display = '';
+        $('f_nightmin').value = d.night_min;
+      }
+      $('timeFields').style.display = '';
+      updPreview();
+    } else {
+      // imported row: no times to edit — this edit is for the adverse flag,
+      // supervisor, and notes only.
+      $('timeFields').style.display = 'none';
+    }
+    $('f_adverse').checked = !!d.adverse;
+    $('advRow').style.display = d.adverse ? '' : 'none';
+    $('f_anote').value = d.adverse_note || '';
+    $('f_notes').value = d.notes || '';
+    if (d.supervisor) $('f_sup').value = d.supervisor;
+    $('f_cancel').style.display = '';
+    $('f_go').textContent = 'Save changes';
+    $('addBox').open = true;
+    $('addBox').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function post(payload, btn) {
+    if (btn) btn.disabled = true;
+    banner('');
+    return fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (j) {
+        if (!r.ok || (j && j.status === 'error')) {
+          throw new Error((j && j.message) || ('HTTP ' + r.status));
+        }
+        return j || {};
+      });
+    }).then(function (j) { load(); return j; })
+      .catch(function (e) { banner(String(e.message || e)); return null; })
+      .finally(function () { if (btn) btn.disabled = false; });
+  }
+
+  $('f_override').addEventListener('change', function () {
+    $('overrideRow').style.display = this.checked ? '' : 'none';
+    updPreview();
+  });
+  $('f_adverse').addEventListener('change', function () {
+    $('advRow').style.display = this.checked ? '' : 'none';
+  });
+  ['f_date','f_start','f_end','f_nightmin'].forEach(function (id) {
+    $(id).addEventListener('input', updPreview);
+  });
+
+  $('f_go').addEventListener('click', function () {
+    var sup = $('f_sup').value;
+    localStorage.setItem(SUP_KEY, sup);
+    var payload;
+    if (editId !== null && editSource === 'import') {
+      payload = {
+        action: 'update', drive_id: editId,
+        adverse: $('f_adverse').checked,
+        adverse_note: $('f_anote').value.trim(),
+        notes: $('f_notes').value.trim(),
+      };
+      if (sup) payload.supervisor = sup;
+    } else {
+      var w = formWindow();
+      if (!w) { banner('Date, start and end are all required'); return; }
+      if ((w.e - w.s) > 16*3600000) { banner('Longer than 16 h — check the times'); return; }
+      payload = {
+        action: editId !== null ? 'update' : 'log',
+        started_at: new Date(w.s).toISOString(),
+        ended_at: new Date(w.e).toISOString(),
+        night_override: $('f_override').checked,
+        adverse: $('f_adverse').checked,
+        adverse_note: $('f_anote').value.trim(),
+        supervisor: sup,
+        notes: $('f_notes').value.trim(),
+      };
+      if ($('f_override').checked) payload.night_min = $('f_nightmin').value.trim();
+      if (editId !== null) payload.drive_id = editId;
+      else payload.source = pendingSource;
+    }
+    post(payload, $('f_go')).then(function (j) {
+      if (!j || !j.result) return;
+      var r = j.result;
+      banner((payload.action === 'log' ? 'Logged ' : 'Saved ')
+        + fmtHM((r.day_min || 0) + (r.night_min || 0))
+        + (r.night_min ? ' (' + fmtHM(r.night_min) + ' night)' : '')
+        + (r.adverse ? ' · adverse' : ''), 'ok');
+      resetForm();
+    });
+  });
+  $('f_cancel').addEventListener('click', resetForm);
+
+  // ---- timer --------------------------------------------------------------
+  function timerStart() { return parseInt(localStorage.getItem(TIMER_KEY) || '', 10) || null; }
+  function renderTimer() {
+    var t0 = timerStart();
+    var btn = $('timerBtn');
+    if (t0) {
+      $('timerRun').style.display = '';
+      btn.textContent = 'Stop & save';
+      btn.className = 'big stop';
+      if (!timerTick) timerTick = setInterval(renderTimer, 1000);
+      var el = Date.now() - t0;
+      var mm = Math.floor(el/60000), ss = Math.floor((el % 60000)/1000);
+      var hh = Math.floor(mm/60); mm = mm % 60;
+      $('tElapsed').textContent = (hh ? hh + ':' + pad2(mm) : String(mm)) + ':' + pad2(ss);
+      var sp = splitDayNight(t0, Math.max(Date.now(), t0 + 60000));
+      $('tSub').textContent = 'started ' + fmtClock(t0) + ' · so far ' + fmtHM(sp.dayMin) + ' day / ' + fmtHM(sp.nightMin) + ' night';
+    } else {
+      $('timerRun').style.display = 'none';
+      btn.textContent = 'Start drive';
+      btn.className = 'big';
+      if (timerTick) { clearInterval(timerTick); timerTick = null; }
+    }
+  }
+  $('timerBtn').addEventListener('click', function () {
+    var t0 = timerStart();
+    if (!t0) {
+      localStorage.setItem(TIMER_KEY, String(Date.now()));
+      renderTimer();
+      return;
+    }
+    // Stop: hand off to the form, prefilled; saving posts source='timer'.
+    var end = Date.now();
+    if (end - t0 < 60000) {
+      if (!confirm('Under a minute — discard this timer?')) return;
+      localStorage.removeItem(TIMER_KEY);
+      renderTimer();
+      return;
+    }
+    resetForm();
+    pendingSource = 'timer';
+    var sd = new Date(t0), ed = new Date(end);
+    $('f_date').value = sd.getFullYear() + '-' + pad2(sd.getMonth()+1) + '-' + pad2(sd.getDate());
+    $('f_start').value = pad2(sd.getHours()) + ':' + pad2(sd.getMinutes());
+    $('f_end').value = pad2(ed.getHours()) + ':' + pad2(ed.getMinutes());
+    localStorage.removeItem(TIMER_KEY);
+    renderTimer();
+    updPreview();
+    $('formTitle').textContent = '+ Save timed drive';
+    $('addBox').open = true;
+    $('addBox').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  // ---- list actions -------------------------------------------------------
+  $('list').addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.edit) {
+      var d = state.drives.filter(function (x) { return String(x.drive_id) === btn.dataset.edit; })[0];
+      if (d) openEdit(d);
+    } else if (btn.dataset.del) {
+      var dd = state.drives.filter(function (x) { return String(x.drive_id) === btn.dataset.del; })[0];
+      var name = dd ? (dateLabel(dd.drive_date) + ', ' + fmtHM(dd.day_min + dd.night_min)) : ('#' + btn.dataset.del);
+      if (!confirm('Delete the drive on ' + name + '?')) return;
+      post({ action: 'delete', drive_id: parseInt(btn.dataset.del, 10) }, btn).then(function (j) {
+        if (j && j.result) banner('Deleted drive on ' + name, 'ok');
+      });
+    }
+  });
+
+  // ---- DMV printable log --------------------------------------------------
+  $('printBtn').addEventListener('click', function () {
+    var rows = [];
+    var totDay = 0, totNight = 0, totAdv = 0;
+    // oldest first on paper; a drive spanning sunset prints as two rows,
+    // matching the old app's whole-row Day/Night format.
+    state.drives.slice().reverse().forEach(function (d) {
+      var p = d.drive_date.split('-');
+      var us = p[1] + '/' + p[2] + '/' + p[0];
+      if (d.day_min > 0) rows.push([us, 'Day', d.day_min]);
+      if (d.night_min > 0) rows.push([us, 'Night', d.night_min]);
+      totDay += d.day_min; totNight += d.night_min;
+      if (d.adverse) totAdv += d.day_min + d.night_min;
+    });
+    function hm(min) { return Math.floor(min/60) + ' hrs ' + (min % 60) + ' min'; }
+    var html = '<h1>Driving Log</h1>'
+      + '<div class="drv">Driver Name: ______________________</div>'
+      + '<table><tr><th>Date</th><th>Day/Night</th><th>Duration</th></tr>';
+    rows.forEach(function (r) {
+      html += '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + hm(r[2]) + '</td></tr>';
+    });
+    html += '</table>'
+      + '<div class="totals">Total Day: ' + hm(totDay) + ' | Total Night: ' + hm(totNight)
+      + ' | Total: ' + hm(totDay + totNight) + '</div>'
+      + '<div class="totals">Adverse-weather driving (flagged in log): ' + hm(totAdv) + '</div>'
+      + '<div class="sig">Adult Signature: ______________________ &nbsp;&nbsp; Date: ____________</div>';
+    $('printLog').innerHTML = html;
+    window.print();
+  });
+
+  // ---- load ---------------------------------------------------------------
+  function load() {
+    fetch(API).then(function (r) {
+      if (!r.ok) throw new Error('load failed: HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      state = j;
+      renderDash();
+      renderForecast();
+      renderList();
+    }).catch(function (e) { banner(String(e.message || e)); });
+  }
+
+  $('f_sup').value = localStorage.getItem(SUP_KEY) || 'ian';
+  renderTimer();
+  load();
+})();
+</script>
+</body>
+</html>
