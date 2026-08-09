@@ -25,18 +25,15 @@
   .card { background:var(--card); border-radius:12px; padding:12px 14px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.25); }
   .card h2 { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--slate); margin:0 0 8px; }
 
-  /* dashboard */
-  .goalrow { margin-bottom:12px; }
-  .goalrow .lbl { display:flex; justify-content:space-between; font-size:.85rem; font-weight:700; color:var(--ink); }
-  .goalrow .lbl .nums { font-weight:400; color:#444; }
-  .bar { position:relative; height:14px; background:#dfe5ec; border-radius:7px; margin:4px 0 3px; overflow:hidden; }
-  .bar .fill { position:absolute; inset:0 auto 0 0; background:var(--green); border-radius:7px; }
-  .bar .fill.behind { background:var(--amber); }
-  .bar .tick { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--ink); }
-  .goalrow .pace { font-size:.75rem; color:#555; }
-  .goalrow .pace .ahead { color:var(--green); font-weight:700; }
-  .goalrow .pace .behind { color:var(--red); font-weight:700; }
-  .daysleft { font-size:.8rem; color:var(--slate); text-align:center; margin-top:4px; }
+  /* dashboard: one verdict, a couple of KPIs, one weather line. No charts. */
+  .verdict { font-size:1.35rem; font-weight:700; text-align:center; padding:6px 0 2px; }
+  .verdict.go { color:var(--red); }
+  .verdict.ok { color:var(--green); }
+  .kpis { text-align:center; font-size:.9rem; color:#333; margin-top:2px; }
+  .mini { text-align:center; font-size:.78rem; color:var(--slate); margin-top:6px; }
+  .fcline { text-align:center; font-size:.88rem; color:var(--ink); background:#e3ecf5;
+    border-radius:8px; padding:8px 10px; margin-top:10px; }
+  .fcline.dim { color:#777; background:#eef1f5; }
 
   /* timer */
   .timerbox { text-align:center; }
@@ -45,13 +42,6 @@
   .timerbox button.big.stop { background:var(--red); }
   .timerbox .elapsed { font-size:2rem; font-weight:700; color:var(--ink); margin:6px 0 2px; font-variant-numeric:tabular-nums; }
   .timerbox .tsub { font-size:.8rem; color:var(--slate); margin-bottom:8px; }
-
-  /* forecast */
-  .fc { font-size:.85rem; }
-  .fc .fcrow { padding:6px 0; border-bottom:1px solid #e4e9ef; }
-  .fc .fcrow:last-child { border-bottom:0; }
-  .fc .combo { color:var(--ink); font-weight:700; }
-  .fc .dim { color:#777; font-size:.78rem; }
 
   /* form */
   details.add { background:var(--paper); border-radius:12px; padding:10px 14px; margin-bottom:14px; }
@@ -114,7 +104,7 @@
 <main>
   <div class="banner" id="banner"></div>
 
-  <div class="card" id="dash"><h2>Progress · loading…</h2></div>
+  <div class="card" id="dash"><div class="kpis">Loading…</div></div>
 
   <div class="card timerbox" id="timerCard">
     <h2>Timer</h2>
@@ -124,8 +114,6 @@
     </div>
     <button class="big" id="timerBtn" type="button">Start drive</button>
   </div>
-
-  <div class="card fc" id="fcCard" style="display:none"></div>
 
   <details class="add" id="addBox">
     <summary id="formTitle">+ Log a drive</summary>
@@ -275,83 +263,73 @@
   function todayMid() { var n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime(); }
   function isoDateMs(iso) { var p = iso.split('-'); return new Date(+p[0], +p[1]-1, +p[2]).getTime(); }
 
-  // ---- dashboard ----------------------------------------------------------
+  // ---- dashboard: verdict first, no charts --------------------------------
+  // Ian's spec (2026-08-09): open the app and instantly read "oh shit, we
+  // gotta go practice" or "we're good" — one verdict, a couple of KPIs, and
+  // at most ONE plain-English adverse-weather line. Detail lives in the
+  // drive list, not here.
+  function dayWord(iso) {
+    var t = isoDateMs(iso), today = todayMid();
+    if (t === today) return 'today';
+    if (t === today + 86400000) return 'tomorrow';
+    var p = iso.split('-');
+    return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+      [new Date(+p[0], +p[1]-1, +p[2]).getDay()];
+  }
+  function nextAdverseLine() {
+    if (!state.forecast) return null;
+    for (var i = 0; i < state.forecast.length; i++) {
+      var f = state.forecast[i];
+      var evening = f.evening_precip_chance != null && +f.evening_precip_chance >= 40;
+      var daytime = (f.precip_chance != null && +f.precip_chance >= 40)
+        || (f.precip_in != null && +f.precip_in >= 0.05);
+      if (!evening && !daytime) continue;
+      var wet = /snow|flurr|wintry|sleet|ice/i.test(f.evening_short_forecast || '') ? 'Snow' : 'Rain';
+      if (evening) {
+        var p = f.d.split('-');
+        var sev = sunTimesLocal(+p[0], +p[1], +p[2]);
+        return wet + ' expected ' + dayWord(f.d) + ' evening — night + adverse in one drive'
+          + (sev.setMs ? ' after ' + fmtClock(sev.setMs) : '');
+      }
+      return wet + ' expected ' + dayWord(f.d) + ' — adverse-hours chance';
+    }
+    return null;
+  }
   function renderDash() {
     var g = state.goal, t = state.totals;
-    if (!g || !t) { $('dash').innerHTML = '<h2>Progress unavailable</h2>'; return; }
+    if (!g || !t) { $('dash').innerHTML = '<div class="kpis">Progress unavailable</div>'; return; }
     var start = isoDateMs(g.period_start), target = isoDateMs(g.target_date);
     var frac = Math.min(1, Math.max(0, (todayMid() - start) / (target - start)));
     var daysLeft = Math.max(0, Math.round((target - todayMid())/86400000));
     var weeksLeft = Math.max(daysLeft/7, 1/7);
-    var rows = [
-      { name: 'Total',   have: t.total_min,   goal: g.total_min },
-      { name: 'Night',   have: t.night_min,   goal: g.night_min },
-      { name: 'Adverse', have: t.adverse_min, goal: g.adverse_min },
+    // A bucket is "behind" only past a grace margin, so the verdict doesn't
+    // flip on rounding: 60 min on the big goal, 30 min on the small ones.
+    var buckets = [
+      { name: 'total',   have: t.total_min,   goal: g.total_min,   grace: 60 },
+      { name: 'night',   have: t.night_min,   goal: g.night_min,   grace: 30 },
+      { name: 'adverse', have: t.adverse_min, goal: g.adverse_min, grace: 30 },
     ];
-    var html = '<h2>Progress · target ' + esc(g.target_date) + '</h2>';
-    rows.forEach(function (r) {
-      var expected = r.goal * frac;
-      var delta = r.have - expected;
-      var pct = Math.min(100, 100 * r.have / r.goal);
-      var behind = delta < -1;  // within a minute counts as on pace
-      var remaining = Math.max(0, r.goal - r.have);
-      var perWk = remaining / weeksLeft;
-      var paceTxt = behind
-        ? '<span class="behind">' + fmtHM(-delta) + ' behind pace</span>'
-        : '<span class="ahead">' + (delta > 1 ? fmtHM(delta) + ' ahead of pace' : 'on pace') + '</span>';
-      var needTxt = remaining === 0 ? ' · DONE'
-        : ' · need ' + fmtHM(perWk) + '/wk';
-      html += '<div class="goalrow">'
-        + '<div class="lbl"><span>' + r.name + '</span><span class="nums">'
-        + fmtHM(r.have) + ' / ' + fmtHM(r.goal) + '</span></div>'
-        + '<div class="bar"><div class="fill' + (behind ? ' behind' : '') + '" style="width:' + pct + '%"></div>'
-        + '<div class="tick" style="left:' + (100*frac) + '%"></div></div>'
-        + '<div class="pace">' + paceTxt + needTxt + '</div></div>';
-    });
-    html += '<div class="daysleft">' + daysLeft + ' days to ' + esc(g.target_date)
-      + ' (hard limit ' + esc(g.hard_deadline) + ')</div>';
+    var behind = buckets.filter(function (b) { return (b.goal * frac) - b.have > b.grace; });
+    var allDone = buckets.every(function (b) { return b.have >= b.goal; });
+    var perWk = Math.max(0, g.total_min - t.total_min) / weeksLeft;
+    var verdict, cls;
+    if (allDone) { verdict = '✓ 65 hours DONE'; cls = 'ok'; }
+    else if (!behind.length) { verdict = '✓ On pace'; cls = 'ok'; }
+    else {
+      verdict = 'Get driving — behind on '
+        + (behind.length === 3 ? 'all three' : behind.map(function (b) { return b.name; }).join(' + '));
+      cls = 'go';
+    }
+    var html = '<div class="verdict ' + cls + '">' + verdict + '</div>'
+      + '<div class="kpis">' + (allDone ? 'target met' : ('need ~' + fmtHM(perWk) + '/wk'))
+      + ' · ' + daysLeft + ' days to ' + esc(g.target_date) + '</div>'
+      + '<div class="mini">Total ' + fmtHM(t.total_min) + ' of ' + fmtHM(g.total_min)
+      + ' · Night ' + fmtHM(t.night_min) + ' of ' + fmtHM(g.night_min)
+      + ' · Adverse ' + fmtHM(t.adverse_min) + ' of ' + fmtHM(g.adverse_min) + '</div>';
+    var fc = nextAdverseLine();
+    if (fc) html += '<div class="fcline">' + esc(fc) + '</div>';
+    else if (state.forecast) html += '<div class="fcline dim">No adverse weather in the next 7 days</div>';
     $('dash').innerHTML = html;
-  }
-
-  // ---- forecast -----------------------------------------------------------
-  function renderForecast() {
-    var card = $('fcCard');
-    var n = new Date();
-    var ev = sunTimesLocal(n.getFullYear(), n.getMonth()+1, n.getDate());
-    var sunsetLine = ev.setMs
-      ? '<div class="fcrow dim">Sunset today ' + fmtClock(ev.setMs) + ' — night hours start then.</div>'
-      : '';
-    if (!state.forecast) {
-      card.style.display = 'block';
-      card.innerHTML = '<h2>Adverse-weather windows</h2>' + sunsetLine
-        + '<div class="fcrow dim">Forecast unavailable right now.</div>';
-      return;
-    }
-    var hits = state.forecast.filter(function (f) {
-      return (f.precip_chance != null && +f.precip_chance >= 40)
-        || (f.precip_in != null && +f.precip_in >= 0.05)
-        || (f.evening_precip_chance != null && +f.evening_precip_chance >= 40);
-    });
-    var html = '<h2>Adverse-weather windows · next 7 days</h2>' + sunsetLine;
-    if (!hits.length) {
-      html += '<div class="fcrow dim">No adverse-weather windows in the forecast.</div>';
-    }
-    hits.forEach(function (f) {
-      var p = f.d.split('-');
-      var sev = sunTimesLocal(+p[0], +p[1], +p[2]);
-      var bits = [];
-      if (f.precip_chance != null) bits.push(Math.round(+f.precip_chance) + '% precip');
-      if (f.precip_in != null && +f.precip_in > 0) bits.push((+f.precip_in).toFixed(2) + ' in');
-      var combo = f.evening_precip_chance != null && +f.evening_precip_chance >= 40;
-      html += '<div class="fcrow">' + dateLabel(f.d) + ' · ' + bits.join(' · ')
-        + (combo ? '<div class="combo">Evening ' + Math.round(+f.evening_precip_chance) + '%'
-            + (f.evening_short_forecast ? ' — ' + esc(f.evening_short_forecast) : '')
-            + ' · drive after ' + (sev.setMs ? fmtClock(sev.setMs) : 'sunset')
-            + ' = night + adverse in one drive</div>' : '')
-        + '</div>';
-    });
-    card.style.display = 'block';
-    card.innerHTML = html;
   }
 
   // ---- drive list ---------------------------------------------------------
@@ -651,7 +629,6 @@
     }).then(function (j) {
       state = j;
       renderDash();
-      renderForecast();
       renderList();
     }).catch(function (e) { banner(String(e.message || e)); });
   }
