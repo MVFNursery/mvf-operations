@@ -211,6 +211,7 @@
   .badge-recur { background: rgba(167,139,250,0.16); color: #c4b5fd; }
   .badge-loc { background: rgba(96,165,250,0.14); color: #93c5fd; }
   .badge-area { background: rgba(196,132,252,0.14); color: #d8b4fe; }
+  .badge-project { background: rgba(94,234,212,0.12); color: #5eead4; }
   .badge-assignee { background: rgba(255,255,255,0.08); color: var(--text2); }
   .badge-suggest { background: rgba(240,184,64,0.12); color: var(--amber); }
   .badge-score { background: rgba(126,207,79,0.18); color: var(--green); font-weight: 700; }
@@ -269,6 +270,23 @@
   }
   .archive-row-btn:hover { color: var(--text2); border-color: var(--text2); }
   .archive-row-btn:active { opacity: 0.7; }
+
+  /* PROJECT LIST (Projects chip → drill into one project's tasks) */
+  .project-row {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+  }
+  .project-row:active { opacity: 0.7; }
+  .project-row.complete { opacity: 0.55; }
+  .project-name { flex: 1; font-size: 14px; min-width: 0; }
+  .project-count { font-size: 12px; color: var(--text3); background: var(--bg3); padding: 3px 9px; border-radius: 99px; flex-shrink: 0; }
+  .project-count.has-open { color: var(--green); background: rgba(126,207,79,0.12); }
+  .project-back {
+    background: none; border: none; font-family: inherit; cursor: pointer;
+    font-size: 13px; color: var(--text2); padding: 4px 12px 10px; text-align: left;
+  }
+  .project-back:active { opacity: 0.6; }
 
   /* SECTION LABEL */
   .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); padding: 14px 12px 6px; }
@@ -515,6 +533,8 @@ const WEBHOOK_GET  = N8N_BASE + '/mvfn-field-get';
 // ──────────────────────────────────────────────────────────
 
 let allTasks = [];
+let allProjects = [];         // [{id, slug, name, status, open_tasks}] — business tasks.projects (V019)
+let projectDrill = null;      // project id, or 'none' for the unfiled bucket, while inside the Projects view
 let allAreas = [];            // [{id, name}]
 let allUsers = [];            // [{slug, display_name}]
 let ownership = [];           // [{area, owner}]
@@ -547,6 +567,7 @@ async function loadTasks() {
     if (row && Array.isArray(row.tasks)) {
       // single-payload shape: {tasks, areas, users, ownership, me, categories, household_categories}
       allTasks = row.tasks;
+      allProjects = row.projects || [];
       allAreas = row.areas || [];
       allUsers = row.users || [];
       ownership = row.ownership || [];
@@ -596,12 +617,14 @@ function renderFilterChips() {
     '<button class="filter-chip' + (activeFilter === val ? ' active' : '') + '" onclick="setFilter(\'' + esc(val) + '\',this)">' + escH(label) + '</button>';
   let html = chip('All', 'All');
   if (me) html += chip('Mine', 'Mine');
+  if (allProjects.length) html += chip('Projects', 'Projects');
   categories.forEach(c => { html += chip(c.category_id, c.label); });
   html += '<button class="filter-chip' + (activeFilter === 'Proposed' ? ' active proposed-chip' : '') + '" id="proposedChip" onclick="setFilter(\'Proposed\',this)">Proposed</button>';
   bar.innerHTML = html;
 }
 function setFilter(val, el) {
   activeFilter = val;
+  projectDrill = null;   // leaving or re-entering the Projects view always starts at the list
   document.querySelectorAll('.filter-chip').forEach(c => { c.classList.remove('active'); c.classList.remove('proposed-chip'); });
   el.classList.add('active');
   if (val === 'Proposed') el.classList.add('proposed-chip');
@@ -611,6 +634,11 @@ function setFilter(val, el) {
 // ── RENDER ────────────────────────────────────────────────
 function renderTasks() {
   const list = document.getElementById('taskList');
+
+  if (activeFilter === 'Projects') {
+    renderProjectsView(list);
+    return;
+  }
 
   if (activeFilter === 'Proposed') {
     const proposed = allTasks.filter(t => t.status === 'proposed');
@@ -685,6 +713,61 @@ function renderTasks() {
 
 function toggleClosed() {
   closedExpanded = !closedExpanded;
+  renderTasks();
+}
+
+// ── PROJECTS VIEW ────────────────────────────────────────
+// List of projects (open-task counts), plus a "No project" bucket for the
+// unfiled majority; tap a row to drill into that project's open tasks. The
+// drilled list reuses card(), so every editor works from here too.
+function renderProjectsView(list) {
+  const openTasks = allTasks.filter(t => t.status === 'open' || t.status === 'blocked');
+
+  if (projectDrill) {
+    const proj = projectDrill === 'none' ? null : allProjects.find(p => p.id === projectDrill);
+    const name = projectDrill === 'none' ? 'No project' : (proj ? proj.name : 'Unknown project');
+    const drilled = openTasks
+      .filter(t => projectDrill === 'none' ? !t.project_ref : t.project_ref === projectDrill)
+      .sort((a, b) => {
+        const sa = a.score == null ? -Infinity : Number(a.score);
+        const sb = b.score == null ? -Infinity : Number(b.score);
+        if (sa !== sb) return sb - sa;
+        return Number(a.task_id) - Number(b.task_id);
+      });
+    document.getElementById('countBadge').textContent = drilled.length + ' open';
+    let html = '<button class="project-back" onclick="projectDrill=null;renderTasks()">‹ All projects</button>'
+             + '<div class="section-label" style="padding-top:0">' + escH(name) + '</div>';
+    if (!drilled.length) {
+      html += '<div class="empty">No open tasks here.</div>';
+    } else {
+      drilled.forEach((t, i) => { html += card(t, i); });
+    }
+    list.innerHTML = html;
+    return;
+  }
+
+  const unfiled = openTasks.filter(t => !t.project_ref).length;
+  document.getElementById('countBadge').textContent = allProjects.length + ' projects';
+  let html = '';
+  if (unfiled) {
+    html += '<div class="project-row" onclick="drillProject(\'none\')">'
+          + '<span class="project-name">📥 No project</span>'
+          + '<span class="project-count has-open">' + unfiled + ' open</span></div>';
+  }
+  allProjects.forEach(p => {
+    const n = Number(p.open_tasks) || 0;
+    html += '<div class="project-row' + (p.status === 'complete' ? ' complete' : '') + '" onclick="drillProject(\'' + esc(p.id) + '\')">'
+          + '<span class="project-name">' + escH(p.name) + '</span>'
+          + (p.status === 'complete' ? '<span class="badge badge-closed">complete</span>' : '')
+          + '<span class="project-count' + (n ? ' has-open' : '') + '">' + n + ' open</span></div>';
+  });
+  if (!html) html = '<div class="empty">No projects.</div>';
+  list.innerHTML = html;
+}
+
+function drillProject(id) {
+  projectDrill = id;
+  expandedId = null;
   renderTasks();
 }
 
@@ -821,6 +904,7 @@ function card(t, rank) {
           ${(!isDone && t.score!=null)?`<span class="badge badge-score${(rank!=null && rank<3)?' top':''}">★ ${Math.round(Number(t.score))}</span>`:''}
           ${t.category_label?`<span class="badge badge-category">${escH(t.category_label)}</span>`:''}
           ${t.area?`<span class="badge badge-area">📍 ${escH(t.area)}</span>`:''}
+          ${t.project?`<span class="badge badge-project">🗂 ${escH(t.project)}</span>`:''}
           ${t.assignee?`<span class="badge badge-assignee">👤 ${escH(userLabel(t.assignee))}</span>`:''}
           ${(!t.assignee && t.suggested_assignee)?`<span class="badge badge-suggest">💡 ${escH(userLabel(t.suggested_assignee))}?</span>`:''}
           ${t.effort_minutes?`<span class="badge badge-effort">${escH(fmtEffort(t.effort_minutes))}</span>`:''}
@@ -833,6 +917,7 @@ function card(t, rank) {
     <div class="task-expand${isOpen?' open':''}" id="exp-${esc(id)}">
       ${t.detail?`<div class="task-notes-text">${escH(t.detail)}</div>`:''}
       ${areaEditor(id, t.area)}
+      ${projectEditor(id, t.project_ref)}
       ${assigneeEditor(id, t.assignee, t.suggested_assignee)}
       ${locEditor(id, t.work_location)}
       <div class="note-row">
@@ -1502,6 +1587,20 @@ function areaEditor(id, curArea) {
     </div>
   </div>`;
 }
+// Active projects only in the picker — a complete project is history, not a
+// filing target — plus the task's current project even if complete (so the
+// pill shows what is set and can be un-set), plus None.
+function projectEditor(id, curRef) {
+  if (!allProjects.length) return '';
+  const opts = allProjects.filter(p => p.status === 'active' || p.id === curRef);
+  const pill = (v, txt, on) => `<button class="loc-pill${on?' active':''}" onclick="setProject('${esc(id)}','${esc(v)}')">${txt}</button>`;
+  return `<div class="loc-edit">
+    <div class="loc-edit-label">Project</div>
+    <div class="loc-btns">
+      ${opts.map(p => pill(p.id, '🗂 ' + escH(p.name), curRef === p.id)).join('')}${pill('', 'None', !curRef)}
+    </div>
+  </div>`;
+}
 function assigneeEditor(id, curAssignee, suggested) {
   if (!allUsers.length) return '';
   const pill = (v, txt, on) => `<button class="loc-pill${on?' active':''}" onclick="setAssignee('${esc(id)}','${esc(v)}')">${txt}</button>`;
@@ -1522,6 +1621,25 @@ async function setArea(taskId, areaId) {
     if (r.status === 'ok') {
       const t = taskById(taskId);
       if (t) { const a = allAreas.find(x => x.id === areaId); t.area = a ? a.name : null; }
+      renderTasks();
+      showToast('Saved ✓', 'success');
+    } else { showToast('Save failed', 'error'); }
+  } catch (e) { reportWriteFailure(e, 'Save'); }
+}
+async function setProject(taskId, projectId) {
+  showToast('Saving…', '');
+  try {
+    const r = await post({ action: 'set_project', task_id: taskId, project_id: projectId });
+    if (r.status === 'ok') {
+      const t = taskById(taskId);
+      if (t) {
+        t.project_ref = projectId || null;
+        const p = allProjects.find(x => x.id === projectId);
+        t.project = p ? p.name : null;
+      }
+      // Keep the list-row counts honest without a refetch.
+      allProjects.forEach(p => { p.open_tasks = allTasks.filter(x =>
+        (x.status === 'open' || x.status === 'blocked') && x.project_ref === p.id).length; });
       renderTasks();
       showToast('Saved ✓', 'success');
     } else { showToast('Save failed', 'error'); }
