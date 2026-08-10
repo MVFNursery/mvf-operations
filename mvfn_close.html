@@ -357,14 +357,19 @@
          </table></div>`
       : `<div class="hint">no open tasks due within 60 days of month end</div>`;
 
-    // registry
+    // registry — month accounts first, then registry accounts with no activity this
+    // month (they still hold the income/liability panels locked until typed)
+    const acctRow = (name, type, activity) => `<tr><td>${esc(name)}</td>
+        <td class="num">${activity}</td>
+        <td><select class="acctype ${type ? '' : 'untyped'}" data-account="${esc(name)}">
+          ${TYPES.map(t => `<option value="${t}" ${(type || '') === t ? 'selected' : ''}>${t || '— untyped —'}</option>`).join('')}
+        </select></td></tr>`;
+    const inMonth = new Set(D.accounts.map(a => a.account));
+    const dormant = (D.registry || []).filter(r => !inMonth.has(r.account));
     const registry = `<div class="scrollwrap"><table>
       <tr><th>account</th><th class="num">activity</th><th>type</th></tr>
-      ${D.accounts.map(a => `<tr><td>${esc(a.account)}</td>
-        <td class="num">${a.txn_count} txns</td>
-        <td><select class="acctype ${a.account_type ? '' : 'untyped'}" data-account="${esc(a.account)}">
-          ${TYPES.map(t => `<option value="${t}" ${(a.account_type || '') === t ? 'selected' : ''}>${t || '— untyped —'}</option>`).join('')}
-        </select></td></tr>`).join('')}
+      ${D.accounts.map(a => acctRow(a.account, a.account_type, `${a.txn_count} txns`)).join('')}
+      ${dormant.map(r => acctRow(r.account, r.account_type, '<span style="color:#8a8a70">none this month</span>')).join('')}
     </table></div>
     <div class="hint">typing accounts is what unlocks computed income + liability panels. Types are yours to confirm &mdash; nothing guesses them.</div>`;
 
@@ -386,7 +391,7 @@
       <div class="card" id="ph4"><h2>Phase 4 &mdash; Tax &amp; compliance ${prog(4)}</h2>
         ${liab}${tasks}${checklistHTML(4)}</div>
       <div class="card" id="accounts"><h2>Accounts</h2>
-        <div class="sub">Wave chart of accounts seen in imports</div>${registry}</div>
+        <div class="sub">full Wave chart of accounts &mdash; including accounts with no activity this month</div>${registry}</div>
       <div class="card" id="ph5"><h2>Close out ${prog(5)}</h2>
         ${checklistHTML(5)}
         <label class="hint" for="runNotes">month notes</label>
