@@ -50,6 +50,12 @@
   .done-btn { background:var(--ink); color:#fff; }
   .cancel-btn { background:#e7e2d2; color:var(--red); }
   .empty { color:var(--paper); text-align:center; padding:30px 10px; font-size:.9rem; opacity:.85; }
+  .chip.proj { background:#cfe3dd; color:#1f4a3d; }
+  .projbar { margin-bottom:10px; }
+  .projbar select { width:100%; padding:8px 10px; border:0; border-radius:8px;
+    font-family:inherit; font-size:.9rem; background:var(--paper); color:var(--ink); }
+  .actions select.proj-sel { flex:1; padding:8px; border:0; border-radius:8px;
+    font-family:inherit; font-size:.8rem; background:#e7e2d2; color:#3d4a1e; min-width:0; }
   .section-h { color:var(--paper); font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; margin:16px 4px 8px; opacity:.8; }
 </style>
 </head>
@@ -61,6 +67,8 @@
 </header>
 <main>
   <div class="banner" id="banner"></div>
+
+  <div class="projbar"><select id="projFilter"></select></div>
 
   <details class="add" id="addBox">
     <summary>+ Add task</summary>
@@ -114,7 +122,7 @@
   var API = 'https://megamachine.taile865b6.ts.net:5680/webhook/mvfn-household-tasks';
   var ME_KEY = 'mvfn_household_user';
   var $ = function (id) { return document.getElementById(id); };
-  var state = { users: [], categories: [], tasks: [] };
+  var state = { users: [], categories: [], tasks: [], projects: [] };
 
   function banner(msg, kind) {
     var b = $('banner');
@@ -156,6 +164,16 @@
       cSel.insertAdjacentHTML('beforeend',
         '<option value="' + esc(c.category_id) + '">' + esc(c.label) + '</option>');
     });
+    // Project filter (top of list). Selection survives a reload of the payload.
+    var pf = $('projFilter'), was = pf.value;
+    var opts = '<option value="">All projects</option><option value="none">No project</option>';
+    (state.projects || []).forEach(function (p) {
+      opts += '<option value="' + esc(p.id) + '">' + esc(p.name)
+            + (p.status === 'complete' ? ' (complete)' : '')
+            + ' · ' + esc(p.open_tasks) + ' open</option>';
+    });
+    pf.innerHTML = opts;
+    if (was && pf.querySelector('option[value="' + was + '"]')) pf.value = was;
   }
 
   function chip(text, cls) { return '<span class="chip ' + (cls || '') + '">' + esc(text) + '</span>'; }
@@ -167,6 +185,9 @@
       return t.visibility !== 'private' || t.assigned_to === me()
         || (!t.assigned_to && t.created_by === me());
     });
+    var pf = $('projFilter').value;
+    if (pf === 'none') visible = visible.filter(function (t) { return !t.project_ref; });
+    else if (pf) visible = visible.filter(function (t) { return t.project_ref === pf; });
     if (!visible.length) {
       $('list').innerHTML = '<div class="empty">No open tasks. Add one above.</div>';
       return;
@@ -174,6 +195,7 @@
     var html = '';
     visible.forEach(function (t) {
       var chips = [chip(t.category_label)];
+      if (t.project) chips.push(chip('🗂 ' + t.project, 'proj'));
       chips.push(chip(t.assigned_to
         ? '@' + (state.users.find(function (u) { return u.user_id === t.assigned_to; }) || { display_name: t.assigned_to }).display_name
         : 'unassigned'));
@@ -193,9 +215,33 @@
         + '<div class="actions">'
         + '<button class="done-btn" data-done="' + t.task_id + '">Done</button>'
         + '<button class="cancel-btn" data-cancel="' + t.task_id + '">Cancel</button>'
+        + projSelect(t)
         + '</div></div>';
     });
     $('list').innerHTML = html;
+  }
+
+  // Per-card project picker: active projects (+ the task's own even if
+  // complete, so it can be un-set), No project, and New project… which
+  // prompts for a name, creates it, then files the task into it.
+  function projSelect(t) {
+    var h = '<select class="proj-sel" data-task="' + t.task_id + '">'
+          + '<option value=""' + (!t.project_ref ? ' selected' : '') + '>No project</option>';
+    (state.projects || []).forEach(function (p) {
+      if (p.status !== 'active' && p.id !== t.project_ref) return;
+      h += '<option value="' + esc(p.id) + '"' + (t.project_ref === p.id ? ' selected' : '')
+         + '>🗂 ' + esc(p.name) + '</option>';
+    });
+    return h + '<option value="__new">➕ New project…</option></select>';
+  }
+
+  function setProject(taskId, projId, sel) {
+    post({ action: 'set_project', task_id: taskId, project_id: projId, user_id: me() }, sel)
+      .then(function (j) {
+        if (!j || !j.result) return;
+        banner(projId ? ('Filed “' + j.result.title + '” under ' + j.result.project)
+                      : ('Removed “' + j.result.title + '” from its project'), 'ok');
+      });
   }
 
   function post(payload, btn) {
@@ -222,6 +268,26 @@
   $('me').addEventListener('change', function () {
     localStorage.setItem(ME_KEY, $('me').value);
     renderList();
+  });
+
+  $('projFilter').addEventListener('change', renderList);
+
+  $('list').addEventListener('change', function (e) {
+    var sel = e.target.closest('select.proj-sel');
+    if (!sel) return;
+    var taskId = parseInt(sel.dataset.task, 10);
+    if (sel.value === '__new') {
+      var name = (prompt('New project name:') || '').trim();
+      if (!name) { renderList(); return; }
+      post({ action: 'add_project', name: name }, sel).then(function (j) {
+        // add returns the bare RETURNING row {id, slug, name, status}
+        var created = j && (j.result || j);
+        if (!created || !created.id) { renderList(); return; }
+        setProject(taskId, created.id, null);
+      });
+      return;
+    }
+    setProject(taskId, sel.value, sel);
   });
 
   $('f_go').addEventListener('click', function () {
