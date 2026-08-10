@@ -62,6 +62,8 @@
   .check .c-detail { font-size: .7rem; color: #8a8a70; margin-top: 2px; }
   .check .c-meta { font-size: .66rem; color: #5a6b2d; margin-top: 2px; }
   .check.done .c-label { color: #5a6b2d; text-decoration: line-through; text-decoration-thickness: 1px; }
+  .check.na .c-label { color: #8a8a70; font-style: italic; }
+  .check.na .c-meta { color: #8a8a70; }
 
   details { margin: 4px 0; }
   summary { cursor: pointer; font-size: .75rem; color: #2d5016; }
@@ -176,16 +178,20 @@
 
   // ── rendering ──────────────────────────────────────────────────────────────
 
+  // state helper: 'open' | 'done' | 'na' (pre-V136 payloads only had done_at)
+  const st = c => c.state || (c.done_at ? 'done' : 'open');
+
   function checklistHTML(phase) {
     const items = D.checklist.filter(c => c.phase === phase);
     return items.map(c => {
-      const done = !!c.done_at;
-      return `<div class="check ${done ? 'done' : ''}">
-        <input type="checkbox" data-item="${esc(c.item_key)}" ${done ? 'checked' : ''}>
+      const s = st(c);
+      return `<div class="check ${s === 'open' ? '' : s}">
+        <input type="checkbox" data-item="${esc(c.item_key)}" data-state="${s}"
+          ${s === 'done' ? 'checked' : ''} title="tap cycles: open &rarr; done &rarr; n/a">
         <div>
           <div class="c-label">${esc(c.label)}</div>
           ${c.detail ? `<div class="c-detail">${esc(c.detail)}</div>` : ''}
-          ${done ? `<div class="c-meta">done by ${esc(c.done_by || '?')} &middot; ${esc((c.done_at || '').slice(0, 16))}</div>` : ''}
+          ${s !== 'open' ? `<div class="c-meta">${s === 'na' ? 'n/a' : 'done'} by ${esc(c.done_by || '?')} &middot; ${esc((c.done_at || '').slice(0, 16))}</div>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -193,8 +199,9 @@
 
   function prog(phase) {
     const items = D.checklist.filter(c => c.phase === phase);
-    const done = items.filter(c => c.done_at).length;
-    return `<span class="prog">${done}/${items.length}</span>`;
+    const settled = items.filter(c => st(c) !== 'open').length;
+    const na = items.filter(c => st(c) === 'na').length;
+    return `<span class="prog">${settled}/${items.length}${na ? ` &middot; ${na} n/a` : ''}</span>`;
   }
 
   // ── "What's left" — the directed step list for this month ─────────────────
@@ -211,7 +218,7 @@
     const expRows = unc.filter(r => r.debit != null).length;
     const cash = D.accounts.find(a => a.account === 'Cash on Hand');
     const item = k => D.checklist.find(c => c.item_key === k);
-    const open = D.checklist.filter(c => !c.done_at);
+    const open = D.checklist.filter(c => st(c) === 'open');
     if (!D.import) {
       s.push({ t: `In Wave, run <b>Reports &rarr; Account Transactions</b> for ${esc(D.period.label)} (cash basis), export the CSV, and upload it here.`, act: 'upload' });
     } else {
@@ -229,7 +236,7 @@
         }
       }
       if (uncDebit > 0) s.push({ t: `Categorize <b>${money(uncDebit)}</b> of Uncategorized Expense in Wave (${expRows} row${expRows === 1 ? '' : 's'} &mdash; list in Phase 1). Then re-export + upload again.`, a: '#ph1' });
-      if (cash && item('p1_balances') && !item('p1_balances').done_at)
+      if (cash && item('p1_balances') && st(item('p1_balances')) === 'open')
         s.push({ t: `Count the drawer against Cash on Hand <b>${money(cash.ending_balance)}</b>; check M1st + the card against statements.`, a: '#ph1' });
     }
     if (Number(D.scorecard.untyped_accounts) > 0)
@@ -398,6 +405,8 @@
         <textarea id="runNotes" placeholder="anything unusual this month&hellip;">${esc(D.run ? D.run.notes : '')}</textarea>
         <button class="small" id="saveNotes">Save notes</button>
         <span id="closeout"></span>
+        <div class="hint">checkbox taps cycle: open &rarr; &#10003; done &rarr; &ndash; n/a (doesn't apply this month)</div>
+        <div class="hint">closing here records the <b>books</b> close only &mdash; the &ldquo;Month-end close (SOP)&rdquo; row in the Tasks app is completed separately</div>
         <button class="primary ${closed ? 'warn' : ''}" id="closeBtn">${closed ? 'Reopen month' : 'Close ' + esc(D.period.label)}</button>
       </div>`;
 
@@ -463,12 +472,15 @@
       fileInput.value = '';
     });
     document.querySelectorAll('.check input[type="checkbox"]').forEach(cb => {
-      cb.addEventListener('change', async () => {
+      cb.indeterminate = cb.dataset.state === 'na';
+      cb.addEventListener('click', async e => {
+        e.preventDefault(); // reload() paints the real state; taps cycle open -> done -> na
+        const next = { open: 'done', done: 'na', na: 'open' }[cb.dataset.state || 'open'];
         cb.disabled = true;
         try {
-          await post({ action: 'set_item', month, item_key: cb.dataset.item, done: cb.checked, actor: actor() });
+          await post({ action: 'set_item', month, item_key: cb.dataset.item, state: next, actor: actor() });
           await load(month, true);
-        } catch (e) { toast(e.message, true); cb.checked = !cb.checked; }
+        } catch (e2) { toast(e2.message, true); }
         cb.disabled = false;
       });
     });
@@ -491,7 +503,7 @@
     });
     $('closeBtn').addEventListener('click', async () => {
       const closed = D.run && D.run.closed_at;
-      const openItems = D.checklist.filter(c => !c.done_at).length;
+      const openItems = D.checklist.filter(c => st(c) === 'open').length;
       if (!closed && openItems > 0 && !confirm(`${openItems} checklist item(s) still open. Close ${D.period.label} anyway?`)) return;
       if (closed && !confirm(`Reopen ${D.period.label}?`)) return;
       try {
