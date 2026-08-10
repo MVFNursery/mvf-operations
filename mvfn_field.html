@@ -905,6 +905,7 @@ function card(t, rank) {
           ${t.category_label?`<span class="badge badge-category">${escH(t.category_label)}</span>`:''}
           ${t.area?`<span class="badge badge-area">📍 ${escH(t.area)}</span>`:''}
           ${t.project?`<span class="badge badge-project">🗂 ${escH(t.project)}</span>`:''}
+          ${(!t.project && t.suggested_project)?`<span class="badge badge-suggest">💡 ${escH(t.suggested_project)}?</span>`:''}
           ${t.assignee?`<span class="badge badge-assignee">👤 ${escH(userLabel(t.assignee))}</span>`:''}
           ${(!t.assignee && t.suggested_assignee)?`<span class="badge badge-suggest">💡 ${escH(userLabel(t.suggested_assignee))}?</span>`:''}
           ${t.effort_minutes?`<span class="badge badge-effort">${escH(fmtEffort(t.effort_minutes))}</span>`:''}
@@ -917,7 +918,7 @@ function card(t, rank) {
     <div class="task-expand${isOpen?' open':''}" id="exp-${esc(id)}">
       ${t.detail?`<div class="task-notes-text">${escH(t.detail)}</div>`:''}
       ${areaEditor(id, t.area)}
-      ${projectEditor(id, t.project_ref)}
+      ${projectEditor(id, t.project_ref, t.suggested_project_ref, t.suggested_project)}
       ${assigneeEditor(id, t.assignee, t.suggested_assignee)}
       ${locEditor(id, t.work_location)}
       <div class="note-row">
@@ -1590,14 +1591,21 @@ function areaEditor(id, curArea) {
 // Active projects only in the picker — a complete project is history, not a
 // filing target — plus the task's current project even if complete (so the
 // pill shows what is set and can be un-set), plus None.
-function projectEditor(id, curRef) {
+function projectEditor(id, curRef, suggestedRef, suggestedName) {
   if (!allProjects.length) return '';
   const opts = allProjects.filter(p => p.status === 'active' || p.id === curRef);
   const pill = (v, txt, on) => `<button class="loc-pill${on?' active':''}" onclick="setProject('${esc(id)}','${esc(v)}')">${txt}</button>`;
+  // Overnight suggester hint (V020): same shape as the assignee hint. Tapping
+  // the marked pill is an ordinary set_project; the server clears the
+  // suggestion on any explicit choice.
+  const showHint = !curRef && suggestedRef;
+  const hint = showHint
+    ? `<div class="loc-edit-label" style="color:var(--amber)">💡 Overnight pipeline suggests ${escH(suggestedName || 'a project')} — tap to accept</div>` : '';
   return `<div class="loc-edit">
     <div class="loc-edit-label">Project</div>
+    ${hint}
     <div class="loc-btns">
-      ${opts.map(p => pill(p.id, '🗂 ' + escH(p.name), curRef === p.id)).join('')}${pill('', 'None', !curRef)}
+      ${opts.map(p => pill(p.id, ((showHint && suggestedRef === p.id) ? '💡 ' : '🗂 ') + escH(p.name), curRef === p.id)).join('')}${pill('', 'None', !curRef)}
     </div>
   </div>`;
 }
@@ -1636,6 +1644,8 @@ async function setProject(taskId, projectId) {
         t.project_ref = projectId || null;
         const p = allProjects.find(x => x.id === projectId);
         t.project = p ? p.name : null;
+        t.suggested_project_ref = null;   // server cleared it (V020); mirror locally
+        t.suggested_project = null;
       }
       // Keep the list-row counts honest without a refetch.
       allProjects.forEach(p => { p.open_tasks = allTasks.filter(x =>
