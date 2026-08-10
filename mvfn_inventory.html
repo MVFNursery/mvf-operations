@@ -137,6 +137,27 @@
   .badge.other   { color: #6b7280; }
   .native-dot { color: #047857; font-size: 0.72rem; }
 
+  /* Archived (closed-out) rows — collapsed section below the live list */
+  details.archived { margin-top: 18px; }
+  details.archived summary {
+    cursor: pointer; font-family: 'Fraunces', serif; font-weight: 600;
+    font-size: 0.95rem; color: #8a8a7a; padding: 8px 2px;
+  }
+  details.archived .stock-list { margin-top: 10px; }
+  .stock-card.closed { opacity: 0.65; border-style: dashed; cursor: default; }
+  .stock-card.closed .closeinfo { font-size: 0.72rem; color: #8a8a7a; margin-top: 8px; }
+  .stock-card.closed button.reopen {
+    margin-top: 10px; padding: 8px 14px; border: 2px solid #8a8a7a; background: white;
+    color: #2d3319; border-radius: 6px; font-family: 'Fraunces', serif; font-size: 0.8rem;
+    font-weight: 600; cursor: pointer;
+  }
+  .editor button.closeout {
+    padding: 9px 12px; border: 2px solid #7f1d1d; background: white; color: #7f1d1d;
+    border-radius: 6px; font-family: 'Fraunces', serif; font-size: 0.8rem; font-weight: 600;
+    cursor: pointer;
+  }
+  .editor .closehint { font-size: 0.7rem; color: #8a8a7a; }
+
   /* Inline editor (inside card, shown when the card is tapped) */
   .editor { display: none; margin-top: 12px; border-top: 1px dashed #d1d5db; padding-top: 12px; }
   .stock-card.editing .editor { display: block; }
@@ -312,6 +333,11 @@
 
     <div id="list" class="stock-list"></div>
 
+    <details class="archived" id="archivedWrap" style="display:none;">
+      <summary id="archivedSummary">Archived</summary>
+      <div id="archivedList" class="stock-list"></div>
+    </details>
+
     <div id="state" class="state">Loading stock…</div>
     <div class="updated" id="updated"></div>
   </div>
@@ -328,7 +354,7 @@
     <div class="rmodal-card">
       <div class="rmodal-title" id="rmTitle"></div>
       <div class="rmodal-sub" id="rmSub"></div>
-      <div class="rmodal-q">What happened?</div>
+      <div class="rmodal-q" id="rmQ">What happened?</div>
       <div class="rmodal-opts" id="rmOpts"></div>
       <div class="rmodal-detail" id="rmDetail"></div>
       <div class="rmodal-msg" id="rmMsg"></div>
@@ -468,23 +494,39 @@
     const q = $('search').value.trim().toLowerCase();
     const statusF = $('statusFilter').value;
 
-    const rows = stock
-      .map(s => ({ s, sp: speciesById[speciesKey(s.species_id)] || {} }))
-      .filter(({ s, sp }) => {
-        if (statusF !== 'all' && s.status !== statusF) return false;
-        if (!q) return true;
-        const hay = `${sp.common_name || ''} ${sp.scientific_name || ''} ${s.species_id || ''}`.toLowerCase();
-        return hay.includes(q);
-      })
-      .sort((a, b) =>
-        (a.sp.common_name || a.s.species_id || '').localeCompare(b.sp.common_name || b.s.species_id || ''));
+    // Closed-out rows (closed_at set) are done forever: they live in a collapsed
+    // Archived section, not among the live cards. Search reaches them; the
+    // status filter doesn't (their status is just the stage the row died in).
+    const all = stock.map(s => ({ s, sp: speciesById[speciesKey(s.species_id)] || {} }));
+    const matchesSearch = ({ s, sp }) => {
+      if (!q) return true;
+      const hay = `${sp.common_name || ''} ${sp.scientific_name || ''} ${s.species_id || ''}`.toLowerCase();
+      return hay.includes(q);
+    };
+    const bySpecies = (a, b) =>
+      (a.sp.common_name || a.s.species_id || '').localeCompare(b.sp.common_name || b.s.species_id || '');
+    const rows = all
+      .filter(({ s }) => !s.closed_at)
+      .filter(({ s }) => statusF === 'all' || s.status === statusF)
+      .filter(matchesSearch)
+      .sort(bySpecies);
+    const archived = all.filter(({ s }) => s.closed_at).filter(matchesSearch).sort(bySpecies);
 
-    const forSale = stock.filter(s => s.status === 'for-sale' && Number(s.quantity) > 0).length;
-    const species = new Set(stock.map(s => speciesKey(s.species_id))).size;
+    const live = stock.filter(s => !s.closed_at);
+    const archTotal = stock.length - live.length;
+    const forSale = live.filter(s => s.status === 'for-sale' && Number(s.quantity) > 0).length;
+    const species = new Set(live.map(s => speciesKey(s.species_id))).size;
     $('summary').textContent =
-      `${stock.length} stock items · ${forSale} for sale · ${species} species`;
+      `${live.length} stock items · ${forSale} for sale · ${species} species`
+      + (archTotal ? ` · ${archTotal} archived` : '');
 
-    if (!rows.length) { setState('No matching stock.', false); $('list').innerHTML = ''; return; }
+    $('archivedWrap').style.display = archived.length ? '' : 'none';
+    $('archivedSummary').textContent =
+      `Archived (${archived.length}${archived.length !== archTotal ? ' of ' + archTotal : ''})`;
+    $('archivedList').innerHTML = archived.map(({ s, sp }) => archivedCardHTML(s, sp)).join('');
+    archived.forEach(({ s }) => wireArchivedCard(s.stock_id));
+
+    if (!rows.length && !archived.length) { setState('No matching stock.', false); $('list').innerHTML = ''; return; }
     setState('', false);
 
     $('list').innerHTML = rows.map(({ s, sp }) => cardHTML(s, sp)).join('');
@@ -509,6 +551,42 @@
       ${loc}
       ${editorHTML(s)}
     </div>`;
+  }
+
+  function archivedCardHTML(s, sp) {
+    const name = sp.common_name || s.species_id || 'Unknown';
+    const sci = sp.scientific_name ? `<div class="sci">${esc(sp.scientific_name)}</div>` : '';
+    const closedDate = s.closed_at ? new Date(s.closed_at).toLocaleDateString() : '';
+    return `<div class="stock-card closed" data-arch="${s.stock_id}">
+      <div class="name">${esc(name)}</div>
+      ${sci}
+      <div class="meta">
+        <span>${esc(s.container_size || '—')}</span>
+        <span class="badge ${statusClass(s.status)}">${esc(s.status || '—')}</span>
+      </div>
+      <div class="closeinfo">closed ${esc(closedDate)} · ${esc(s.close_reason || '')}</div>
+      ${s.notes ? `<div class="loc">${esc(s.notes)}</div>` : ''}
+      <button class="reopen" type="button">Reopen</button>
+    </div>`;
+  }
+
+  function wireArchivedCard(stockId) {
+    const card = document.querySelector(`[data-arch="${stockId}"]`);
+    if (!card) return;
+    const btn = card.querySelector('button.reopen');
+    btn.addEventListener('click', async () => {
+      if (!confirm('Reopen this stock row? It returns to the live list at qty 0.')) return;
+      btn.disabled = true; btn.textContent = 'Reopening…';
+      try {
+        const data = await postAction({ action: 'reopen_stock', stock_id: stockId });
+        if (Number(data.result && data.result.reopened) !== 1) throw new Error('server did not reopen the row');
+        showToast('Reopened');
+        await load();
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Reopen';
+        alert(`Reopen failed: ${err.message}`);
+      }
+    });
   }
 
   function editorHTML(s) {
@@ -536,6 +614,10 @@
         <label>Loc</label>
         <input class="locinput" type="text" value="${esc(s.location || '')}" placeholder="location">
         <button class="save" type="button" data-act="meta">Save</button>
+      </div>
+      <div class="line closeline" style="${Number(s.quantity ?? 0) === 0 ? '' : 'display:none;'}">
+        <button class="closeout" type="button" data-act="close">Close out…</button>
+        <span class="closehint">done forever — moves the row to Archived</span>
       </div>
     </div>`;
   }
@@ -585,6 +667,7 @@
             updateDelta();
             setMsg('✓ saved', 'ok');
             card.querySelector('.meta .qty').textContent = `${n} avail`;
+            card.querySelector('.closeline').style.display = n === 0 ? '' : 'none';
           },
         });
         return;
@@ -597,6 +680,7 @@
         setMsg('✓ saved', 'ok');
         showToast(`Count saved · ${n}`);
         card.querySelector('.meta .qty').textContent = `${n} avail`;
+        card.querySelector('.closeline').style.display = n === 0 ? '' : 'none';
       } catch (err) {
         setMsg(`✗ ${err.message} — tap to retry`, 'err');
       } finally { btn.disabled = false; }
@@ -642,6 +726,9 @@
         setMsg(`✗ ${err.message} — tap to retry`, 'err');
       } finally { btn.disabled = false; }
     });
+
+    // Close out — only offered at qty 0; the server re-checks both guards.
+    card.querySelector('[data-act="close"]').addEventListener('click', () => openCloseModal(s));
   }
 
   // ---- Add Stock ----
@@ -956,6 +1043,7 @@
   // that key is unique in the current grain, so .find() is deterministic.
   function findCounterpart(s, targetStatus) {
     return stock.find(x => x.stock_id !== s.stock_id
+      && !x.closed_at                                  // never move stock onto a closed row
       && speciesKey(x.species_id) === speciesKey(s.species_id)
       && (x.container_size || '') === (s.container_size || '')
       && x.status === targetStatus) || null;
@@ -974,6 +1062,7 @@
     $('rmTitle').textContent = `${sp.common_name || s.species_id || 'Unknown'} · ${s.container_size || '—'}`;
     $('rmSub').textContent =
       `${sideName(s.status)} · ${oldQty} → ${newQty} (${delta > 0 ? '+' : ''}${delta})`;
+    $('rmQ').textContent = 'What happened?';       // the close-out modal reuses this dialog
     $('rmMsg').textContent = '';
     $('rmDetail').innerHTML = '';
     $('rmConfirm').style.display = 'none';
@@ -1085,6 +1174,64 @@
   function closeReasonModal() {
     $('rmodal').classList.remove('show');
     $('rmodal').querySelectorAll('button').forEach(b => b.disabled = false);
+  }
+
+  // ---- Close-out modal (reuses the reason-modal dialog) ----
+  // Closure is a column pair (closed_at + close_reason), NOT a status: the row
+  // keeps the stage it died in and moves to the Archived section. The reason
+  // taxonomy is closed — it must match the server's guard list exactly.
+  const CLOSE_REASONS = [
+    { key: 'mistake',              label: 'Mistake — row never should have existed' },
+    { key: 'container-phased-out', label: 'Container phased out' },
+    { key: 'superseded-by-split',  label: 'Superseded by a split' },
+    { key: 'snapshot-period-end',  label: 'Period-end snapshot leftover' },
+  ];
+
+  function openCloseModal(s) {
+    const sp = speciesById[speciesKey(s.species_id)] || {};
+    $('rmTitle').textContent = `${sp.common_name || s.species_id || 'Unknown'} · ${s.container_size || '—'}`;
+    $('rmSub').textContent = 'Close out forever — moves to Archived (reopenable)';
+    $('rmQ').textContent = 'Why is this row done for good?';
+    $('rmMsg').textContent = '';
+    $('rmDetail').innerHTML = '';
+    $('rmConfirm').style.display = 'none';
+    $('rmOpts').innerHTML = CLOSE_REASONS.map(o =>
+      `<button type="button" data-reason="${o.key}">${esc(o.label)}</button>`).join('');
+
+    let chosen = null;
+    $('rmOpts').querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        chosen = btn.getAttribute('data-reason');
+        $('rmOpts').querySelectorAll('button').forEach(b => b.classList.toggle('sel', b === btn));
+        $('rmMsg').textContent = '';
+        $('rmDetail').innerHTML = `<textarea rows="2" placeholder="Note (optional)"></textarea>`;
+        $('rmConfirm').style.display = '';
+      });
+    });
+
+    $('rmConfirm').onclick = async () => {
+      if (!chosen) return;
+      const payload = { action: 'close_stock', stock_id: s.stock_id, reason: chosen };
+      const noteEl = $('rmDetail').querySelector('textarea');
+      if (noteEl && noteEl.value.trim()) payload.note = noteEl.value.trim();
+      $('rmodal').querySelectorAll('button').forEach(b => b.disabled = true);
+      try {
+        const data = await postAction(payload);
+        // The server refuses (closed=0) unless the row is still open AND at qty 0.
+        if (Number(data.result && data.result.closed) !== 1) {
+          throw new Error('row not closed — it must be at 0 and still open (refresh and retry)');
+        }
+        closeReasonModal();
+        showToast('Closed out');
+        await load();
+      } catch (err) {
+        $('rmodal').querySelectorAll('button').forEach(b => b.disabled = false);
+        $('rmMsg').textContent = `✗ ${err.message}`;
+      }
+    };
+    $('rmCancel').onclick = closeReasonModal;
+    $('rmodal').querySelectorAll('button').forEach(b => b.disabled = false);
+    $('rmodal').classList.add('show');
   }
 
   // Centered checkmark confirmation; auto-dismisses after 3s, OK/backdrop dismiss early.
