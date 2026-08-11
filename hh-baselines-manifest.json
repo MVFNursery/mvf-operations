@@ -1,0 +1,11 @@
+{
+  "name": "Scene Baselines",
+  "short_name": "Baselines",
+  "start_url": "hh_baselines.html",
+  "display": "standalone",
+  "background_color": "#14263d",
+  "theme_color": "#1f3a5f",
+  "icons": [
+    { "src": "icon-hh-baselines.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

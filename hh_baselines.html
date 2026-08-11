@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3a5f">
+<link rel="manifest" href="hh-baselines-manifest.json">
+<title>Scene Baselines</title>
+<script src="mvfn-auth.js"
+        data-token-key="mvfn_household_token"
+        data-validate-url="https://megamachine.taile865b6.ts.net:5680/webhook/hh-baselines"></script>
+<style>
+  :root { --ink:#1f3a5f; --slate:#4a6584; --paper:#eef1f5; --card:#fbfcfe;
+          --red:#9b2c1f; --green:#2d6a3f; --amber:#9a6b1f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#14263d; font-family:Georgia,serif; color:#222; }
+  header { background:var(--ink); color:#fff; padding:14px 16px 12px; display:flex; align-items:baseline; gap:10px; }
+  header h1 { font-size:1.15rem; margin:0; flex:1; }
+  header button { border:0; border-radius:6px; padding:5px 10px; font-family:inherit; font-size:.78rem;
+    background:var(--paper); color:var(--ink); cursor:pointer; }
+  main { max-width:560px; margin:0 auto; padding:12px 12px 80px; }
+  .banner { display:none; background:var(--red); color:#fff; padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:.85rem; }
+  .banner.ok { background:var(--green); }
+  .card { background:var(--card); border-radius:12px; padding:12px 14px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.25); }
+  .card h2 { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--slate); margin:0 0 8px; }
+  label { display:block; font-size:.78rem; color:var(--slate); margin:8px 0 3px; }
+  input[type=text], textarea { width:100%; padding:9px; border:1px solid #c5cede; border-radius:8px;
+    font-family:inherit; font-size:.95rem; background:#fff; }
+  textarea { min-height:52px; resize:vertical; }
+  .row { display:flex; gap:10px; align-items:center; }
+  .chk { display:flex; gap:6px; align-items:center; font-size:.85rem; color:#333; margin-top:10px; }
+  .btn { border:0; border-radius:8px; padding:11px 14px; font-family:inherit; font-size:.95rem; font-weight:700; cursor:pointer; }
+  .btn.primary { background:var(--ink); color:#fff; width:100%; margin-top:12px; }
+  .btn.danger { background:var(--red); color:#fff; }
+  .btn[disabled] { opacity:.55; cursor:wait; }
+  .bl { display:flex; gap:10px; padding:10px 0; border-top:1px solid #e3e8ef; cursor:pointer; }
+  .bl:first-of-type { border-top:0; }
+  .bl img { width:96px; height:54px; object-fit:cover; border-radius:6px; background:#0a1420; flex:none; }
+  .bl .meta { flex:1; min-width:0; }
+  .bl .lab { font-weight:700; font-size:.92rem; }
+  .bl .sub { font-size:.75rem; color:var(--slate); margin-top:2px; }
+  .tag { display:inline-block; font-size:.65rem; padding:1px 6px; border-radius:99px; background:var(--amber); color:#fff; vertical-align:1px; }
+  .bl input[type=checkbox] { align-self:center; width:18px; height:18px; }
+  #cmpbar { position:fixed; bottom:0; left:0; right:0; background:var(--ink); color:#fff; padding:10px 16px;
+    display:none; justify-content:space-between; align-items:center; font-size:.85rem; }
+  #cmpbar button { border:0; border-radius:6px; padding:7px 14px; font-family:inherit; font-weight:700;
+    background:#fff; color:var(--ink); cursor:pointer; }
+  .ovl { position:fixed; inset:0; background:rgba(10,18,30,.94); z-index:50; overflow-y:auto; display:none; padding:14px; }
+  .ovl .inner { max-width:760px; margin:0 auto; }
+  .ovl img { width:100%; border-radius:10px; background:#000; }
+  .ovl .close { position:sticky; top:0; float:right; background:#fff; color:var(--ink); border:0;
+    border-radius:8px; padding:8px 14px; font-family:inherit; font-weight:700; cursor:pointer; margin-bottom:8px; }
+  .ovl .card { margin-top:10px; }
+  .kv { width:100%; border-collapse:collapse; font-size:.82rem; }
+  .kv td { padding:4px 6px; border-top:1px solid #e3e8ef; vertical-align:top; }
+  .kv td:first-child { color:var(--slate); white-space:nowrap; }
+  .kv .diff { background:#fdf3e4; font-weight:700; }
+  .cmp2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  @media (max-width:520px) { .cmp2 { grid-template-columns:1fr; } }
+  .desc { font-size:.85rem; line-height:1.45; color:#333; }
+  .muted { color:var(--slate); font-size:.8rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Scene Baselines</h1>
+  <button onclick="load()">Refresh</button>
+  <button onclick="mvfnLock()">Lock</button>
+</header>
+<main>
+  <div id="banner" class="banner"></div>
+
+  <div class="card">
+    <h2>Capture baseline now</h2>
+    <label for="f_label">Label</label>
+    <input id="f_label" type="text" list="labels" placeholder="default_night" autocapitalize="off">
+    <datalist id="labels">
+      <option value="default_night"><option value="default_day"><option value="default_dusk">
+      <option value="burn_in_progress"><option value="rain"><option value="snow"><option value="full_moon">
+    </datalist>
+    <label for="f_note">Note</label>
+    <textarea id="f_note" placeholder="context worth remembering (weather oddity, camera moved, ...)"></textarea>
+    <div class="chk"><input id="f_prov" type="checkbox" checked>
+      <span>Provisional (camera not permanently mounted yet)</span></div>
+    <button id="f_go" class="btn primary" onclick="capture()">Capture — snapshot + AI description + conditions</button>
+    <div class="muted" style="margin-top:6px">Takes ~10–30s: grabs a full 4K frame, the vision model describes it,
+      and on-site weather + moon phase are attached. The data is in the deltas.</div>
+  </div>
+
+  <div class="card">
+    <h2>Baselines <span id="count" class="muted"></span></h2>
+    <div id="list" class="muted">Loading…</div>
+  </div>
+</main>
+
+<div id="cmpbar"><span id="cmpmsg"></span><button onclick="compare()">Compare</button></div>
+
+<div id="detail" class="ovl"><div class="inner">
+  <button class="close" onclick="hide('detail')">Close</button>
+  <div id="detail_body"></div>
+</div></div>
+
+<div id="cmp" class="ovl"><div class="inner">
+  <button class="close" onclick="hide('cmp')">Close</button>
+  <div id="cmp_body"></div>
+</div></div>
+
+<script>
+var API = 'https://megamachine.taile865b6.ts.net:5680/webhook/hh-baselines';
+var rows = [], imgCache = {}, selected = [];
+
+function $(id){ return document.getElementById(id); }
+function banner(msg, ok){ var b=$('banner'); b.textContent=msg; b.className='banner'+(ok?' ok':''); b.style.display='block';
+  clearTimeout(banner._t); banner._t=setTimeout(function(){ b.style.display='none'; }, 5000); }
+function hide(id){ $(id).style.display='none'; }
+function esc(s){ var d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; }
+function fmtTs(iso){ var d=new Date(iso.replace(' ','T').replace(/(\.\d+)?\+00(:00)?$/,'Z'));
+  return d.toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}); }
+
+function imgUrl(id, cb){
+  if (imgCache[id]) return cb(imgCache[id]);
+  fetch(API + '?image=' + id).then(function(r){ if(!r.ok) throw 0; return r.blob(); })
+    .then(function(b){ imgCache[id]=URL.createObjectURL(b); cb(imgCache[id]); })
+    .catch(function(){ cb(null); });
+}
+
+function condSummary(c){
+  var w=(c&&c.weather_actuals)||{}, m=(c&&c.moon)||{};
+  var bits=[];
+  if (w.temp_f!=null) bits.push(Math.round(w.temp_f)+'°F');
+  if (w.humidity_pct!=null) bits.push(Math.round(w.humidity_pct)+'% RH');
+  if (m.phase) bits.push(m.phase+' '+m.illumination_pct+'%');
+  return bits.join(' · ');
+}
+
+function load(){
+  fetch(API).then(function(r){ return r.json(); }).then(function(j){
+    rows = j.baselines || [];
+    $('count').textContent = '· ' + rows.length;
+    selected = [];
+    syncCmpBar();
+    if (!rows.length){ $('list').innerHTML='No baselines yet — capture the first one above.'; return; }
+    $('list').innerHTML = rows.map(function(b){
+      return '<div class="bl">' +
+        '<input type="checkbox" data-sel="'+b.baseline_id+'" onclick="event.stopPropagation();toggleSel('+b.baseline_id+', this)">' +
+        '<img id="thumb'+b.baseline_id+'" alt="" onclick="detail('+b.baseline_id+')">' +
+        '<div class="meta" onclick="detail('+b.baseline_id+')">' +
+          '<div class="lab">'+esc(b.label)+(b.provisional?' <span class="tag">provisional</span>':'')+'</div>' +
+          '<div class="sub">'+esc(fmtTs(b.captured_at))+' · '+esc(b.camera)+'</div>' +
+          '<div class="sub">'+esc(condSummary(b.conditions))+'</div>' +
+        '</div></div>';
+    }).join('');
+    rows.forEach(function(b){ imgUrl(b.baseline_id, function(u){ if(u) $('thumb'+b.baseline_id).src=u; }); });
+  }).catch(function(){ $('list').innerHTML='Could not load — check Tailscale.'; });
+}
+
+function capture(){
+  var label=$('f_label').value.trim();
+  if(!label){ banner('Label required'); $('f_label').focus(); return; }
+  var go=$('f_go'); go.disabled=true; go.textContent='Capturing… (vision model running)';
+  fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ action:'capture', camera:'driveway', label:label,
+      note:$('f_note').value.trim(), provisional:$('f_prov').checked }) })
+  .then(function(r){ return r.json(); })
+  .then(function(j){
+    if (j.status==='ok'){ banner('Baseline #'+j.result.baseline_id+' captured', true);
+      $('f_note').value=''; load(); }
+    else banner('Failed: '+(j.message||'unknown'));
+  })
+  .catch(function(){ banner('Failed — network/timeout'); })
+  .finally(function(){ go.disabled=false; go.textContent='Capture — snapshot + AI description + conditions'; });
+}
+
+function del(id){
+  if (!confirm('Delete baseline #'+id+' and its image?')) return;
+  fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ action:'delete', baseline_id:id }) })
+  .then(function(r){ return r.json(); })
+  .then(function(j){
+    if (j.status==='ok'){ banner('Deleted', true); hide('detail'); delete imgCache[id]; load(); }
+    else banner('Failed: '+(j.message||'unknown'));
+  });
+}
+
+function condTable(list){
+  // rows of [label, getter]; when two baselines are shown, differing cells highlight
+  var fields = [
+    ['captured', function(b){ return fmtTs(b.captured_at); }],
+    ['temp', function(b){ var w=(b.conditions||{}).weather_actuals||{}; return w.temp_f!=null?w.temp_f+'°F':'—'; }],
+    ['humidity', function(b){ var w=(b.conditions||{}).weather_actuals||{}; return w.humidity_pct!=null?w.humidity_pct+'%':'—'; }],
+    ['dew point', function(b){ var w=(b.conditions||{}).weather_actuals||{}; return w.dewpoint_f!=null?w.dewpoint_f+'°F':'—'; }],
+    ['wind', function(b){ var w=(b.conditions||{}).weather_actuals||{}; return w.wind_speed_mph!=null?w.wind_speed_mph+' mph (gust '+w.wind_gust_mph+')':'—'; }],
+    ['rain rate', function(b){ var w=(b.conditions||{}).weather_actuals||{}; return w.rain_rate_in!=null?w.rain_rate_in+' in/hr':'—'; }],
+    ['rain 24h', function(b){ var w=(b.conditions||{}).weather_actuals||{}; return w.rain_last24h_in!=null?w.rain_last24h_in+' in':'—'; }],
+    ['solar', function(b){ var w=(b.conditions||{}).weather_actuals||{}; return w.solar_w_m2!=null?w.solar_w_m2+' W/m²':'—'; }],
+    ['barometer', function(b){ var w=(b.conditions||{}).weather_actuals||{}; return w.baro_rel_in!=null?w.baro_rel_in+' in':'—'; }],
+    ['moon', function(b){ var m=(b.conditions||{}).moon||{}; return m.phase?m.phase+' · '+m.illumination_pct+'%':'—'; }],
+    ['provisional', function(b){ return b.provisional?'yes':'no'; }]
+  ];
+  var html='<table class="kv">';
+  fields.forEach(function(f){
+    var vals=list.map(function(b){ return f[1](b); });
+    var differ = list.length===2 && vals[0]!==vals[1];
+    html+='<tr><td>'+f[0]+'</td>'+vals.map(function(v){
+      return '<td'+(differ?' class="diff"':'')+'>'+esc(v)+'</td>'; }).join('')+'</tr>';
+  });
+  return html+'</table>';
+}
+
+function detail(id){
+  var b = rows.find(function(r){ return r.baseline_id===id; });
+  if (!b) return;
+  $('detail_body').innerHTML =
+    '<img id="dimg" alt="">' +
+    '<div class="card"><h2>'+esc(b.label)+(b.provisional?' <span class="tag">provisional</span>':'')+'</h2>' +
+    (b.description?'<div class="desc">'+esc(b.description)+'</div>':'<div class="muted">no description</div>') +
+    (b.note?'<div class="muted" style="margin-top:8px">Note: '+esc(b.note)+'</div>':'') +
+    '</div><div class="card"><h2>Conditions</h2>'+condTable([b])+'</div>' +
+    '<button class="btn danger" onclick="del('+b.baseline_id+')">Delete this baseline</button>';
+  $('detail').style.display='block';
+  imgUrl(id, function(u){ if(u) $('dimg').src=u; });
+}
+
+function toggleSel(id, box){
+  if (box.checked){ selected.push(id); if (selected.length>2){ var drop=selected.shift();
+    var old=document.querySelector('[data-sel="'+drop+'"]'); if(old) old.checked=false; } }
+  else selected = selected.filter(function(x){ return x!==id; });
+  syncCmpBar();
+}
+function syncCmpBar(){
+  var bar=$('cmpbar');
+  if (selected.length===2){ bar.style.display='flex';
+    $('cmpmsg').textContent='2 baselines selected — the data is in the deltas'; }
+  else if (selected.length===1){ bar.style.display='flex';
+    $('cmpmsg').textContent='Select one more to compare'; }
+  else bar.style.display='none';
+}
+function compare(){
+  if (selected.length!==2) return;
+  var pair = selected.map(function(id){ return rows.find(function(r){ return r.baseline_id===id; }); });
+  $('cmp_body').innerHTML =
+    '<div class="cmp2">' + pair.map(function(b,i){
+      return '<div><img id="cimg'+i+'" alt=""><div class="muted" style="text-align:center;margin-top:4px">' +
+        esc(b.label)+' · '+esc(fmtTs(b.captured_at))+'</div></div>'; }).join('') + '</div>' +
+    '<div class="card"><h2>Conditions — differences highlighted</h2>'+condTable(pair)+'</div>' +
+    '<div class="card"><h2>Descriptions</h2>' + pair.map(function(b){
+      return '<div class="desc" style="margin-bottom:8px"><b>'+esc(b.label)+':</b> '+esc(b.description||'—')+'</div>'; }).join('') + '</div>';
+  $('cmp').style.display='block';
+  pair.forEach(function(b,i){ imgUrl(b.baseline_id, function(u){ if(u) $('cimg'+i).src=u; }); });
+}
+
+load();
+</script>
+</body>
+</html>
