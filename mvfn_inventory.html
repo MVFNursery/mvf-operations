@@ -476,7 +476,9 @@
     const seen = new Set();
     stock.forEach(s => { const v = (s.source || '').trim(); if (v) seen.add(v); });
     $('sourceList').innerHTML = [...seen].sort((a, b) => a.localeCompare(b))
-      .map(v => `<option value="${esc(v)}"></option>`).join('');
+      // Text content, not just value — Firefox renders the dropdown from the
+      // option's label and shows nothing for value-only options.
+      .map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
   }
 
   function setState(msg, isError) {
