@@ -325,9 +325,9 @@
         <input id="addPrice" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Price">
       </div>
       <div class="flabel">Source</div>
-      <div class="row">
-        <input id="addSource" list="sourceList" placeholder="Where it came from (pick or type)">
-        <datalist id="sourceList"></datalist>
+      <div class="row tawrap">
+        <input id="addSource" placeholder="Where it came from (pick or type)" autocomplete="off">
+        <div class="taresults" id="sourceResults"></div>
       </div>
       <div class="msg err" id="addMsg" style="font-size:0.72rem;min-height:1em;"></div>
       <div class="actions">
@@ -411,7 +411,7 @@
       speciesList.forEach(sp => { speciesById[speciesKey(sp.species_id)] = sp; });
       containerList = (data.containers || []).slice();
       buildContainerDatalist();
-      buildSourceDatalist();
+      buildSourceOptions();
       $('controls').style.display = 'flex';
       $('updated').textContent = 'Updated ' + new Date().toLocaleString();
       render();
@@ -469,16 +469,32 @@
       }).join('');
   }
 
-  // Sources already in use on stock rows -> datalist suggestions for the add form.
-  // Free text is the norm here (vendor / seed lot / order #), so this only helps
-  // reuse an existing spelling — anything new is welcome too.
-  function buildSourceDatalist() {
+  // Sources already in use on stock rows -> pick list for the add form. Free
+  // text is the norm here (vendor / seed lot / order #), so this only helps
+  // reuse an existing spelling — anything new is welcome too. Custom dropdown
+  // (same pattern as the species typeahead), not a <datalist>: native datalist
+  // rendering is too browser-dependent to trust (desktop Firefox showed none
+  // of these options).
+  let sourceOptions = [];
+  function buildSourceOptions() {
     const seen = new Set();
     stock.forEach(s => { const v = (s.source || '').trim(); if (v) seen.add(v); });
-    $('sourceList').innerHTML = [...seen].sort((a, b) => a.localeCompare(b))
-      // Text content, not just value — Firefox renders the dropdown from the
-      // option's label and shows nothing for value-only options.
-      .map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    sourceOptions = [...seen].sort((a, b) => a.localeCompare(b));
+  }
+
+  function renderSourceResults() {
+    const box = $('sourceResults');
+    const typed = $('addSource').value.trim().toLowerCase();
+    const matches = typed ? sourceOptions.filter(v => v.toLowerCase().includes(typed)) : sourceOptions;
+    if (!matches.length) { box.classList.remove('show'); box.innerHTML = ''; return; }
+    box.innerHTML = matches.map(v =>
+      `<div class="taitem" data-v="${esc(v)}"><div class="taname">${esc(v)}</div></div>`).join('');
+    box.classList.add('show');
+  }
+
+  function hideSourceResults() {
+    $('sourceResults').classList.remove('show');
+    $('sourceResults').innerHTML = '';
   }
 
   function setState(msg, isError) {
@@ -980,6 +996,7 @@
     $('newSpecies').classList.remove('show');
     pickedSpecies = null;
     hideTaResults();
+    hideSourceResults();
   }
 
   async function submitAddStock() {
@@ -1293,6 +1310,17 @@
     pickSpecies(taMatches[Number(item.dataset.i)]);
   });
   $('addSpecies').addEventListener('blur', () => setTimeout(hideTaResults, 150));
+  $('addSource').addEventListener('input', renderSourceResults);
+  $('addSource').addEventListener('focus', renderSourceResults);
+  // mousedown, not click — same reason as the species list above.
+  $('sourceResults').addEventListener('mousedown', e => {
+    const item = e.target.closest('.taitem');
+    if (!item) return;
+    e.preventDefault();
+    $('addSource').value = item.dataset.v;
+    hideSourceResults();
+  });
+  $('addSource').addEventListener('blur', () => setTimeout(hideSourceResults, 150));
   $('addStatus').addEventListener('change', () => {
     if ($('addStatus').value === 'for-sale' && !$('addLocation').value.trim()) $('addLocation').value = 'retail';
   });
