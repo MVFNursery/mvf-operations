@@ -179,11 +179,18 @@
   function chip(text, cls) { return '<span class="chip ' + (cls || '') + '">' + esc(text) + '</span>'; }
 
   function renderList() {
-    var today = new Date().toISOString().slice(0, 10);
+    // Local calendar date, not toISOString() (UTC): from ~8pm ET the UTC date
+    // is already tomorrow, which would open windows and flag overdue a day early.
+    var today = new Date().toLocaleDateString('sv-SE');
     // Private rows: server returns all; render only what this device's user may see.
     var visible = state.tasks.filter(function (t) {
       return t.visibility !== 'private' || t.assigned_to === me()
         || (!t.assigned_to && t.created_by === me());
+    });
+    // Closed-window rows (V013: not_before in the future) are hidden outright;
+    // the daily email's Upcoming section is the surface for future-windowed work.
+    visible = visible.filter(function (t) {
+      return !(t.not_before && t.not_before > today);
     });
     var pf = $('projFilter').value;
     if (pf === 'none') visible = visible.filter(function (t) { return !t.project_ref; });

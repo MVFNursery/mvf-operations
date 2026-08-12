@@ -658,8 +658,15 @@ function renderTasks() {
   const chip = document.getElementById('proposedChip');
   if (chip) chip.textContent = proposedCount ? `Proposed (${proposedCount})` : 'Proposed';
 
+  // Closed-window rows (V013: not_before in the future, gate_reason
+  // 'window opens …' computed server-side against nursery-local today) are
+  // hidden outright: the daily email's Upcoming section is the surface for
+  // future-windowed work, and the phone list is for what's actionable now.
+  // Weather / blocked / dependency gates still render — those can clear today.
   const open = allTasks.filter(t =>
-    (t.status === 'open' || t.status === 'blocked') && matchesFilter(t)
+    (t.status === 'open' || t.status === 'blocked')
+    && !(t.gate_reason && t.gate_reason.startsWith('window opens'))
+    && matchesFilter(t)
   ).sort((a, b) => {
     // Weather-aware score first (higher = do first); unscored sink to the bottom.
     const sa = a.score == null ? -Infinity : Number(a.score);
