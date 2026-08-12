@@ -373,6 +373,10 @@
 <script>
   // n8n webhook base — same tailnet host the other field PWAs use.
   const N8N_BASE = 'https://megamachine.taile865b6.ts.net:5678/webhook';
+  // Bump on every ship. Shown in the footer so "which version am I running"
+  // is answerable at a glance — GitHub Pages caches HTML for 10 minutes, and
+  // a quick retest after a deploy can silently re-serve the old page.
+  const BUILD = '2026-08-11c';
 
   let stock = [];
   let speciesById = {};
@@ -413,7 +417,7 @@
       buildContainerDatalist();
       buildSourceOptions();
       $('controls').style.display = 'flex';
-      $('updated').textContent = 'Updated ' + new Date().toLocaleString();
+      $('updated').textContent = 'Updated ' + new Date().toLocaleString() + ' · build ' + BUILD;
       render();
     } catch (err) {
       $('controls').style.display = 'none';
