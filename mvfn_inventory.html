@@ -324,6 +324,11 @@
         <input id="addLocation" placeholder="Location">
         <input id="addPrice" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Price">
       </div>
+      <div class="flabel">Source</div>
+      <div class="row">
+        <input id="addSource" list="sourceList" placeholder="Where it came from (pick or type)">
+        <datalist id="sourceList"></datalist>
+      </div>
       <div class="msg err" id="addMsg" style="font-size:0.72rem;min-height:1em;"></div>
       <div class="actions">
         <button class="cancel" id="addCancel" type="button">Cancel</button>
@@ -406,6 +411,7 @@
       speciesList.forEach(sp => { speciesById[speciesKey(sp.species_id)] = sp; });
       containerList = (data.containers || []).slice();
       buildContainerDatalist();
+      buildSourceDatalist();
       $('controls').style.display = 'flex';
       $('updated').textContent = 'Updated ' + new Date().toLocaleString();
       render();
@@ -461,6 +467,16 @@
         const lbl = c.nominal_volume ? `${c.container_id} — ${c.nominal_volume}` : c.container_id;
         return `<option value="${esc(c.container_id)}">${esc(lbl)}</option>`;
       }).join('');
+  }
+
+  // Sources already in use on stock rows -> datalist suggestions for the add form.
+  // Free text is the norm here (vendor / seed lot / order #), so this only helps
+  // reuse an existing spelling — anything new is welcome too.
+  function buildSourceDatalist() {
+    const seen = new Set();
+    stock.forEach(s => { const v = (s.source || '').trim(); if (v) seen.add(v); });
+    $('sourceList').innerHTML = [...seen].sort((a, b) => a.localeCompare(b))
+      .map(v => `<option value="${esc(v)}"></option>`).join('');
   }
 
   function setState(msg, isError) {
@@ -955,7 +971,7 @@
   }
 
   function resetAddForm() {
-    ['addSpecies','addContainer','addQty','addLocation','addPrice','addSci'].forEach(id => $(id).value = '');
+    ['addSpecies','addContainer','addQty','addLocation','addPrice','addSci','addSource'].forEach(id => $(id).value = '');
     $('addNative').checked = false;
     $('addMsg').textContent = '';
     $('speciesNote').textContent = ''; $('speciesNote').className = 'speciesnote';
@@ -1022,6 +1038,7 @@
         location: $('addLocation').value.trim(),
         status: $('addStatus').value,
         price_per_unit: $('addPrice').value.trim(),
+        source: $('addSource').value.trim(),
       });
       resetAddForm();
       $('addForm').classList.remove('open');
