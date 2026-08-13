@@ -57,6 +57,10 @@
   .actions select.proj-sel { flex:1; padding:8px; border:0; border-radius:8px;
     font-family:inherit; font-size:.8rem; background:#e7e2d2; color:#3d4a1e; min-width:0; }
   .section-h { color:var(--paper); font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; margin:16px 4px 8px; opacity:.8; }
+  .refresh-btn { width:30px; height:30px; border:0; border-radius:8px; background:var(--paper);
+    color:var(--ink); font-size:1rem; line-height:1; cursor:pointer; }
+  .refresh-btn:active { opacity:.6; }
+  .refresh-btn[disabled] { opacity:.5; }
 </style>
 </head>
 <body>
@@ -64,6 +68,7 @@
   <h1>MVFN Household</h1>
   <label style="font-size:.7rem;opacity:.85">Me:</label>
   <select id="me"></select>
+  <button class="refresh-btn" id="refreshBtn" title="Refresh">↻</button>
 </header>
 <main>
   <div class="banner" id="banner"></div>
@@ -123,6 +128,8 @@
   var ME_KEY = 'mvfn_household_user';
   var $ = function (id) { return document.getElementById(id); };
   var state = { users: [], categories: [], tasks: [], projects: [] };
+  var lastLoad = 0;
+  var STALE_MS = 60000;
 
   function banner(msg, kind) {
     var b = $('banner');
@@ -139,14 +146,21 @@
 
   function load() {
     banner('');
-    fetch(API).then(function (r) {
+    var btn = $('refreshBtn');
+    if (btn) btn.disabled = true;
+    // no-store: the response carries an ETag and no Cache-Control, so iOS is
+    // free to answer this GET from cache. A task written anywhere else (another
+    // phone, the MCP connector, psql) would then stay invisible here.
+    return fetch(API, { cache: 'no-store' }).then(function (r) {
       if (!r.ok) throw new Error('list failed: HTTP ' + r.status);
       return r.json();
     }).then(function (j) {
       state = j;
+      lastLoad = Date.now();
       renderMeta();
       renderList();
-    }).catch(function (e) { banner(String(e.message || e)); });
+    }).catch(function (e) { banner(String(e.message || e)); })
+      .finally(function () { if (btn) btn.disabled = false; });
   }
 
   function renderMeta() {
@@ -278,6 +292,22 @@
   });
 
   $('projFilter').addEventListener('change', renderList);
+
+  $('refreshBtn').addEventListener('click', function () { load(); });
+
+  // An iOS home-screen PWA is usually RESUMED, not reloaded: load() ran once at
+  // first launch and the cards on screen can be days old. Task 173 was written
+  // to the DB on 8/12 and served correctly by the API, but never appeared here
+  // for exactly this reason. Re-fetch whenever the app comes back to the front
+  // after being away longer than STALE_MS. pageshow covers the bfcache restore
+  // that fires no visibilitychange.
+  function refreshIfStale() {
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - lastLoad < STALE_MS) return;
+    load();
+  }
+  document.addEventListener('visibilitychange', refreshIfStale);
+  window.addEventListener('pageshow', function (e) { if (e.persisted) refreshIfStale(); });
 
   $('list').addEventListener('change', function (e) {
     var sel = e.target.closest('select.proj-sel');
