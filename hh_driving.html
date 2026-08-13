@@ -9,7 +9,7 @@
 <title>Driving Log</title>
 <script src="mvfn-auth.js"
         data-token-key="mvfn_household_token"
-        data-validate-url="https://megamachine.taile865b6.ts.net:5680/webhook/hh-driving"></script>
+        data-validate-url="https://homelab.taile865b6.ts.net:5680/webhook/hh-driving"></script>
 <style>
   :root { --ink:#1f3a5f; --slate:#4a6584; --paper:#eef1f5; --card:#fbfcfe;
           --red:#9b2c1f; --green:#2d6a3f; --amber:#9a6b1f; }
@@ -161,7 +161,7 @@
 <div id="printLog"></div>
 <script>
 (function () {
-  var API = 'https://megamachine.taile865b6.ts.net:5680/webhook/hh-driving';
+  var API = 'https://homelab.taile865b6.ts.net:5680/webhook/hh-driving';
   var TIMER_KEY = 'hh_driving_timer_start';
   var SUP_KEY = 'hh_driving_supervisor';
   var $ = function (id) { return document.getElementById(id); };

@@ -22,14 +22,25 @@
   var TOKEN_KEY = ds.tokenKey || 'mvfn_field_token';
   var VALIDATE_URL = ds.validateUrl || '';
   var HEADER = 'X-MVFN-Token';
-  var N8N_HOST = 'megamachine.taile865b6.ts.net';
+  // BOTH hosts are accepted during the megamachine -> homelab cutover. A device
+  // still running cached HTML calls megamachine; a freshly loaded one calls
+  // homelab; either must get the auth header or n8n 403s and this file throws
+  // up the unlock overlay on an app that was working a minute ago. Drop
+  // megamachine from this list only after its serve entries are retired.
+  var N8N_HOSTS = ['homelab.taile865b6.ts.net', 'megamachine.taile865b6.ts.net'];
 
   function getTok() { return (localStorage.getItem(TOKEN_KEY) || '').trim(); }
   function setTok(t) {
     if (t) localStorage.setItem(TOKEN_KEY, t.trim());
     else localStorage.removeItem(TOKEN_KEY);
   }
-  function isN8n(url) { return typeof url === 'string' && url.indexOf(N8N_HOST) !== -1; }
+  function isN8n(url) {
+    if (typeof url !== 'string') return false;
+    for (var i = 0; i < N8N_HOSTS.length; i++) {
+      if (url.indexOf(N8N_HOSTS[i]) !== -1) return true;
+    }
+    return false;
+  }
 
   // expose controls for apps that want a "Lock" button
   window.mvfnLock = function () { setTok(''); showOverlay(); };
