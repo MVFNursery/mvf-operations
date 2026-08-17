@@ -22,12 +22,12 @@
   var TOKEN_KEY = ds.tokenKey || 'mvfn_field_token';
   var VALIDATE_URL = ds.validateUrl || '';
   var HEADER = 'X-MVFN-Token';
-  // BOTH hosts are accepted during the megamachine -> homelab cutover. A device
-  // still running cached HTML calls megamachine; a freshly loaded one calls
-  // homelab; either must get the auth header or n8n 403s and this file throws
-  // up the unlock overlay on an app that was working a minute ago. Drop
-  // megamachine from this list only after its serve entries are retired.
-  var N8N_HOSTS = ['homelab.taile865b6.ts.net', 'megamachine.taile865b6.ts.net'];
+  // homelab only since 2026-08-17: megamachine's :5678/:5680 serve bridges are
+  // RETIRED (they'd already been dead through the 8/17 MM tailnet outage, so
+  // no cached-HTML device can still be working through them). If a stale
+  // cached app ever resurfaces pointing at megamachine, the fix is a reload,
+  // not re-adding the host here.
+  var N8N_HOSTS = ['homelab.taile865b6.ts.net'];
 
   function getTok() { return (localStorage.getItem(TOKEN_KEY) || '').trim(); }
   function setTok(t) {
