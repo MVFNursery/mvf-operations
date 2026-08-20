@@ -312,7 +312,7 @@
     act('[data-act="cancel-edit"]', () => { editingId = null; renderInbox(); });
     act('[data-act="save-text"]', async () => {
       if (!requireToken()) return;
-      const val = card.querySelector(`[data-edit="${r.id}"]`).value;
+      const val = card.querySelector(`[data-edit="${r.id}"]`).value.trim();
       try {
         await postAction('mvfn-ecology-candidates', { action: 'set_text', id: r.id, final_text: val });
         editingId = null;
@@ -437,8 +437,8 @@
     const sentBtn = $('issueSent');
     if (sentBtn) sentBtn.onclick = () => { if (confirm('Mark this issue sent? It will drop out of future queues.')) saveIssue(true); };
     $('issueCopy').onclick = () => {
-      const subject = $('issueSubject').value;
-      const intro = $('issueIntro').value;
+      const subject = $('issueSubject').value.trim();
+      const intro = $('issueIntro').value.trim();
       const body = [subject, '', intro, '', ...items.map(it =>
         `${it.common_name || 'Note'} — ${it.text}${it.photo_attribution ? '\n' + it.photo_attribution : ''}`)]
         .join('\n\n');
@@ -452,7 +452,7 @@
     try {
       await postAction('mvfn-ecology-newsletter', {
         action: 'update_issue', id: state.issue.issue.id,
-        subject: $('issueSubject').value, intro: $('issueIntro').value,
+        subject: $('issueSubject').value.trim(), intro: $('issueIntro').value.trim(),
         mark_sent: !!markSent,
       });
       flashToast(markSent ? 'Marked sent' : 'Saved');
