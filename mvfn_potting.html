@@ -90,6 +90,10 @@
     font-family: 'DM Mono', monospace; font-size: 0.85rem; background: white; color: #2d3319; }
   .half { display: flex; gap: 8px; }
   .half > div { flex: 1 1 0; }
+  .checkline { display: flex; align-items: center; gap: 9px; margin-top: 13px;
+    font-size: 0.85rem; color: #2d3319; cursor: pointer; }
+  .checkline input[type=checkbox] { width: 19px; height: 19px; accent-color: #2d3319; }
+  .checkline .hint { font-size: 0.72rem; color: #6b7280; }
 
   .preflight { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { padding: 7px 11px; border-radius: 8px; font-size: 0.76rem; line-height: 1.4; }
@@ -395,6 +399,10 @@
       h += '<div class="group"><div class="label">Source note</div>' +
         '<input type="text" id="bf-fromnote" placeholder="e.g. prop tray A" value="' +
         esc(f.from_note || '') + '"></div>';
+    } else {
+      h += '<label class="checkline"><input type="checkbox" id="bf-usedup"' +
+        (usedUpChecked(f) ? ' checked' : '') + '> Source used up — close it out' +
+        '</label>';
     }
     h += '<div class="group"><div class="label">Into container</div><select id="bf-to">' +
       '<option value="">pick…</option>' +
@@ -415,6 +423,18 @@
     h += '<div class="preflight" id="preflight"></div>';
     h += '<div class="actions"><button type="button" class="btn-primary" id="bf-save">Record batch</button></div>';
     return h;
+  }
+
+  // "source used up" default: a batch at least as big as the source's count
+  // usually consumed it (flats recorded as 1, whole-row divisions)
+  function usedUpDefault(f) {
+    const src = (state.data.stock || []).find(s => s.stock_id === Number(f.from_stock_id));
+    const qty = parseInt(f.qty, 10) || 0;
+    return !!src && qty > 0 && qty >= src.quantity;
+  }
+
+  function usedUpChecked(f) {
+    return f.source_used_up_touched ? !!f.source_used_up : usedUpDefault(f);
   }
 
   function preflightHtml(sid) {
@@ -456,10 +476,12 @@
   function resultHtml(r) {
     let h = '<div class="result"><h3>Batch recorded</h3>';
     h += '<div class="line">' + r.to_quantity + ' now in stock row #' + r.to_stock_id +
-      (r.to_merged ? ' (merged into today’s row)' : ' (new row)') + '.</div>';
+      (r.to_merged ? ' (merged into existing row)' : ' (new row)') + '.</div>';
     if (r.from_stock) {
-      h += '<div class="line">Source row #' + r.from_stock.stock_id + ' down to ' +
-        r.from_stock.quantity + '.</div>';
+      h += r.from_stock.closed
+        ? '<div class="line">Source row #' + r.from_stock.stock_id + ' used up — closed out.</div>'
+        : '<div class="line">Source row #' + r.from_stock.stock_id + ' down to ' +
+          r.from_stock.quantity + '.</div>';
     }
     (r.supplies || []).forEach(s => {
       h += '<div class="line">' + esc(s.supply_id) + ': ' + s.qty_delta + ' → ' +
@@ -560,12 +582,21 @@
     f.tags_used = $('bf-tags') ? ($('bf-tags').value === '' ? null : $('bf-tags').value) : f.tags_used;
     f.location = $('bf-loc') ? $('bf-loc').value : f.location;
     f.note = $('bf-note') ? $('bf-note').value : f.note;
+    if ($('bf-usedup')) f.source_used_up = $('bf-usedup').checked;
   }
 
   function wireBatchForm(sid) {
-    const refresh = () => { $('preflight').innerHTML = preflightHtml(sid); };
+    const refresh = () => {
+      $('preflight').innerHTML = preflightHtml(sid);
+      // the "used up" default tracks qty vs source count until Ian flips it
+      if ($('bf-usedup') && !state.form.source_used_up_touched) {
+        $('bf-usedup').checked = usedUpDefault(state.form);
+      }
+    };
     $('bf-from').onchange = () => {
       readBatchForm();
+      state.form.source_used_up_touched = false;
+      state.form.source_used_up = false;
       const nxt = suggestedNext(sid);
       if (nxt) state.form.to_container_id = nxt;
       render();
@@ -574,6 +605,10 @@
     $('bf-qty').oninput = () => { readBatchForm(); refresh(); };
     $('bf-tags').oninput = () => { readBatchForm(); refresh(); };
     if ($('bf-fromnote')) $('bf-fromnote').oninput = () => readBatchForm();
+    if ($('bf-usedup')) $('bf-usedup').onchange = () => {
+      state.form.source_used_up = $('bf-usedup').checked;
+      state.form.source_used_up_touched = true;
+    };
     $('bf-loc').oninput = () => readBatchForm();
     $('bf-note').oninput = () => readBatchForm();
     refresh();
@@ -601,7 +636,10 @@
         tags_used: f.tags_used == null ? '' : String(parseInt(f.tags_used, 10) || 0),
         to_status: 'growing',
         location: trim(f.location),
-        note: trim(f.note)
+        note: trim(f.note),
+        // strings on purpose: the n8n (body.x || '') idiom turns a JSON
+        // boolean false into '' (= auto server-side)
+        source_used_up: f.from_stock_id ? String(usedUpChecked(f)) : ''
       };
       try {
         const data = await postAction(payload);

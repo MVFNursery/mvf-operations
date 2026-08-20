@@ -376,7 +376,7 @@
   // Bump on every ship. Shown in the footer so "which version am I running"
   // is answerable at a glance — GitHub Pages caches HTML for 10 minutes, and
   // a quick retest after a deploy can silently re-serve the old page.
-  const BUILD = '2026-08-11c';
+  const BUILD = '2026-08-20a';
 
   let stock = [];
   let speciesById = {};
@@ -529,16 +529,19 @@
   }
 
   function render() {
-    const q = $('search').value.trim().toLowerCase();
+    const q = taNorm($('search').value);
     const statusF = $('statusFilter').value;
 
     // Closed-out rows (closed_at set) are done forever: they live in a collapsed
     // Archived section, not among the live cards. Search reaches them; the
     // status filter doesn't (their status is just the stage the row died in).
     const all = stock.map(s => ({ s, sp: speciesById[speciesKey(s.species_id)] || {} }));
+    // Same fields as the Add Stock typeahead: common + scientific + slug +
+    // alternate names, all through taNorm so "ten petal" hits "Ten-petal".
     const matchesSearch = ({ s, sp }) => {
       if (!q) return true;
-      const hay = `${sp.common_name || ''} ${sp.scientific_name || ''} ${s.species_id || ''}`.toLowerCase();
+      const hay = taNorm(`${sp.common_name || ''} ${sp.scientific_name || ''} ` +
+        `${s.species_id || ''} ${sp.alternate_names || ''}`);
       return hay.includes(q);
     };
     const bySpecies = (a, b) =>
