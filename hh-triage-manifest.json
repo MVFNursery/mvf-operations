@@ -1,0 +1,11 @@
+{
+  "name": "Identity Triage",
+  "short_name": "Triage",
+  "start_url": "hh_triage.html",
+  "display": "standalone",
+  "background_color": "#14263d",
+  "theme_color": "#1f3a5f",
+  "icons": [
+    { "src": "icon-hh-triage.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
