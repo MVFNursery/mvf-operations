@@ -1,0 +1,12 @@
+{
+  "id": "/mvf-operations/mvfn-driving",
+  "name": "Business Mileage",
+  "short_name": "Mileage",
+  "start_url": "mvfn_driving.html",
+  "display": "standalone",
+  "background_color": "#1d3110",
+  "theme_color": "#2d5016",
+  "icons": [
+    { "src": "icon-mvfn-driving.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
