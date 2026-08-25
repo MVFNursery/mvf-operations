@@ -40,7 +40,7 @@
   details.add { background:var(--paper); border-radius:12px; padding:10px 14px; margin-bottom:14px; }
   details.add summary { font-weight:700; color:var(--ink); cursor:pointer; padding:4px 0; }
   .add label { display:block; font-size:.72rem; color:var(--moss); margin:8px 0 2px; text-transform:uppercase; letter-spacing:.04em; }
-  .add input, .add textarea {
+  .add input, .add select, .add textarea {
     width:100%; padding:9px 10px; border:1.5px solid var(--moss); border-radius:8px;
     font-family:inherit; font-size:.95rem; background:#fff; }
   .add textarea { min-height:48px; resize:vertical; }
@@ -61,6 +61,7 @@
   .chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
   .chip { font-size:.68rem; background:#dfe7d5; color:#3a4f2a; border-radius:999px; padding:2px 8px; }
   .chip.money { background:var(--ink); color:#fff; }
+  .chip.imp { background:#c9cfd6; color:#555; }
   .actions { display:flex; gap:8px; margin-top:8px; }
   .actions button { flex:1; padding:7px; border:0; border-radius:8px; font-family:inherit; font-weight:700; cursor:pointer; font-size:.8rem; }
   .edit-btn { background:var(--paper); color:var(--ink); }
@@ -105,7 +106,16 @@
     <summary id="formTitle">+ Log a trip</summary>
     <div class="row2">
       <div><label>Date</label><input type="date" id="f_date"></div>
-      <div><label>Vehicle</label><input type="text" id="f_vehicle" autocomplete="off"></div>
+      <div><label>Vehicle</label>
+        <select id="f_vehicle">
+          <option value="F-150">F-150</option>
+          <option value="Kona">Kona</option>
+          <option value="__other">Other…</option>
+        </select></div>
+    </div>
+    <div id="otherRow" style="display:none">
+      <label>Vehicle name</label>
+      <input type="text" id="f_vehicle_other" autocomplete="off">
     </div>
     <label>Destination</label>
     <input type="text" id="f_dest" autocomplete="off">
@@ -138,7 +148,7 @@
   var VEH_KEY = 'mvfn_driving_vehicle';
   var $ = function (id) { return document.getElementById(id); };
   var state = { rates: [], totals: null, trips: [] };
-  var editId = null, showAll = false;
+  var editId = null, editSource = null, showAll = false;
 
   function banner(msg, kind) {
     var b = $('banner');
@@ -168,6 +178,29 @@
     var pad = function (x) { return (x < 10 ? '0' : '') + x; };
     return n.getFullYear() + '-' + pad(n.getMonth()+1) + '-' + pad(n.getDate());
   }
+  // ---- vehicle picker: F-150 / Kona / Other(free text) --------------------
+  function setVehicle(name) {
+    name = (name || '').trim();
+    if (name === 'F-150' || name === 'Kona') {
+      $('f_vehicle').value = name;
+      $('otherRow').style.display = 'none';
+      $('f_vehicle_other').value = '';
+    } else if (name) {
+      $('f_vehicle').value = '__other';
+      $('otherRow').style.display = '';
+      $('f_vehicle_other').value = name;
+    } else {
+      $('f_vehicle').value = 'F-150';
+      $('otherRow').style.display = 'none';
+      $('f_vehicle_other').value = '';
+    }
+  }
+  function currentVehicle() {
+    return $('f_vehicle').value === '__other'
+      ? $('f_vehicle_other').value.trim()
+      : $('f_vehicle').value;
+  }
+
   // Display-only estimate; the server's per-trip deduction is authoritative.
   function rateFor(iso) {
     var r = null;
@@ -208,20 +241,21 @@
     if (!top.length) { $('repeatCard').style.display = 'none'; return; }
     $('repeatCard').style.display = '';
     $('repeats').innerHTML = top.map(function (x, i) {
-      return '<button type="button" data-rep="' + i + '">' + esc(x.d.destination)
+      return '<button type="button" data-rep="' + i + '">' + esc(x.d.destination || x.d.purpose)
         + ' <span class="mi">' + fmtMi(x.d.miles) + '</span><br>'
-        + '<small>' + esc(x.d.purpose) + ' · logged ' + x.n + '×</small></button>';
+        + '<small>' + (x.d.destination ? esc(x.d.purpose) + ' · ' : '') + 'logged ' + x.n + '×</small></button>';
     }).join('');
     $('repeats').querySelectorAll('button').forEach(function (btn, i) {
       btn.addEventListener('click', function () {
         var d = top[i].d;
         resetForm();
         $('f_date').value = todayIso();
-        $('f_dest').value = d.destination;
+        $('f_dest').value = d.destination || '';
         $('f_purpose').value = d.purpose;
         $('f_miles').value = d.miles;
-        if (d.vehicle) $('f_vehicle').value = d.vehicle;
+        if (d.vehicle) setVehicle(d.vehicle);
         updPreview();
+        if (!d.destination) $('f_dest').focus();
         $('formTitle').textContent = '+ Log a trip';
         $('addBox').open = true;
         $('addBox').scrollIntoView({ behavior: 'smooth' });
@@ -244,10 +278,14 @@
       if (d.vehicle) chips.push('<span class="chip">' + esc(d.vehicle) + '</span>');
       if (+d.tolls_parking > 0) chips.push('<span class="chip">tolls/parking ' + fmt$(d.tolls_parking) + '</span>');
       if (d.odo_start != null) chips.push('<span class="chip">odo ' + esc(d.odo_start) + ' → ' + esc(d.odo_end) + '</span>');
+      if (d.source === 'import') chips.push('<span class="chip imp">import</span>');
+      // import rows have no destination — their purpose text carries both
+      var title = d.destination || d.purpose;
+      var sub = (d.destination ? esc(d.purpose) : '') + (d.notes ? (d.destination ? ' · ' : '') + esc(d.notes) : '');
       html += '<div class="trip">'
-        + '<div class="t"><span>' + dateLabel(d.trip_date) + ' · ' + esc(d.destination) + '</span>'
+        + '<div class="t"><span>' + dateLabel(d.trip_date) + ' · ' + esc(title) + '</span>'
         + '<span class="mi">' + fmtMi(d.miles) + '</span></div>'
-        + '<div class="sub">' + esc(d.purpose) + (d.notes ? ' · ' + esc(d.notes) : '') + '</div>'
+        + (sub ? '<div class="sub">' + sub + '</div>' : '')
         + '<div class="chips">' + chips.join('') + '</div>'
         + '<div class="actions">'
         + '<button class="edit-btn" data-edit="' + d.trip_id + '">Edit</button>'
@@ -287,11 +325,11 @@
   }
 
   function resetForm() {
-    editId = null;
+    editId = null; editSource = null;
     $('formTitle').textContent = '+ Log a trip';
     ['f_dest','f_purpose','f_miles','f_odos','f_odoe','f_tolls','f_notes'].forEach(function (id) { $(id).value = ''; });
     $('f_date').value = todayIso();
-    $('f_vehicle').value = localStorage.getItem(VEH_KEY) || '';
+    setVehicle(localStorage.getItem(VEH_KEY) || '');
     $('f_cancel').style.display = 'none';
     $('f_go').textContent = 'Save trip';
     $('preview').style.display = 'none';
@@ -300,14 +338,14 @@
 
   function openEdit(d) {
     resetForm();
-    editId = d.trip_id;
+    editId = d.trip_id; editSource = d.source;
     $('formTitle').textContent = 'Edit trip · ' + dateLabel(d.trip_date);
     $('f_date').value = d.trip_date;
-    $('f_dest').value = d.destination;
+    $('f_dest').value = d.destination || '';
     $('f_purpose').value = d.purpose;
     if (d.odo_start != null) { $('f_odos').value = d.odo_start; $('f_odoe').value = d.odo_end; }
     else $('f_miles').value = d.miles;
-    $('f_vehicle').value = d.vehicle || '';
+    setVehicle(d.vehicle || '');
     if (+d.tolls_parking > 0) $('f_tolls').value = d.tolls_parking;
     $('f_notes').value = d.notes || '';
     updPreview();
@@ -339,14 +377,21 @@
   ['f_date','f_miles','f_odos','f_odoe'].forEach(function (id) {
     $(id).addEventListener('input', updPreview);
   });
+  $('f_vehicle').addEventListener('change', function () {
+    $('otherRow').style.display = this.value === '__other' ? '' : 'none';
+    if (this.value === '__other') $('f_vehicle_other').focus();
+  });
 
   $('f_go').addEventListener('click', function () {
     var dest = $('f_dest').value.trim(), purpose = $('f_purpose').value.trim();
+    var importEdit = editId !== null && editSource === 'import';
     if (!$('f_date').value) { banner('Date is required'); return; }
-    if (!dest) { banner('Destination is required'); return; }
+    // imported spreadsheet rows have no destination column — purpose carries it
+    if (!dest && !importEdit) { banner('Destination is required'); return; }
     if (!purpose) { banner('Business purpose is required'); return; }
     if (!formMiles()) { banner('Miles (or a full odometer pair) is required'); return; }
-    var vehicle = $('f_vehicle').value.trim();
+    var vehicle = currentVehicle();
+    if ($('f_vehicle').value === '__other' && !vehicle) { banner('Enter the vehicle name'); return; }
     if (vehicle) localStorage.setItem(VEH_KEY, vehicle);
     var payload = {
       action: editId !== null ? 'update' : 'log',
@@ -361,11 +406,13 @@
       notes: $('f_notes').value.trim(),
     };
     if (editId !== null) payload.trip_id = editId;
+    // an import row keeps its NULL destination unless one is typed in
+    if (importEdit && !dest) delete payload.destination;
     post(payload, $('f_go')).then(function (j) {
       if (!j || !j.result) return;
       var r = j.result;
       banner((payload.action === 'log' ? 'Logged ' : 'Saved ')
-        + fmtMi(r.miles) + ' to ' + r.destination, 'ok');
+        + fmtMi(r.miles) + (r.destination ? ' to ' + r.destination : ''), 'ok');
       resetForm();
     });
   });
@@ -380,7 +427,7 @@
       if (d) openEdit(d);
     } else if (btn.dataset.del) {
       var dd = state.trips.filter(function (x) { return String(x.trip_id) === btn.dataset.del; })[0];
-      var name = dd ? (dateLabel(dd.trip_date) + ' to ' + dd.destination) : ('#' + btn.dataset.del);
+      var name = dd ? (dateLabel(dd.trip_date) + ' — ' + (dd.destination || dd.purpose)) : ('#' + btn.dataset.del);
       if (!confirm('Delete the trip on ' + name + '?')) return;
       post({ action: 'delete', trip_id: parseInt(btn.dataset.del, 10) }, btn).then(function (j) {
         if (j && j.result) banner('Deleted trip on ' + name, 'ok');
@@ -442,7 +489,7 @@
   }
 
   $('f_date').value = todayIso();
-  $('f_vehicle').value = localStorage.getItem(VEH_KEY) || '';
+  setVehicle(localStorage.getItem(VEH_KEY) || '');
   load();
 })();
 </script>
