@@ -301,6 +301,36 @@
   }
 
   // ---- form ---------------------------------------------------------------
+  var derived = {}; // field id -> true while its value is our math, not Ian's
+  function autoOdoMath(src) {
+    // Any two of miles / odo start / odo end determine the third — fill it in.
+    // Never write into the field being typed, never overwrite a hand-entered
+    // value; clearing a source field clears what was derived from it.
+    derived[src] = false;
+    var ids = ['f_miles', 'f_odos', 'f_odoe'];
+    var v = {};
+    ids.forEach(function (id) { v[id] = parseFloat($(id).value); });
+    if (!Number.isFinite(v[src])) {
+      ids.forEach(function (id) { if (derived[id]) { $(id).value = ''; derived[id] = false; } });
+      return;
+    }
+    var others = ids.filter(function (id) { return id !== src; });
+    var target;
+    if (Number.isFinite(v[others[0]]) !== Number.isFinite(v[others[1]])) {
+      target = Number.isFinite(v[others[0]]) ? others[1] : others[0];
+    } else {
+      // both known (or neither): only a value we filled ourselves may be redone
+      target = derived[others[0]] ? others[0] : derived[others[1]] ? others[1] : null;
+    }
+    if (!target || (!derived[target] && $(target).value !== '')) return;
+    var out = target === 'f_miles' ? v.f_odoe - v.f_odos
+            : target === 'f_odoe'  ? v.f_odos + v.f_miles
+            :                        v.f_odoe - v.f_miles;
+    if (!Number.isFinite(out) || out < 0 || (target === 'f_miles' && out <= 0)) return;
+    $(target).value = Math.round(out * 10) / 10;
+    derived[target] = true;
+  }
+
   function formMiles() {
     // Odometer pair wins when complete (the server recomputes the same way);
     // otherwise the miles field. null when neither is usable.
@@ -325,7 +355,7 @@
   }
 
   function resetForm() {
-    editId = null; editSource = null;
+    editId = null; editSource = null; derived = {};
     $('formTitle').textContent = '+ Log a trip';
     ['f_dest','f_purpose','f_miles','f_odos','f_odoe','f_tolls','f_notes'].forEach(function (id) { $(id).value = ''; });
     $('f_date').value = todayIso();
@@ -374,9 +404,10 @@
       .finally(function () { if (btn) btn.disabled = false; });
   }
 
-  ['f_date','f_miles','f_odos','f_odoe'].forEach(function (id) {
-    $(id).addEventListener('input', updPreview);
+  ['f_miles','f_odos','f_odoe'].forEach(function (id) {
+    $(id).addEventListener('input', function () { autoOdoMath(id); updPreview(); });
   });
+  $('f_date').addEventListener('input', updPreview);
   $('f_vehicle').addEventListener('change', function () {
     $('otherRow').style.display = this.value === '__other' ? '' : 'none';
     if (this.value === '__other') $('f_vehicle_other').focus();
