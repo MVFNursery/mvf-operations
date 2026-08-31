@@ -221,6 +221,14 @@
   .loc-btns { display: flex; gap: 6px; flex-wrap: wrap; }
   .loc-pill { font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-family: inherit; cursor: pointer; }
   .loc-pill.active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  /* SQUARE MAPPING (expanded card, square-sync tasks only) */
+  .map-fallback { margin-top: 8px; }
+  .map-fallback-link {
+    background: none; border: none; font-family: inherit; cursor: pointer;
+    font-size: 12px; color: var(--text2); text-decoration: underline; padding: 4px 0;
+  }
+  .map-fallback-link:active { opacity: 0.7; }
+  .map-fallback-warn { font-size: 11px; color: var(--amber); margin: 6px 0; }
   .badge-score.top { background: var(--green); color: #0d1f0d; }
   .task-reason { font-size: 11px; color: var(--text3); margin-top: 3px; font-style: italic; }
 
@@ -525,6 +533,21 @@
   </div>
 </div>
 
+<!-- Square→inventory mapping is confirmed BY NAME for the same reason completions
+     are: it is not undoable from here — the server closes the task and starts
+     auto-decrementing this stock row on every future Square sale. -->
+<div class="archive-overlay" id="mapConfirmOverlay" onclick="cancelMapConfirm(event)">
+  <div class="archive-sheet">
+    <div class="archive-sheet-title">Map to inventory?</div>
+    <div class="archive-sheet-desc" id="mapConfirmDesc"></div>
+    <div class="confirm-meta" id="mapConfirmMeta"></div>
+    <div class="archive-sheet-btns">
+      <button class="confirm-go-btn" onclick="confirmMapConfirm()">Map it</button>
+      <button class="archive-cancel-btn" onclick="cancelMapConfirm()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── CONFIG — update this to your MegaMachine Tailscale IP ──
 const N8N_BASE = 'https://homelab.taile865b6.ts.net:5678/webhook';
@@ -533,6 +556,7 @@ const WEBHOOK_GET  = N8N_BASE + '/mvfn-field-get';
 // ──────────────────────────────────────────────────────────
 
 let allTasks = [];
+let squareProposals = [];     // [{catalog_object_id, item_name, variation_name, sku, task_source_ref, candidates}] — Square→inventory mapping suggestions
 let allProjects = [];         // [{id, slug, name, status, open_tasks}] — business tasks.projects (V019)
 let projectDrill = null;      // project id, or 'none' for the unfiled bucket, while inside the Projects view
 let allAreas = [];            // [{id, name}]
@@ -567,6 +591,7 @@ async function loadTasks() {
     if (row && Array.isArray(row.tasks)) {
       // single-payload shape: {tasks, areas, users, ownership, me, categories, household_categories}
       allTasks = row.tasks;
+      squareProposals = Array.isArray(row.square_proposals) ? row.square_proposals : [];
       allProjects = row.projects || [];
       allAreas = row.areas || [];
       allUsers = row.users || [];
@@ -576,6 +601,7 @@ async function loadTasks() {
       me = row.me || null;
     } else {
       allTasks = rows; // legacy shape: bare task rows
+      squareProposals = []; // legacy payload never carries proposals
     }
     renderFilterChips();
     renderTasks();
@@ -928,6 +954,7 @@ function card(t, rank) {
       ${projectEditor(id, t.project_ref, t.suggested_project_ref, t.suggested_project)}
       ${assigneeEditor(id, t.assignee, t.suggested_assignee)}
       ${locEditor(id, t.work_location)}
+      ${squareMapSection(t)}
       <div class="note-row">
         <textarea class="note-input" id="note-${esc(id)}" placeholder="Add note…" rows="1"></textarea>
         <button class="note-save-btn" onclick="saveNote('${esc(id)}')">Save</button>
@@ -1580,6 +1607,122 @@ function locEditor(id, wl) {
     </div>
   </div>`;
 }
+// ── SQUARE INVENTORY MAPPING ──────────────────────────────
+// A square-sync task names an unmapped Square catalog item; source_ref carries
+// which one. squareProposals (from the GET payload, [] on an old server) pairs
+// that ref with up to 3 scored candidate stock rows. Confirming one closes the
+// task server-side and wires the row to future Square sales.
+function findSquareProposal(t) {
+  if (t.source !== 'square-sync' || !t.source_ref) return null;
+  return squareProposals.find(p => p.task_source_ref === t.source_ref) || null;
+}
+function squareMapSection(t) {
+  const p = findSquareProposal(t);
+  if (!p) return '';
+  const id = t.task_id != null ? String(t.task_id) : '';
+  const cands = Array.isArray(p.candidates) ? p.candidates : [];
+  const chip = c => `<button class="loc-pill" onclick="showMapConfirm('${esc(id)}','${esc(p.catalog_object_id)}',${Number(c.stock_id)})">${escH(c.label)} · ${escH(c.container_size || '')} · qty ${escH(c.qty)} · #${escH(c.stock_id)}</button>`;
+  return `<div class="loc-edit">
+    <div class="loc-edit-label">Map to inventory</div>
+    <div class="loc-btns">
+      ${cands.map(chip).join('')}
+    </div>
+    <div class="map-fallback">
+      <button class="map-fallback-link" onclick="toggleMapFallback('${esc(id)}')">map to another stock id…</button>
+      <div class="map-fallback-form" id="mapFallbackForm-${esc(id)}" style="display:none">
+        <div class="map-fallback-warn">Unvalidated — server will reject closed rows.</div>
+        <div class="note-row">
+          <input class="note-input" id="mapStockInput-${esc(id)}" type="number" inputmode="numeric" placeholder="Stock ID">
+          <button class="note-save-btn" onclick="submitMapFallback('${esc(id)}','${esc(p.catalog_object_id)}')">Map</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+function toggleMapFallback(id) {
+  const form = document.getElementById('mapFallbackForm-' + id);
+  if (!form) return;
+  form.style.display = form.style.display === 'none' ? '' : 'none';
+}
+function submitMapFallback(taskId, catalogObjectId) {
+  const inp = document.getElementById('mapStockInput-' + taskId);
+  const val = inp ? inp.value.trim() : '';
+  const stockId = Number(val);
+  if (!val || !Number.isInteger(stockId) || stockId <= 0) {
+    showToast('Enter a valid stock ID', 'error');
+    return;
+  }
+  showMapConfirm(taskId, catalogObjectId, stockId);
+}
+
+let _pendingMapCatalogId = null;
+let _pendingMapStockId = null;
+
+// Confirm by name, same reason as completeTask: the candidate under the finger
+// is not proof of which stock row it is, and this is not undoable from here.
+function showMapConfirm(taskId, catalogObjectId, stockId) {
+  const p = squareProposals.find(x => x.catalog_object_id === catalogObjectId);
+  if (!p) {
+    showToast('Proposal no longer available — refresh', 'error');
+    return;
+  }
+  const cand = (p.candidates || []).find(c => Number(c.stock_id) === Number(stockId));
+  _pendingMapCatalogId = catalogObjectId;
+  _pendingMapStockId = stockId;
+  const itemText = p.item_name + (p.variation_name ? ' (' + p.variation_name + ')' : '');
+  const targetText = cand
+    ? (cand.label + (cand.container_size ? ' ' + cand.container_size : '') + ' (#' + stockId + ')')
+    : ('stock #' + stockId);
+  document.getElementById('mapConfirmDesc').textContent = 'Map "' + itemText + '" → ' + targetText + '?';
+  document.getElementById('mapConfirmMeta').textContent = 'Future Square sales will auto-decrement this row.';
+  document.getElementById('mapConfirmOverlay').classList.add('show');
+}
+function cancelMapConfirm(e) {
+  if (e && e.target !== document.getElementById('mapConfirmOverlay')) return;
+  document.getElementById('mapConfirmOverlay').classList.remove('show');
+  _pendingMapCatalogId = null;
+  _pendingMapStockId = null;
+}
+function confirmMapConfirm() {
+  const catalogObjectId = _pendingMapCatalogId;
+  const stockId = _pendingMapStockId;
+  document.getElementById('mapConfirmOverlay').classList.remove('show');
+  _pendingMapCatalogId = null;
+  _pendingMapStockId = null;
+  if (catalogObjectId && stockId != null) doSquareMapConfirm(catalogObjectId, stockId);
+}
+async function doSquareMapConfirm(catalogObjectId, stockId) {
+  showToast('Mapping…', '');
+  try {
+    const r = await post({ action: 'square_map_confirm', catalog_object_id: catalogObjectId, stock_id: Number(stockId) });
+    const res = (r && r.result) || {};
+    let msg = 'Mapped to ' + (res.stock_label || ('stock #' + res.stock_id)) + '.';
+    if (Number(res.auto_qty) > 0) {
+      msg += ' ' + res.auto_qty + ' already-sold will apply at the next 05:00 sync.';
+    }
+    // Residue arrays are [{order_id, qty}] (V147 envelope), not bare ids.
+    const fmtOrders = a => a.map(o => o.order_id + ' (qty ' + o.qty + ')').join(', ');
+    if (Array.isArray(res.manual_orders) && res.manual_orders.length) {
+      msg += ' Adjust on-hand manually for order(s): ' + fmtOrders(res.manual_orders) + '.';
+    }
+    if (Array.isArray(res.verify_after_sync) && res.verify_after_sync.length) {
+      msg += ' Verify on-hand after tomorrow\'s sync (order(s) ' + fmtOrders(res.verify_after_sync) + ').';
+    }
+    showToast('Mapped ✓', 'success');
+    showNotice(msg, 'ok');
+    // The task closes server-side as part of this write — reload rather than
+    // patch allTasks locally, same as any action the server both writes and
+    // scores (unlike completeTask, there is no adjacent-row tap hazard here).
+    loadTasks();
+  } catch(e) {
+    showToast('Not mapped', 'error');
+    showNotice(e && e.serverMessage
+      ? 'Nothing was mapped: ' + e.serverMessage
+      : 'Nothing was mapped — could not reach the server. Check Tailscale, then refresh.',
+      'error');
+  }
+}
+
 // ── AREA + ASSIGNEE ───────────────────────────────────────
 function userLabel(slug) {
   const u = allUsers.find(x => x.slug === slug);
