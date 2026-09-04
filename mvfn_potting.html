@@ -418,6 +418,8 @@
       esc(f.tags_used == null ? '' : f.tags_used) + '"></div></div>';
     h += '<div class="group"><div class="label">Location (optional)</div>' +
       '<input type="text" id="bf-loc" placeholder="e.g. nursery rows" value="' + esc(f.location || '') + '"></div>';
+    h += '<div class="group"><div class="label">Ready by (optional)</div>' +
+      '<input type="date" id="bf-ready" value="' + esc(f.ready_date || '') + '"></div>';
     h += '<div class="group"><div class="label">Note (optional)</div>' +
       '<input type="text" id="bf-note" value="' + esc(f.note || '') + '"></div>';
     h += '<div class="preflight" id="preflight"></div>';
@@ -582,6 +584,7 @@
     f.tags_used = $('bf-tags') ? ($('bf-tags').value === '' ? null : $('bf-tags').value) : f.tags_used;
     f.location = $('bf-loc') ? $('bf-loc').value : f.location;
     f.note = $('bf-note') ? $('bf-note').value : f.note;
+    f.ready_date = $('bf-ready') ? $('bf-ready').value : f.ready_date;
     if ($('bf-usedup')) f.source_used_up = $('bf-usedup').checked;
   }
 
@@ -611,6 +614,7 @@
     };
     $('bf-loc').oninput = () => readBatchForm();
     $('bf-note').oninput = () => readBatchForm();
+    $('bf-ready').onchange = () => readBatchForm();
     refresh();
 
     $('bf-save').onclick = async () => {
@@ -637,6 +641,8 @@
         to_status: 'growing',
         location: trim(f.location),
         note: trim(f.note),
+        // '' = not stated -> NULL; the server never infers a ready date
+        ready_date: trim(f.ready_date),
         // strings on purpose: the n8n (body.x || '') idiom turns a JSON
         // boolean false into '' (= auto server-side)
         source_used_up: f.from_stock_id ? String(usedUpChecked(f)) : ''

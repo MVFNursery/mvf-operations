@@ -184,6 +184,12 @@
     flex: 1 1 120px; padding: 9px; border: 2px solid #d1d5db; border-radius: 6px;
     font-family: 'DM Mono', monospace; font-size: 0.85rem; background: white;
   }
+  .editor input.readyinput, .editor input.costinput {
+    flex: 1 1 110px; min-width: 0; padding: 9px; border: 2px solid #d1d5db; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 0.85rem; background: white;
+  }
+  .editor input.costinput { flex: 1 1 80px; }
+  .stock-card .loc.sub { margin-top: 3px; }
   .editor select.statussel {
     padding: 9px; border: 2px solid #d1d5db; border-radius: 6px;
     font-family: 'DM Mono', monospace; font-size: 0.85rem; background: white;
@@ -323,6 +329,11 @@
         </select>
         <input id="addLocation" placeholder="Location">
         <input id="addPrice" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Price">
+      </div>
+      <div class="flabel">What I paid per unit &middot; ready date (both optional)</div>
+      <div class="row">
+        <input id="addCost" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Cost / unit">
+        <input id="addReady" type="date" aria-label="Ready date">
       </div>
       <div class="flabel">Source</div>
       <div class="row tawrap">
@@ -522,6 +533,28 @@
     return isNaN(n) ? '' : '$' + n.toFixed(2).replace(/\.00$/, '');
   }
 
+  // ready_date arrives as 'YYYY-MM-DD' (row_to_json of a date). Build the Date
+  // from parts so a UTC-midnight parse never shows the day before.
+  function fmtDate(d) {
+    if (!d) return '';
+    const m = String(d).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return String(d);
+    return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function isoDate(d) { return d ? String(d).slice(0, 10) : ''; }
+
+  // Compare costs by value, not text: 2.5 === '2.50'.
+  function costKey(v) { return (v == null || v === '') ? '' : Number(v).toFixed(2); }
+
+  function subLineText(s) {
+    const parts = [];
+    if (s.ready_date) parts.push(`ready ${fmtDate(s.ready_date)}`);
+    const cost = fmtPrice(s.cost_per_unit);
+    if (cost) parts.push(`paid ${cost}/unit`);
+    return parts.join(' · ');
+  }
+
   function statusClass(s) {
     if (s === 'for-sale') return 'for-sale';
     if (s === 'growing') return 'growing';
@@ -580,6 +613,8 @@
     const native = sp.is_true_native ? '<span class="native-dot" title="True native">● native</span>' : '';
     const price = fmtPrice(s.price_per_unit);
     const loc = s.location ? `<div class="loc">${esc(s.location)}</div>` : '';
+    const sub = subLineText(s);
+    const subLine = `<div class="loc sub" data-sub${sub ? '' : ' style="display:none;"'}>${esc(sub)}</div>`;
     return `<div class="stock-card" data-card="${s.stock_id}">
       <div class="name">${esc(name)} ${native}</div>
       ${sci}
@@ -590,6 +625,7 @@
         ${price ? `<span class="price">${price}</span>` : ''}
       </div>
       ${loc}
+      ${subLine}
       ${editorHTML(s)}
     </div>`;
   }
@@ -654,6 +690,13 @@
         </select>
         <label>Loc</label>
         <input class="locinput" type="text" value="${esc(s.location || '')}" placeholder="location">
+      </div>
+      <div class="line">
+        <label>Ready</label>
+        <input class="readyinput" type="date" value="${esc(isoDate(s.ready_date))}" aria-label="ready date">
+        <label>Paid</label>
+        <input class="costinput" type="number" inputmode="decimal" step="0.01" min="0"
+               value="${s.cost_per_unit == null ? '' : esc(String(s.cost_per_unit))}" placeholder="$/unit">
         <button class="save" type="button" data-act="meta">Save</button>
       </div>
       <div class="line closeline" style="${Number(s.quantity ?? 0) === 0 ? '' : 'display:none;'}">
@@ -734,11 +777,14 @@
       if (statusSel.value === 'for-sale' && !locInput.value.trim()) locInput.value = 'retail';
     });
 
-    // Save status / location / container -> set_* (only what changed)
+    // Save status / location / container / ready date / cost -> set_* (only what changed)
     card.querySelector('[data-act="meta"]').addEventListener('click', async () => {
       const newStatus = statusSel.value;
       const newLoc = locInput.value.trim();
       const newCont = card.querySelector('input.continput').value.trim();
+      const newReady = card.querySelector('input.readyinput').value.trim();
+      const newCostRaw = card.querySelector('input.costinput').value.trim();
+      if (newCostRaw !== '' && !(Number(newCostRaw) >= 0)) { setMsg('Cost must be ≥ 0', 'err'); return; }
       const btn = card.querySelector('[data-act="meta"]');
       btn.disabled = true; setMsg('Saving…', 'saving');
       try {
@@ -760,6 +806,22 @@
           s.container_size = newCont;
           card.querySelector('.meta span').textContent = newCont || '—';
           changed = true;
+        }
+        if (newReady !== isoDate(s.ready_date)) {
+          await postAction({ action: 'set_ready_date', stock_id: stockId, ready_date: newReady });
+          s.ready_date = newReady || null;
+          changed = true;
+        }
+        if (costKey(newCostRaw) !== costKey(s.cost_per_unit)) {
+          await postAction({ action: 'set_cost', stock_id: stockId, cost_per_unit: newCostRaw });
+          s.cost_per_unit = newCostRaw === '' ? null : Number(newCostRaw);
+          changed = true;
+        }
+        if (changed) {
+          const subEl = card.querySelector('[data-sub]');
+          const sub = subLineText(s);
+          subEl.textContent = sub;
+          subEl.style.display = sub ? '' : 'none';
         }
         setMsg(changed ? '✓ saved' : 'no changes', 'ok');
         if (changed) showToast('Saved');
@@ -996,7 +1058,7 @@
   }
 
   function resetAddForm() {
-    ['addSpecies','addContainer','addQty','addLocation','addPrice','addSci','addSource'].forEach(id => $(id).value = '');
+    ['addSpecies','addContainer','addQty','addLocation','addPrice','addCost','addReady','addSci','addSource'].forEach(id => $(id).value = '');
     $('addNative').checked = false;
     $('addMsg').textContent = '';
     $('speciesNote').textContent = ''; $('speciesNote').className = 'speciesnote';
@@ -1013,6 +1075,8 @@
     const qtyRaw = $('addQty').value.trim();
     const qty = qtyRaw === '' ? 0 : parseInt(qtyRaw, 10);
     if (isNaN(qty) || qty < 0) { addMsg.textContent = 'Qty must be ≥ 0.'; return; }
+    const costRaw = $('addCost').value.trim();
+    if (costRaw !== '' && !(Number(costRaw) >= 0)) { addMsg.textContent = 'Cost must be ≥ 0.'; return; }
 
     // Three cases, in order of preference:
     //   carried  -> reuse the existing inventory key, create nothing.
@@ -1064,6 +1128,9 @@
         location: $('addLocation').value.trim(),
         status: $('addStatus').value,
         price_per_unit: $('addPrice').value.trim(),
+        // Optional. '' -> NULL server-side; nothing is inferred for either.
+        cost_per_unit: costRaw,
+        ready_date: $('addReady').value.trim(),
         source: $('addSource').value.trim(),
       });
       resetAddForm();
