@@ -416,8 +416,17 @@
       '<div class="group"><div class="label">Tags used</div>' +
       '<input type="number" id="bf-tags" min="0" inputmode="numeric" placeholder="= plants" value="' +
       esc(f.tags_used == null ? '' : f.tags_used) + '"></div></div>';
+    // Controlled list (inventory.location, V154): Bench Book zones + retail.
+    // Active codes are offered; a legacy code prefilled from the source row
+    // stays selectable so the form never rewrites it behind Ian's back.
+    var curLoc = f.location || '';
+    var locs = (state.data.locations || []).filter(function (l) { return l.active || l.code === curLoc; });
+    if (curLoc && !locs.some(function (l) { return l.code === curLoc; })) locs.push({ code: curLoc, label: curLoc + ' (not in list)' });
     h += '<div class="group"><div class="label">Location (optional)</div>' +
-      '<input type="text" id="bf-loc" placeholder="e.g. nursery rows" value="' + esc(f.location || '') + '"></div>';
+      '<select id="bf-loc"><option value="">— none —</option>' +
+      locs.map(function (l) {
+        return '<option value="' + esc(l.code) + '"' + (l.code === curLoc ? ' selected' : '') + '>' + esc(l.label) + '</option>';
+      }).join('') + '</select></div>';
     h += '<div class="group"><div class="label">Ready by (optional)</div>' +
       '<input type="date" id="bf-ready" value="' + esc(f.ready_date || '') + '"></div>';
     h += '<div class="group"><div class="label">Note (optional)</div>' +

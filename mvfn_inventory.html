@@ -180,7 +180,7 @@
   }
   .editor .delta.neg { color: #b91c1c; }
   .editor .delta.pos { color: #047857; }
-  .editor input.locinput {
+  .editor select.locinput {
     flex: 1 1 120px; padding: 9px; border: 2px solid #d1d5db; border-radius: 6px;
     font-family: 'DM Mono', monospace; font-size: 0.85rem; background: white;
   }
@@ -327,7 +327,7 @@
           <option value="growing">growing</option>
           <option value="for-sale">for-sale</option>
         </select>
-        <input id="addLocation" placeholder="Location">
+        <select id="addLocation" aria-label="Location"><option value="">Location…</option></select>
         <input id="addPrice" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Price">
       </div>
       <div class="flabel">What I paid per unit &middot; ready date (both optional)</div>
@@ -387,12 +387,13 @@
   // Bump on every ship. Shown in the footer so "which version am I running"
   // is answerable at a glance — GitHub Pages caches HTML for 10 minutes, and
   // a quick retest after a deploy can silently re-serve the old page.
-  const BUILD = '2026-08-20a';
+  const BUILD = '2026-09-08a';
 
   let stock = [];
   let speciesById = {};
   let speciesList = [];
   let containerList = [];
+  let locationList = [];   // inventory.location vocab (V154): {code,label,zone_no,active}
 
   // The curated PA-native master (species_ref.species, ~1749 rows / ~271 kB).
   // Fetched lazily on first open of the Add Stock form, never on app load — it is
@@ -426,6 +427,8 @@
       speciesList.forEach(sp => { speciesById[speciesKey(sp.species_id)] = sp; });
       containerList = (data.containers || []).slice();
       buildContainerDatalist();
+      locationList = (data.locations || []).slice();
+      buildLocationSelect();
       buildSourceOptions();
       $('controls').style.display = 'flex';
       $('updated').textContent = 'Updated ' + new Date().toLocaleString() + ' · build ' + BUILD;
@@ -482,6 +485,29 @@
         const lbl = c.nominal_volume ? `${c.container_id} — ${c.nominal_volume}` : c.container_id;
         return `<option value="${esc(c.container_id)}">${esc(lbl)}</option>`;
       }).join('');
+  }
+
+  // Location is a controlled list (inventory.location, V154): the Bench Book
+  // zones + retail. Active codes are offered everywhere; an inactive/legacy
+  // code stays selectable only on the row that already carries it, so nothing
+  // is silently rewritten. The stored value is the code; the label is shown.
+  function locLabel(code) {
+    if (!code) return '';
+    const l = locationList.find(x => x.code === code);
+    return l ? l.label : code;
+  }
+  function locationOptionsHTML(current, placeholder) {
+    const cur = current || '';
+    const opts = locationList.filter(l => l.active || l.code === cur);
+    if (cur && !opts.some(l => l.code === cur)) opts.push({ code: cur, label: cur + ' (not in list)' });
+    return `<option value="">${esc(placeholder || '— none —')}</option>` + opts
+      .map(l => `<option value="${esc(l.code)}"${l.code === cur ? ' selected' : ''}>${esc(l.label)}</option>`)
+      .join('');
+  }
+  function buildLocationSelect() {
+    const sel = $('addLocation');
+    const keep = sel.value;
+    sel.innerHTML = locationOptionsHTML(keep, 'Location…');
   }
 
   // Sources already in use on stock rows -> pick list for the add form. Free
@@ -612,7 +638,7 @@
     const sci = sp.scientific_name ? `<div class="sci">${esc(sp.scientific_name)}</div>` : '';
     const native = sp.is_true_native ? '<span class="native-dot" title="True native">● native</span>' : '';
     const price = fmtPrice(s.price_per_unit);
-    const loc = s.location ? `<div class="loc">${esc(s.location)}</div>` : '';
+    const loc = s.location ? `<div class="loc">${esc(locLabel(s.location))}</div>` : '';
     const sub = subLineText(s);
     const subLine = `<div class="loc sub" data-sub${sub ? '' : ' style="display:none;"'}>${esc(sub)}</div>`;
     return `<div class="stock-card" data-card="${s.stock_id}">
@@ -689,7 +715,7 @@
           ).map(o => `<option value="${esc(o)}"${o === s.status ? ' selected' : ''}>${esc(o)}</option>`).join('')}
         </select>
         <label>Loc</label>
-        <input class="locinput" type="text" value="${esc(s.location || '')}" placeholder="location">
+        <select class="locinput" aria-label="location">${locationOptionsHTML(s.location)}</select>
       </div>
       <div class="line">
         <label>Ready</label>
@@ -772,7 +798,7 @@
 
     // Auto-fill location 'retail' when status flips to for-sale and loc is empty.
     const statusSel = card.querySelector('select.statussel');
-    const locInput = card.querySelector('input.locinput');
+    const locInput = card.querySelector('select.locinput');
     statusSel.addEventListener('change', () => {
       if (statusSel.value === 'for-sale' && !locInput.value.trim()) locInput.value = 'retail';
     });
