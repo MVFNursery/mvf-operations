@@ -143,7 +143,19 @@
   .toast.err { background: #9e3b2c; }
 
   /* failed writes: pinned until dismissed (see "failed writes" in the script) */
-  .fails { position: sticky; top: 8px; z-index: 40; }
+  .pinned { position: sticky; top: 8px; z-index: 40; }
+  .queued { display: flex; gap: 10px; align-items: flex-start; background: #fbeccd; color: #6b4410;
+    border: 2px solid #8a5a12; padding: 10px 12px; border-radius: 10px; margin-bottom: 8px;
+    font-size: 0.8rem; line-height: 1.45; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+  .queued .what { flex: 1 1 auto; }
+  .queued .what b { font-weight: 500; }
+  .queued .qline { margin-top: 4px; }
+  .queued button { flex: 0 0 auto; background: white; color: #6b4410; border: 1.5px solid #8a5a12;
+    border-radius: 999px; padding: 4px 11px; font-family: 'DM Mono', monospace; font-size: 0.72rem;
+    cursor: pointer; }
+  .queued .qdrop { margin-left: 8px; padding: 1px 8px; font-size: 0.66rem; }
+  .result.queued-card { background: #fdf6e7; border-color: #8a5a12; }
+  .result.queued-card h3 { color: #8a5a12; }
   .fail { display: flex; gap: 10px; align-items: flex-start; background: #9e3b2c; color: #f5f5f0;
     padding: 11px 13px; border-radius: 10px; margin-bottom: 8px; font-size: 0.8rem; line-height: 1.45;
     box-shadow: 0 2px 8px rgba(0, 0, 0, .18); }
@@ -169,7 +181,10 @@
     <button type="button" onclick="window.appLoad()">Reload</button>
   </div>
 
-  <div class="fails" id="fails" aria-live="assertive"></div>
+  <div class="pinned">
+    <div id="outbox"></div>
+    <div class="fails" id="fails" aria-live="assertive"></div>
+  </div>
 
   <div class="tabs" id="tabs"></div>
 
@@ -185,6 +200,7 @@
 
   const N8N_BASE = 'https://homelab.taile865b6.ts.net:5678/webhook';
   const ME = 'ian';
+  const POST_TIMEOUT_MS = 20000;   // a save with no answer by then waits in the outbox
 
   const state = {
     data: null,          // GET payload
@@ -260,6 +276,113 @@
     renderFails();
   }
 
+  // ── outbox ─────────────────────────────────────────────────────────────────
+  // Every batch is written to this phone BEFORE it is sent, and removed only
+  // when the server confirms it -- or refuses it outright (409). Anything that
+  // got no clear answer (no signal, timeout, 5xx, empty reply) stays and is
+  // resent by itself: on load, when the phone comes back online, when the app
+  // is reopened, and every 30 s while something is waiting. Resending is safe
+  // because each batch carries a client_ref and the server (V157) answers a ref
+  // it already has with the original event instead of potting the plants twice.
+  // Pot-ups only: supply receives are deltas done with the item in hand, so
+  // they stay send-or-banner.
+  const OUTBOX_KEY = 'mvfn_potting_outbox_v1';
+  const inFlight = new Set();
+  let flushing = false;
+  const localDate = d => {
+    const z = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate());
+  };
+  const shortDay = v => {
+    const p = String(v || '').split('-');
+    return p.length === 3 ? (+p[1]) + '/' + (+p[2]) : String(v || '');
+  };
+  const newRef = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+    : 'pb-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+
+  function readOutbox() {
+    try { return JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]') || []; } catch (e) { return []; }
+  }
+  function writeOutbox(list) {
+    try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(list)); return true; } catch (e) { return false; }
+  }
+  const enqueue = entry => writeOutbox(readOutbox().concat([entry]));   // false = this phone can't keep it
+  const dequeue = ref => writeOutbox(readOutbox().filter(x => x.ref !== ref));
+  const noteTry = (ref, why) => writeOutbox(readOutbox().map(x =>
+    x.ref === ref ? Object.assign({}, x, { tries: (x.tries || 0) + 1, lastError: why }) : x));
+
+  function renderOutbox() {
+    const el = $('outbox');
+    const list = readOutbox();
+    if (!list.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div class="queued" role="status"><div class="what"><b>' +
+      (list.length === 1 ? '1 batch' : list.length + ' batches') + ' saved on this phone, not sent yet</b>' +
+      '<div class="why">They send by themselves when there’s signal.</div>' +
+      list.map(x => '<div class="qline">' + esc(x.what) + ' · ' + esc(shortDay(x.day)) +
+        '<button type="button" class="qdrop" data-ref="' + esc(x.ref) + '">Discard</button></div>').join('') +
+      '</div><button type="button" id="ob-send">Send now</button></div>';
+    $('ob-send').onclick = () => flushOutbox();
+    el.querySelectorAll('.qdrop').forEach(b => {
+      b.onclick = () => {
+        const x = readOutbox().find(y => y.ref === b.getAttribute('data-ref'));
+        if (x && window.confirm('Discard this saved batch?\n\n' + x.what + ' · ' + shortDay(x.day) +
+            '\n\nThe server hasn’t confirmed it, so discarding may lose it.')) {
+          dequeue(x.ref);
+          renderOutbox();
+        }
+      };
+    });
+  }
+
+  // one send attempt; the outbox entry is settled here, the caller decides what to show
+  async function sendEntry(entry) {
+    if (inFlight.has(entry.ref)) return { ok: false, retry: true, busy: true };
+    inFlight.add(entry.ref);
+    try {
+      const data = await postAction(entry.payload);
+      dequeue(entry.ref);
+      clearFails('pot:' + entry.payload.species_id);
+      return { ok: true, result: data.result || data };
+    } catch (e) {
+      if (e.retryable) { noteTry(entry.ref, e.message); return { ok: false, retry: true, error: e }; }
+      dequeue(entry.ref);
+      return { ok: false, retry: false, error: e };
+    } finally {
+      inFlight.delete(entry.ref);
+      renderOutbox();
+    }
+  }
+
+  async function flushOutbox() {
+    if (flushing) return;
+    flushing = true;
+    let sent = 0;
+    try {
+      for (const entry of readOutbox()) {
+        const out = await sendEntry(entry);
+        if (out.ok) {
+          sent++;
+          // the card for this very batch is on screen: swap in the real result
+          if (state.result && state.result.queued && state.result.ref === entry.ref) {
+            state.result = out.result;
+            render();
+          }
+        } else if (!out.retry) {
+          failed(entry.what + ' NOT recorded', out.error, 'pot:' + entry.payload.species_id,
+                 'It was saved on this phone, but the server refused it — record it again.');
+        } else if (!out.busy) {
+          break;   // still no connection: leave the rest for the next try
+        }
+      }
+    } finally {
+      flushing = false;
+    }
+    if (sent) {
+      toast(sent === 1 ? 'Sent 1 saved batch' : 'Sent ' + sent + ' saved batches');
+      load(true);
+    }
+  }
+
   // ── data access ────────────────────────────────────────────────────────────
   const speciesById = id => (state.data.species || []).find(s => s.species_id === id);
   const guidanceOf = id => (state.data.guidance || []).find(g => g.species_id === id);
@@ -268,28 +391,38 @@
   const supplyBySpecies = sid => (state.data.supplies || []).find(s => s.species_id === sid);
 
   // ── network ────────────────────────────────────────────────────────────────
+  // Errors carry .retryable: true when the write may not have landed (no answer,
+  // timeout, 5xx, empty reply) -- safe to resend a pot-up now that it's
+  // idempotent (V157); false only for a 409, the server refusing it outright.
   async function postAction(payload) {
-    let res;
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), POST_TIMEOUT_MS) : null;
+    const fail = (msg, retryable) => { const e = new Error(msg); e.retryable = retryable; return e; };
+    let res, text;
     try {
       res = await fetch(N8N_BASE + '/mvfn-potting', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: ctl ? ctl.signal : undefined
       });
+      text = await res.text();
     } catch (e) {
-      // fetch only rejects when no HTTP answer came back at all: no signal,
-      // Tailscale off, or the connection dropped mid-request
-      throw new Error('no connection — the server never answered');
+      // no HTTP answer at all: no signal, Tailscale off, dropped mid-request, or our timeout
+      throw fail(ctl && ctl.signal.aborted
+        ? 'timed out — the server didn’t answer in ' + (POST_TIMEOUT_MS / 1000) + ' s'
+        : 'no connection — the server never answered', true);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
-    const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
     if (!res.ok) {
       const msg = (data && ((data.result && data.result.message) || data.message)) ||
                   ('server error ' + res.status);
-      throw new Error(msg);
+      throw fail(msg, res.status !== 409);
     }
-    if (data === null) throw new Error('empty response — the save may have failed; check and retry');
+    if (data === null) throw fail('empty response — the save may not have landed', true);
     return data;
   }
 
@@ -495,6 +628,9 @@
       locs.map(function (l) {
         return '<option value="' + esc(l.code) + '"' + (l.code === curLoc ? ' selected' : '') + '>' + esc(l.label) + '</option>';
       }).join('') + '</select></div>';
+    h += '<div class="group"><div class="label">Potted on</div>' +
+      '<input type="date" id="bf-date" max="' + localDate(new Date()) + '" value="' +
+      esc(f.event_date || localDate(new Date())) + '"></div>';
     h += '<div class="group"><div class="label">Ready by (optional)</div>' +
       '<input type="date" id="bf-ready" value="' + esc(f.ready_date || '') + '"></div>';
     h += '<div class="group"><div class="label">Note (optional)</div>' +
@@ -553,9 +689,18 @@
   }
 
   function resultHtml(r) {
-    let h = '<div class="result"><h3>Batch recorded</h3>';
+    if (r.queued) {
+      return '<div class="result queued-card"><h3>Saved on this phone</h3>' +
+        '<div class="line"><b>' + esc(r.what) + '</b> didn’t reach the server (' + esc(r.why) + ').</div>' +
+        '<div class="line">It’s kept on this phone and sends by itself when there’s signal — nothing to ' +
+        're-enter. Stock counts won’t include it until it’s sent.</div>' +
+        '<div class="actions">' +
+        '<button type="button" class="btn-primary" id="res-again">Pot another batch</button>' +
+        '<button type="button" class="btn-plain" id="res-done">Done</button></div></div>';
+    }
+    let h = '<div class="result"><h3>' + (r.duplicate ? 'Already recorded' : 'Batch recorded') + '</h3>';
     h += '<div class="line">' + r.to_quantity + ' now in stock row #' + r.to_stock_id +
-      (r.to_merged ? ' (merged into existing row)' : ' (new row)') + '.</div>';
+      (r.duplicate ? '' : (r.to_merged ? ' (merged into existing row)' : ' (new row)')) + '.</div>';
     if (r.from_stock) {
       h += r.from_stock.closed
         ? '<div class="line">Source row #' + r.from_stock.stock_id + ' used up — closed out.</div>'
@@ -662,6 +807,7 @@
     f.location = $('bf-loc') ? $('bf-loc').value : f.location;
     f.note = $('bf-note') ? $('bf-note').value : f.note;
     f.ready_date = $('bf-ready') ? $('bf-ready').value : f.ready_date;
+    f.event_date = $('bf-date') ? $('bf-date').value : f.event_date;
     if ($('bf-usedup')) f.source_used_up = $('bf-usedup').checked;
   }
 
@@ -692,6 +838,7 @@
     $('bf-loc').oninput = () => readBatchForm();
     $('bf-note').oninput = () => readBatchForm();
     $('bf-ready').onchange = () => readBatchForm();
+    $('bf-date').onchange = () => readBatchForm();
     refresh();
 
     $('bf-save').onclick = async () => {
@@ -703,6 +850,9 @@
       if (!f.from_stock_id && !trim(f.from_note)) {
         toast('Name the source — a stock row or a note', true); return;
       }
+      // the batch's own day: stated on the form, else today HERE -- never the server's UTC date
+      const day = trim(f.event_date) || localDate(new Date());
+      if (day > localDate(new Date())) { toast('Potted-on date is in the future', true); return; }
       const btn = $('bf-save');
       btn.disabled = true; btn.textContent = 'Recording…';
       const payload = {
@@ -722,19 +872,31 @@
         ready_date: trim(f.ready_date),
         // strings on purpose: the n8n (body.x || '') idiom turns a JSON
         // boolean false into '' (= auto server-side)
-        source_used_up: f.from_stock_id ? String(usedUpChecked(f)) : ''
+        source_used_up: f.from_stock_id ? String(usedUpChecked(f)) : '',
+        // fixed when recorded, so a batch that waits in the outbox overnight
+        // still lands on the day it was potted
+        event_date: day,
+        // one id per batch: a resend is recognised instead of recorded twice
+        client_ref: newRef()
       };
-      try {
-        const data = await postAction(payload);
-        state.result = data.result || data;
-        clearFails('pot:' + payload.species_id);
-        toast('Batch recorded');
+      const entry = {
+        ref: payload.client_ref, payload: payload, day: day,
+        what: spName(payload.species_id) + ': ' + qty + ' → ' + f.to_container_id,
+        queuedAt: Date.now(), tries: 0, lastError: ''
+      };
+      const kept = enqueue(entry);   // written BEFORE sending; false = this phone can't store it
+      const out = await sendEntry(entry);
+      if (out.ok) {
+        state.result = out.result;
+        toast(out.result.duplicate ? 'Already recorded' : 'Batch recorded');
         render();
         load(true);   // resync counts + stock quietly
-      } catch (e) {
+      } else if (out.retry && kept) {
+        state.result = { queued: true, ref: entry.ref, what: entry.what, why: out.error.message };
+        render();
+      } else {
         btn.disabled = false; btn.textContent = 'Record batch';
-        failed(spName(payload.species_id) + ': ' + qty + ' → ' + f.to_container_id + ' NOT recorded',
-               e, 'pot:' + payload.species_id,
+        failed(entry.what + ' NOT recorded', out.error, 'pot:' + payload.species_id,
                'Tap Record batch again — the form keeps your entries until you leave this species.');
       }
     };
@@ -944,8 +1106,15 @@
     else renderSupplies();
   }
 
-  window.appLoad = () => load(false);
-  load(false);
+  window.appLoad = () => load(false).then(flushOutbox);
+  renderOutbox();
+  // anything left on this phone from last time goes out as soon as we're up
+  load(false).then(flushOutbox);
+  window.addEventListener('online', () => flushOutbox());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') flushOutbox();
+  });
+  setInterval(() => { if (readOutbox().length) flushOutbox(); }, 30000);
 })();
 </script>
 </body>
