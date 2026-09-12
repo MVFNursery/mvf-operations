@@ -1,0 +1,12 @@
+{
+  "id": "/mvf-operations/hh-football",
+  "name": "Football Pool",
+  "short_name": "Pool",
+  "start_url": "hh_football.html",
+  "display": "standalone",
+  "background_color": "#122b17",
+  "theme_color": "#1e4423",
+  "icons": [
+    { "src": "icon-hh-football.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

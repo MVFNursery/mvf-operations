@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e4423">
+<link rel="manifest" href="hh-football-manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-hh-football.png">
+<title>Football Pool</title>
+<script src="mvfn-auth.js"
+        data-token-key="mvfn_household_token"
+        data-validate-url="https://homelab.taile865b6.ts.net:5680/webhook/hh-football"></script>
+<style>
+  :root { --ink:#1e4423; --moss:#4a6b4f; --paper:#eef3ee; --card:#fbfdfb;
+          --leather:#7a4a21; --red:#9b2c1f; --green:#2d6a3f; --amber:#9a6b1f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#122b17; font-family:Georgia,serif; color:#222; }
+  header { background:var(--ink); color:#fff; padding:14px 16px 12px; display:flex; align-items:baseline; gap:10px; }
+  header h1 { font-size:1.15rem; margin:0; flex:1; }
+  header button { border:0; border-radius:6px; padding:5px 10px; font-family:inherit; font-size:.85rem;
+    background:var(--paper); color:var(--ink); cursor:pointer; }
+  main { max-width:560px; margin:0 auto; padding:12px 12px 60px; }
+  .banner { display:none; background:var(--red); color:#fff; padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:.85rem; }
+  .banner.ok { background:var(--green); }
+  .card { background:var(--card); border-radius:12px; padding:12px 14px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.25); }
+  .card h2 { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--moss); margin:0 0 8px; }
+
+  /* verdict-first dashboard: one line that changes the next move, then KPIs */
+  .verdict { font-size:1.3rem; font-weight:700; text-align:center; padding:4px 0 2px; color:var(--ink); }
+  .modeline { text-align:center; font-size:.92rem; margin-top:4px; }
+  .modeline .mode { font-weight:700; }
+  .mode.ev { color:var(--green); }
+  .mode.mild { color:var(--amber); }
+  .mode.chase { color:var(--red); }
+  .mode.cover { color:var(--leather); }
+  .mini { text-align:center; font-size:.78rem; color:var(--moss); margin-top:6px; }
+
+  table { width:100%; border-collapse:collapse; font-size:.85rem; }
+  th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em;
+       color:var(--moss); padding:3px 6px 3px 0; border-bottom:1px solid #d8e2d8; }
+  td { padding:5px 6px 5px 0; border-bottom:1px solid #eef3ee; vertical-align:top; }
+  td.num, th.num { text-align:right; }
+  tr.me td { font-weight:700; background:#f2f7ee; }
+  .dim { color:#888; }
+  .missing { font-size:.78rem; color:var(--moss); margin-top:8px; }
+
+  /* pick form */
+  details.add { background:var(--paper); border-radius:12px; padding:10px 14px; margin-bottom:12px; }
+  details.add summary { font-weight:700; color:var(--ink); cursor:pointer; padding:4px 0; }
+  .add label { display:block; font-size:.72rem; color:var(--moss); margin:8px 0 2px; text-transform:uppercase; letter-spacing:.04em; }
+  .add input, .add select {
+    width:100%; padding:9px 10px; border:1.5px solid var(--moss); border-radius:8px;
+    font-family:inherit; font-size:.95rem; background:#fff; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .add button.go { margin-top:12px; width:100%; padding:12px; border:0; border-radius:8px;
+    background:var(--ink); color:#fff; font-family:inherit; font-size:1rem; font-weight:700; cursor:pointer; }
+  .add button.go:disabled { opacity:.5; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:4px; }
+  .chip { font-size:.68rem; background:#dfe9df; color:#28422c; border-radius:999px; padding:2px 8px; }
+  .tu-row { display:flex; gap:8px; margin-bottom:7px; align-items:baseline; }
+  .tu-row .nm { min-width:92px; font-size:.82rem; }
+  .tu-row .nm.me { font-weight:700; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Football Pool</h1>
+  <button id="refreshBtn" type="button" title="Refresh">&#x21bb;</button>
+</header>
+<main>
+  <div class="banner" id="banner"></div>
+
+  <div class="card" id="dash"><div class="mini">Loading&hellip;</div></div>
+
+  <details class="add" id="addBox">
+    <summary>+ Record a pick</summary>
+    <label>Player</label>
+    <select id="f_player"></select>
+    <div id="newNameRow" style="display:none">
+      <label>New player name (as it appears in the group text)</label>
+      <input type="text" id="f_newname" autocomplete="off">
+    </div>
+    <label>Game (this week)</label>
+    <select id="f_game"></select>
+    <label>Team</label>
+    <select id="f_team"></select>
+    <div class="row2">
+      <div><label>Total guess</label>
+        <input type="number" id="f_total" min="0" max="150" inputmode="numeric"></div>
+      <div><label>Announced (optional)</label>
+        <input type="datetime-local" id="f_ann"></div>
+    </div>
+    <button class="go" id="f_go" type="button">Save pick</button>
+  </details>
+
+  <div class="card" id="weekCard"><h2>This week</h2><div id="weekBody" class="dim">Loading&hellip;</div></div>
+  <div class="card" id="resultsCard" style="display:none"><h2 id="resultsH">Results</h2><div id="resultsBody"></div></div>
+  <div class="card" id="standCard"><h2>Standings</h2><div id="standBody" class="dim">Loading&hellip;</div></div>
+  <div class="card" id="tuCard"><h2>Teams used</h2><div id="tuBody" class="dim">Loading&hellip;</div></div>
+</main>
+<script>
+(function () {
+  var API = 'https://homelab.taile865b6.ts.net:5680/webhook/hh-football';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = null;          // last GET payload
+  var lastLoad = 0;
+
+  function banner(msg, kind) {
+    var b = $('banner');
+    b.textContent = msg || '';
+    b.className = 'banner' + (kind ? ' ' + kind : '');
+    b.style.display = msg ? 'block' : 'none';
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
+    });
+  }
+  function parseTs(ts) {           // PG json timestamptz -> ms (ISO with offset)
+    if (!ts) return null;
+    var t = Date.parse(ts);
+    return Number.isFinite(t) ? t : null;
+  }
+  var DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  function fmtKick(ts) {           // "Sun 1:00 PM"
+    var ms = parseTs(ts);
+    if (ms === null) return '?';
+    var d = new Date(ms), h = d.getHours(), m = d.getMinutes();
+    var ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+    return DAYS[d.getDay()] + ' ' + h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap;
+  }
+  function fmtAnn(ts) {            // "Tue 2:14 PM" or em-dash
+    var ms = parseTs(ts);
+    return ms === null ? '—' : fmtKick(ts);
+  }
+  // ---- verdict: z + mode per PLAN.md 1.4 ----------------------------------
+  // PREVIEW copy of tools/football-pool/report.py section_position(); the
+  // Tuesday session's report.py stays the authoritative strategy readout.
+  function modeOf(z, leading) {
+    // PLAN.md 1.4: LEADING at ANY z >= 0.5 is cover mode — leading must be
+    // checked before the chase branches (a z >= 1.5 LEAD is not a chase).
+    if (leading) {
+      if (z >= 0.5) return { m: 'COVER', cls: 'cover',
+        d: 'announce late, mirror the closest chasers' };
+      return { m: 'PURE EV', cls: 'ev',
+        d: 'best assignment, market total — no heroics' };
+    }
+    if (z >= 1.5) return { m: 'FULL CHASE', cls: 'chase',
+      d: 'underdogs + off-consensus totals; EV can’t close this alone' };
+    if (z >= 0.5) return { m: 'MILD DECORRELATION', cls: 'mild',
+      d: 'near-max-EV team, different game than the leader, total off the cluster' };
+    return { m: 'PURE EV', cls: 'ev',
+      d: 'best assignment, market total — no heroics' };
+  }
+  function renderDash() {
+    var st = state.standings || [];
+    var ian = st.filter(function (s) { return s.is_me; })[0];
+    if (!ian) { $('dash').innerHTML = '<div class="mini">Ian not found in players</div>'; return; }
+    var others = st.filter(function (s) { return !s.is_me; });
+    var leaderPts = Math.max.apply(null, st.map(function (s) { return s.points; }));
+    var leading = ian.points >= leaderPts;
+    var gap, vsName;
+    if (leading) {
+      var best = others.length ? Math.max.apply(null, others.map(function (s) { return s.points; })) : ian.points;
+      gap = ian.points - best;
+      var chaser = others.filter(function (s) { return s.points === best; })[0];
+      vsName = chaser ? chaser.name : 'the pack';
+    } else {
+      gap = ian.points - leaderPts;
+      var leader = st.filter(function (s) { return s.points === leaderPts; })[0];
+      vsName = leader ? leader.name : 'leader';
+    }
+    var picksRemaining = (18 - (state.latest_completed_week || 0)) + 4;
+    var sigma = 3 * Math.sqrt(Math.max(picksRemaining, 1));
+    var z = Math.abs(gap) / sigma;
+    var mode = modeOf(z, leading);
+    var rankWord = ian.rank + (['th','st','nd','rd'][(ian.rank % 100 > 10 && ian.rank % 100 < 14) ? 0 : Math.min(ian.rank % 10, 4)] || 'th');
+    var gapWord = gap === 0 ? (leading ? 'tied on top' : 'tied with ' + esc(vsName))
+      : (leading ? '+' + gap + ' on ' + esc(vsName) : (-gap) + ' behind ' + esc(vsName));
+    $('dash').innerHTML =
+      '<div class="verdict">' + rankWord + ' · ' + ian.points + ' pts · ' + gapWord + '</div>'
+      + '<div class="modeline"><span class="mode ' + mode.cls + '">' + mode.m + '</span> — ' + mode.d + '</div>'
+      + '<div class="mini">z ' + z.toFixed(2) + ' · σ ' + sigma.toFixed(1) + ' · '
+      + picksRemaining + ' picks left (incl. playoffs) · week ' + state.week + '</div>';
+  }
+
+  // ---- this week ----------------------------------------------------------
+  function renderWeek() {
+    var wk = state.week;
+    var picks = (state.results || []).filter(function (r) { return r.week === wk; });
+    var players = state.players || [];
+    var pickedNames = {};
+    picks.forEach(function (p) { pickedNames[p.name] = true; });
+    var missing = players.map(function (p) { return p.name; })
+      .filter(function (n) { return !pickedNames[n]; });
+    var h = '';
+    if (picks.length) {
+      h += '<table><tr><th>player</th><th>pick</th><th class="num">total</th><th>announced</th><th class="num">pts</th></tr>';
+      picks.forEach(function (p) {
+        var me = players.some(function (pl) { return pl.name === p.name && pl.is_me; });
+        var pts = p.win_pts === null ? '<span class="dim">—</span>' : (p.win_pts + p.total_pts);
+        h += '<tr' + (me ? ' class="me"' : '') + '><td>' + esc(p.name) + '</td><td>' + esc(p.picked_abbr)
+          + '</td><td class="num">' + p.total_guess + '</td><td>' + fmtAnn(p.announced_at)
+          + '</td><td class="num">' + pts + '</td></tr>';
+      });
+      h += '</table>';
+    } else {
+      h = '<div class="dim">No picks in yet this week.</div>';
+    }
+    h += '<div class="missing">' + picks.length + ' of ' + players.length + ' in'
+      + (missing.length ? ' · waiting on: ' + esc(missing.join(', ')) : '') + '</div>';
+    $('weekCard').querySelector('h2').textContent = 'Week ' + wk + ' picks';
+    $('weekBody').className = '';
+    $('weekBody').innerHTML = h;
+  }
+
+  // ---- last completed week's results --------------------------------------
+  function renderResults() {
+    var scored = (state.results || []).filter(function (r) { return r.win_pts !== null; });
+    if (!scored.length) { $('resultsCard').style.display = 'none'; return; }
+    var wk = Math.max.apply(null, scored.map(function (r) { return r.week; }));
+    if (wk === state.week) { $('resultsCard').style.display = 'none'; return; } // already in this-week table
+    var rows = scored.filter(function (r) { return r.week === wk; })
+      .sort(function (a, b) { return (b.win_pts + b.total_pts) - (a.win_pts + a.total_pts) || a.name.localeCompare(b.name); });
+    var h = '<table><tr><th>player</th><th>pick</th><th class="num">guess</th><th class="num">actual</th><th class="num">pts</th></tr>';
+    rows.forEach(function (r) {
+      var actual = r.final_home === null ? '—' : (r.final_home + r.final_away);
+      h += '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.picked_abbr) + '</td><td class="num">' + r.total_guess
+        + '</td><td class="num">' + actual + '</td><td class="num">' + (r.win_pts + r.total_pts)
+        + ' <span class="dim">(' + r.win_pts + 'w+' + r.total_pts + 'b)</span></td></tr>';
+    });
+    h += '</table>';
+    $('resultsH').textContent = 'Week ' + wk + ' results';
+    $('resultsBody').innerHTML = h;
+    $('resultsCard').style.display = '';
+  }
+
+  // ---- standings -----------------------------------------------------------
+  function renderStandings() {
+    var st = state.standings || [];
+    if (!st.length) { $('standBody').innerHTML = 'No players yet.'; return; }
+    var h = '<table><tr><th class="num">#</th><th>player</th><th class="num">points</th></tr>';
+    st.forEach(function (s) {
+      h += '<tr' + (s.is_me ? ' class="me"' : '') + '><td class="num">' + s.rank + '</td><td>'
+        + esc(s.name) + (s.is_me ? ' (Ian)' : '') + '</td><td class="num">' + s.points + '</td></tr>';
+    });
+    $('standBody').className = '';
+    $('standBody').innerHTML = h + '</table>';
+  }
+
+  // ---- teams used ----------------------------------------------------------
+  function renderTeamsUsed() {
+    var tu = state.teams_used || [];
+    if (!tu.length) { $('tuBody').innerHTML = 'Nothing used yet.'; return; }
+    var meName = (state.players || []).filter(function (p) { return p.is_me; })
+      .map(function (p) { return p.name; })[0];
+    var h = '';
+    tu.forEach(function (t) {
+      var teams = t.teams_used || [];
+      var me = t.name === meName;
+      h += '<div class="tu-row"><span class="nm' + (me ? ' me' : '') + '">' + esc(t.name)
+        + (me ? ' · ' + (32 - teams.length) + ' left' : '') + '</span><span class="chips">'
+        + teams.map(function (a) { return '<span class="chip">' + esc(a) + '</span>'; }).join('')
+        + '</span></div>';
+    });
+    $('tuBody').className = '';
+    $('tuBody').innerHTML = h;
+  }
+
+  // ---- pick form -----------------------------------------------------------
+  function fillForm() {
+    var ps = $('f_player');
+    var players = state.players || [];
+    var keepP = ps.value, keepG = $('f_game').value;
+    ps.innerHTML = '<option value="">— choose —</option>'
+      + players.map(function (p) {
+          return '<option value="' + p.player_id + '">' + esc(p.name) + (p.is_me ? ' (Ian)' : '') + '</option>';
+        }).join('')
+      + '<option value="__new__">➕ New player…</option>';
+    if (keepP) ps.value = keepP;
+    var gs = $('f_game');
+    var games = state.week_games || [];
+    gs.innerHTML = '<option value="">— choose —</option>'
+      + games.map(function (g) {
+          var label = g.away_abbr + ' @ ' + g.home_abbr + ' · ' + fmtKick(g.kickoff_utc)
+            + (g.final_home !== null ? ' · FINAL' : '');
+          return '<option value="' + g.game_id + '">' + esc(label) + '</option>';
+        }).join('');
+    if (keepG) gs.value = keepG;
+    fillTeams();
+    // announced_at deliberately NOT prefilled: an empty field means "not
+    // recorded" (NULL), matching add_pick.py. Prefilling "now" would stamp
+    // fabricated announce times onto batch-transcribed picks — announce-time
+    // is a strategic input ([[feedback-confirmed-writes-only]]).
+  }
+  function fillTeams() {
+    var gid = $('f_game').value;
+    var g = (state && state.week_games || []).filter(function (x) { return String(x.game_id) === gid; })[0];
+    var ts = $('f_team');
+    var keep = ts.value;
+    ts.innerHTML = g
+      ? '<option value="' + g.away_abbr + '">' + g.away_abbr + ' (away)</option>'
+        + '<option value="' + g.home_abbr + '">' + g.home_abbr + ' (home)</option>'
+      : '<option value="">— pick a game first —</option>';
+    if (g && (keep === g.away_abbr || keep === g.home_abbr)) ts.value = keep;
+  }
+  $('f_game').addEventListener('change', fillTeams);
+  $('f_player').addEventListener('change', function () {
+    $('newNameRow').style.display = this.value === '__new__' ? '' : 'none';
+  });
+
+  $('f_go').addEventListener('click', function () {
+    var payload = { action: 'add_pick' };
+    var pv = $('f_player').value;
+    if (pv === '__new__') {
+      var nm = $('f_newname').value.trim();     // trim client-side too (house rule)
+      if (!nm) { banner('New player needs a name'); return; }
+      payload.player_name = nm;
+    } else if (pv) {
+      payload.player_id = parseInt(pv, 10);
+    } else { banner('Pick a player'); return; }
+    var gid = $('f_game').value;
+    if (!gid) { banner('Pick a game'); return; }
+    payload.game_id = parseInt(gid, 10);
+    var team = $('f_team').value;
+    if (!team) { banner('Pick a team'); return; }
+    payload.picked_abbr = team;
+    var total = $('f_total').value.trim();
+    if (!/^\d+$/.test(total)) { banner('Total guess is required (whole number)'); return; }
+    payload.total_guess = parseInt(total, 10);
+    var ann = $('f_ann').value;
+    if (ann) payload.announced_at = new Date(ann).toISOString();
+
+    var btn = $('f_go');
+    btn.disabled = true;
+    banner('');
+    fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (j) {
+        if (!r.ok || (j && j.status === 'error')) {
+          throw new Error((j && j.message) || ('HTTP ' + r.status));
+        }
+        return j;
+      });
+    }).then(function (j) {
+      var res = (j && j.result) || {};
+      banner('Recorded: ' + (res.player_name || '?') + ' → ' + (res.picked_abbr || '?')
+        + ', total ' + res.total_guess + ' (week ' + res.week + ')'
+        + (res.created_player ? ' · new player created' : ''), 'ok');
+      $('f_total').value = '';
+      $('f_newname').value = '';
+      $('f_player').value = '';
+      $('newNameRow').style.display = 'none';
+      $('f_ann').value = '';
+      load();
+    }).catch(function (e) {
+      banner(String(e.message || e));
+    }).finally(function () { btn.disabled = false; });
+  });
+
+  // ---- load ----------------------------------------------------------------
+  // New-PWA contract ([[gotcha_pwa_stale_no_refetch]]): explicit refresh
+  // button, cache:'no-store' on every GET, and a resume re-fetch past 60s.
+  function load() {
+    fetch(API, { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error('load failed: HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      state = j;
+      lastLoad = Date.now();
+      renderDash();
+      renderWeek();
+      renderResults();
+      renderStandings();
+      renderTeamsUsed();
+      fillForm();
+    }).catch(function (e) { banner(String(e.message || e)); });
+  }
+  $('refreshBtn').addEventListener('click', function () { banner(''); load(); });
+  function maybeRefetch() {
+    if (document.visibilityState === 'visible' && Date.now() - lastLoad > 60000) load();
+  }
+  document.addEventListener('visibilitychange', maybeRefetch);
+  window.addEventListener('pageshow', maybeRefetch);
+
+  load();
+})();
+</script>
+</body>
+</html>
