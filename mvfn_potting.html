@@ -633,6 +633,10 @@
       esc(f.event_date || localDate(new Date())) + '"></div>';
     h += '<div class="group"><div class="label">Ready by (optional)</div>' +
       '<input type="date" id="bf-ready" value="' + esc(f.ready_date || '') + '"></div>';
+    // V162: hands-on minutes for the whole batch (the econ modeler's labor
+    // primitive). Optional; blank = not stated, never guessed.
+    h += '<div class="group"><div class="label">Minutes spent on this batch (optional)</div>' +
+      '<input type="number" id="bf-min" min="1" step="1" inputmode="numeric" placeholder="whole batch, hands-on" value="' + esc(f.minutes || '') + '"></div>';
     h += '<div class="group"><div class="label">Note (optional)</div>' +
       '<input type="text" id="bf-note" value="' + esc(f.note || '') + '"></div>';
     h += '<div class="preflight" id="preflight"></div>';
@@ -807,6 +811,7 @@
     f.location = $('bf-loc') ? $('bf-loc').value : f.location;
     f.note = $('bf-note') ? $('bf-note').value : f.note;
     f.ready_date = $('bf-ready') ? $('bf-ready').value : f.ready_date;
+    f.minutes = $('bf-min') ? $('bf-min').value : f.minutes;
     f.event_date = $('bf-date') ? $('bf-date').value : f.event_date;
     if ($('bf-usedup')) f.source_used_up = $('bf-usedup').checked;
   }
@@ -838,6 +843,7 @@
     $('bf-loc').oninput = () => readBatchForm();
     $('bf-note').oninput = () => readBatchForm();
     $('bf-ready').onchange = () => readBatchForm();
+    $('bf-min').oninput = () => readBatchForm();
     $('bf-date').onchange = () => readBatchForm();
     refresh();
 
@@ -870,6 +876,8 @@
         note: trim(f.note),
         // '' = not stated -> NULL; the server never infers a ready date
         ready_date: trim(f.ready_date),
+        // '' = not stated -> NULL; whole-batch hands-on minutes (V162)
+        minutes: f.minutes ? String(parseInt(f.minutes, 10) || '') : '',
         // strings on purpose: the n8n (body.x || '') idiom turns a JSON
         // boolean false into '' (= auto server-side)
         source_used_up: f.from_stock_id ? String(usedUpChecked(f)) : '',
