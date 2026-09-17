@@ -227,8 +227,11 @@
     const cashCents = sqm ? Number(sqm.cash_cents || 0) : 0;
     const sqBal = D.square && D.square.wave_balance != null ? Number(D.square.wave_balance) : null;
     const sqBalOff = sqBal != null && Math.abs(sqBal) >= 0.005;
+    // Owed only until the import proves it: once the Square balance is $0.00 the
+    // transfer is on the books (it's the Square-account credit "xfer to cash on
+    // hand"), so the step disappears. No import yet = can't tell = still show it.
     const cashStep = () => {
-      if (cashCents > 0) {
+      if (cashCents > 0 && (!D.import || sqBalOff)) {
         const n = Number(sqm.cash_orders || 0);
         s.push({ t: `Transfer <b>${money(cashCents / 100)}</b> from Square to Cash on Hand in Wave (${n} cash-tender Square order${n === 1 ? '' : 's'}), then re-export + upload.`, a: '#ph2' });
       }
@@ -323,7 +326,7 @@
     const sqmTile = sqm && Number(sqm.orders) > 0
       ? `<div class="tile"><div class="t-label">Square money (API)</div>
            <div class="t-value">${money(Number(sqm.gross_cents) / 100)}</div>
-           <div class="t-note">tax ${money(Number(sqm.tax_cents) / 100)} &middot; fees ${money(Number(sqm.fee_cents) / 100)}${Number(sqm.orders_missing_fee) > 0 ? ' (+' + sqm.orders_missing_fee + ' pending)' : ''} &middot; ${sqm.orders} orders${Number(sqm.cash_cents) > 0 ? ` &middot; cash ${money(Number(sqm.cash_cents) / 100)} (${sqm.cash_orders} order${Number(sqm.cash_orders) === 1 ? '' : 's'} &rarr; transfer to Cash on Hand)` : ''}</div></div>`
+           <div class="t-note">tax ${money(Number(sqm.tax_cents) / 100)} &middot; fees ${money(Number(sqm.fee_cents) / 100)}${Number(sqm.orders_missing_fee) > 0 ? ' (+' + sqm.orders_missing_fee + ' pending)' : ''} &middot; ${sqm.orders} orders${Number(sqm.cash_cents) > 0 ? ` &middot; cash ${money(Number(sqm.cash_cents) / 100)} (${sqm.cash_orders} order${Number(sqm.cash_orders) === 1 ? '' : 's'}${sq.wave_balance != null && Math.abs(Number(sq.wave_balance)) < 0.005 ? ', transferred &#10003;' : ' &rarr; transfer to Cash on Hand'})` : ''}</div></div>`
       : `<div class="tile dim"><div class="t-label">Square money (API)</div>
            <div class="t-value">&mdash;</div><div class="t-note">no measured orders this month (backfill or wait for the nightly sync)</div></div>`;
     const tieout = `<div class="tiles">
