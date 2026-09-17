@@ -99,6 +99,14 @@
   .steps li.alldone { list-style: none; margin-left: -22px; font-family: 'Fraunces', serif; font-weight: 600; }
   .steps .stepbtn { margin-left: 8px; }
   .steps li.warn { color: #7a5a00; font-weight: 600; }
+  .steps .je { margin: 6px 0 4px; border: 1px solid #c9d6b8; border-radius: 6px; background: #fff; padding: 6px 8px; max-width: 560px; }
+  .steps .je-head { font-size: .78rem; color: #4a5a3a; margin-bottom: 4px; }
+  .steps .je-head span { font-family: 'Fraunces', serif; font-weight: 600; color: #2d5016; }
+  .steps .je table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  .steps .je th { text-align: left; font-weight: 500; color: #4a5a3a; padding: 3px 4px; border-bottom: 1px solid #c9d6b8; }
+  .steps .je td { padding: 4px 4px; border-bottom: 1px solid #edf2e4; }
+  .steps .je th.num, .steps .je td.num { text-align: right; white-space: nowrap; }
+  .steps .je tr.tot td { border-bottom: none; font-weight: 700; }
   .uploaderrs { border: 1px solid #9b2c1f; background: #fdf1ef; border-radius: 8px;
     padding: 10px 12px; margin-top: 10px; font-size: .75rem; color: #9b2c1f; }
   .uploaderrs div { margin: 2px 0; }
@@ -205,6 +213,17 @@
     return `<span class="prog">${settled}/${items.length}${na ? ` &middot; ${na} n/a` : ''}</span>`;
   }
 
+  // A journal entry rendered like Wave's Journal Entry screen: date +
+  // description header, one row per line (account / debit / credit), totals.
+  function jeTable(date, desc, lines) {
+    const td = lines.reduce((x, l) => x + (l.debit || 0), 0);
+    const tc = lines.reduce((x, l) => x + (l.credit || 0), 0);
+    const rows = lines.map(l => `<tr><td>${l.account}</td><td class="num">${l.debit ? money(l.debit) : ''}</td><td class="num">${l.credit ? money(l.credit) : ''}</td></tr>`).join('');
+    return `<div class="je"><div class="je-head"><span>Journal Entry</span> &middot; date <b>${esc(date)}</b> &middot; description &ldquo;${esc(desc)}&rdquo;</div>
+      <table><tr><th>Account</th><th class="num">Debit</th><th class="num">Credit</th></tr>${rows}
+      <tr class="tot"><td>Total</td><td class="num">${money(td)}</td><td class="num">${money(tc)}</td></tr></table></div>`;
+  }
+
   // ── "What's left" — the directed step list for this month ─────────────────
   function nextSteps() {
     const s = [];
@@ -244,20 +263,24 @@
     } else {
       if (uncCredit > 0) {
         // The Square split is measured nightly (books.square_order_money via the
-        // sales-decrement sync) — print the actual JE numbers when we have them.
+        // sales-decrement sync) — print the actual Journal Entry when we have them.
         const m = (D.square && D.square.money) || null;
         if (m && Number(m.orders) > 0) {
           const inc = (Number(m.gross_cents) - Number(m.tax_cents)) / 100;
           const nMiss = Number(m.orders_missing_fee);
           const feeWarn = nMiss > 0 ? ` (${nMiss} order${nMiss === 1 ? '' : 's'} awaiting posted card fees &mdash; fee total may still move)` : '';
-          s.push({ t: `Reclass <b>${money(uncCredit)}</b> of Uncategorized Income in Wave. Square's month (${m.orders} orders, gross ${money(Number(m.gross_cents) / 100)}) splits: <b>${money(inc)}</b> plant-sale income + <b>${money(Number(m.tax_cents) / 100)}</b> PA sales-tax liability + <b>${money(Number(m.fee_cents) / 100)}</b> card-fee expense${feeWarn}; one summary JE is fine. Then re-export + upload again.`, a: '#ph1' });
+          const lines = [{ account: 'Uncategorized Income', debit: uncCredit }];
+          if (Number(m.fee_cents) > 0) lines.push({ account: 'Merchant Fees - Square', debit: Number(m.fee_cents) / 100 });
+          lines.push({ account: 'Plant Sales (plant-sale income)', credit: inc });
+          lines.push({ account: 'PA (sales-tax liability)', credit: Number(m.tax_cents) / 100 });
+          s.push({ t: `Reclass <b>${money(uncCredit)}</b> of Uncategorized Income in Wave with one summary Journal Entry &mdash; Square's month is ${m.orders} orders, gross ${money(Number(m.gross_cents) / 100)}${feeWarn}:${jeTable(D.period.end, 'Square sales split: income / PA tax / card fees', lines)} Then re-export + upload again.`, a: '#ph1' });
         } else {
-          s.push({ t: `Reclass <b>${money(uncCredit)}</b> of Uncategorized Income in Wave. For Square deposits the split is: plant-sale income + PA sales-tax liability + card-fee expense &mdash; pull the month's tax and fee totals from the Square dashboard; one summary JE is fine. Then re-export + upload again.`, a: '#ph1' });
+          s.push({ t: `Reclass <b>${money(uncCredit)}</b> of Uncategorized Income in Wave. For Square deposits the split is: plant-sale income + PA sales-tax liability + card-fee expense &mdash; pull the month's tax and fee totals from the Square dashboard; one summary Journal Entry is fine. Then re-export + upload again.`, a: '#ph1' });
         }
       }
       if (uncDebit > 0) s.push({ t: `Categorize <b>${money(uncDebit)}</b> of Uncategorized Expense in Wave (${expRows} row${expRows === 1 ? '' : 's'} &mdash; list in Phase 1). Then re-export + upload again.`, a: '#ph1' });
       cashStep();
-      // Sales-tax / card-fee JE. Wave's Square lines carry tax inside income and
+      // Sales-tax / card-fee Journal Entry. Wave's Square lines carry tax inside income and
       // are net of the card fee; once the Square rows are categorized straight to
       // income (no Uncategorized Income to reclass) nothing else prints the split,
       // so this step does — until the liability shows the month's tax credited.
@@ -268,9 +291,14 @@
         if (credited + 0.005 < tax) {
           const feeBooked = fe && Number(fe.debit || 0) + 0.005 >= fee;
           const incDebit = feeBooked ? tax : tax - fee;
-          const liab = tl ? esc(tl.account) : 'the PA sales-tax liability';
+          // no activity this month -> name the account from the registry instead
+          const regLiab = (D.registry || []).find(r => r.account_type === 'liability' && (r.account === 'PA' || /tax/i.test(r.account)));
+          const liab = esc(tl ? tl.account : regLiab ? regLiab.account : 'PA (sales-tax liability)');
           const nMiss = Number(sqm.orders_missing_fee);
-          s.push({ t: `Record the sales-tax${feeBooked ? '' : ' / card-fee'} JE in Wave dated ${esc(D.period.end)}: debit the income accounts <b>${money(incDebit)}</b> (tax ${money(tax)}${feeBooked ? '' : ' &minus; fees ' + money(fee)}, split across the accounts the Square rows were categorized into)${feeBooked ? '' : `, debit <b>Merchant Fees - Square ${money(fee)}</b>`}, credit <b>${liab} ${money(tax)}</b>${credited > 0 ? ` (${money(credited)} credited so far)` : ''}${nMiss > 0 ? ` &mdash; ${nMiss} order${nMiss === 1 ? '' : 's'} still awaiting posted card fees` : ''}. Then re-export + upload.`, a: '#ph1' });
+          const lines = [{ account: 'Income accounts (split across the accounts the Square rows were categorized into)', debit: incDebit }];
+          if (!feeBooked) lines.push({ account: 'Merchant Fees - Square', credit: 0, debit: fee });
+          lines.push({ account: liab, credit: tax });
+          s.push({ t: `Record the sales-tax${feeBooked ? '' : ' / card-fee'} Journal Entry in Wave &mdash; tax ${money(tax)}${feeBooked ? '' : ' &minus; fees ' + money(fee)} on ${sqm.orders} Square orders${credited > 0 ? ` (${money(credited)} credited to ${liab} so far)` : ''}${nMiss > 0 ? `; ${nMiss} order${nMiss === 1 ? '' : 's'} still awaiting posted card fees` : ''}:${jeTable(D.period.end, 'PA Tax Liability Txfr from Sales and Fees', lines)} Then re-export + upload.`, a: '#ph1' });
         }
       }
       if (cash && item('p1_balances') && st(item('p1_balances')) === 'open')
