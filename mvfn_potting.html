@@ -605,12 +605,21 @@
         (usedUpChecked(f) ? ' checked' : '') + '> Source used up — close it out' +
         '</label>';
     }
+    // "Other" = type a code the registry doesn't have yet; the server registers
+    // it on the spot (V162), same as the Inventory app's Add Stock path.
+    const known = containers.some(c => c.container_id === f.to_container_id);
+    const other = f.to_other || (!!f.to_container_id && !known);
     h += '<div class="group"><div class="label">Into container</div><select id="bf-to">' +
       '<option value="">pick…</option>' +
       containers.map(c => '<option value="' + esc(c.container_id) + '"' +
-        (f.to_container_id === c.container_id ? ' selected' : '') + '>' +
+        (!other && f.to_container_id === c.container_id ? ' selected' : '') + '>' +
         esc(c.container_id + (c.label && c.label !== c.container_id ? ' — ' + c.label : '')) +
-        '</option>').join('') + '</select></div>';
+        '</option>').join('') +
+      '<option value="__other"' + (other ? ' selected' : '') + '>Other — type a code…</option>' +
+      '</select>' +
+      (other ? '<input type="text" id="bf-to-other" placeholder="e.g. NSC900" autocapitalize="characters" value="' +
+        esc(known ? '' : (f.to_container_id || '')) + '">' : '') +
+      '</div>';
     h += '<div class="half">' +
       '<div class="group"><div class="label">Plants</div>' +
       '<input type="number" id="bf-qty" min="1" inputmode="numeric" value="' + esc(f.qty || '') + '"></div>' +
@@ -805,7 +814,12 @@
     const f = state.form;
     f.from_stock_id = $('bf-from') ? $('bf-from').value : f.from_stock_id;
     if ($('bf-fromnote')) f.from_note = $('bf-fromnote').value;
-    f.to_container_id = $('bf-to') ? $('bf-to').value : f.to_container_id;
+    if ($('bf-to')) {
+      f.to_other = $('bf-to').value === '__other';
+      f.to_container_id = f.to_other
+        ? trim($('bf-to-other') ? $('bf-to-other').value : '')
+        : $('bf-to').value;
+    }
     f.qty = $('bf-qty') ? $('bf-qty').value : f.qty;
     f.tags_used = $('bf-tags') ? ($('bf-tags').value === '' ? null : $('bf-tags').value) : f.tags_used;
     f.location = $('bf-loc') ? $('bf-loc').value : f.location;
@@ -832,7 +846,14 @@
       if (nxt) state.form.to_container_id = nxt;
       render();
     };
-    $('bf-to').onchange = () => { readBatchForm(); refresh(); };
+    $('bf-to').onchange = () => {
+      const wasOther = !!state.form.to_other;
+      readBatchForm();
+      // switching to/from Other changes the form's shape -> re-render, then focus the box
+      if (state.form.to_other !== wasOther) { render(); if ($('bf-to-other')) $('bf-to-other').focus(); }
+      else refresh();
+    };
+    if ($('bf-to-other')) $('bf-to-other').oninput = () => { readBatchForm(); refresh(); };
     $('bf-qty').oninput = () => { readBatchForm(); refresh(); };
     $('bf-tags').oninput = () => { readBatchForm(); refresh(); };
     if ($('bf-fromnote')) $('bf-fromnote').oninput = () => readBatchForm();
