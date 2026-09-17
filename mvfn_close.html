@@ -257,6 +257,22 @@
       }
       if (uncDebit > 0) s.push({ t: `Categorize <b>${money(uncDebit)}</b> of Uncategorized Expense in Wave (${expRows} row${expRows === 1 ? '' : 's'} &mdash; list in Phase 1). Then re-export + upload again.`, a: '#ph1' });
       cashStep();
+      // Sales-tax / card-fee JE. Wave's Square lines carry tax inside income and
+      // are net of the card fee; once the Square rows are categorized straight to
+      // income (no Uncategorized Income to reclass) nothing else prints the split,
+      // so this step does — until the liability shows the month's tax credited.
+      if (!(uncCredit > 0) && sqm && Number(sqm.orders) > 0 && Number(sqm.tax_cents) > 0) {
+        const tax = Number(sqm.tax_cents) / 100, fee = Number(sqm.fee_cents) / 100;
+        const tl = D.square.tax_liability || null, fe = D.square.fee_expense || null;
+        const credited = tl ? Number(tl.credit || 0) : 0;
+        if (credited + 0.005 < tax) {
+          const feeBooked = fe && Number(fe.debit || 0) + 0.005 >= fee;
+          const incDebit = feeBooked ? tax : tax - fee;
+          const liab = tl ? esc(tl.account) : 'the PA sales-tax liability';
+          const nMiss = Number(sqm.orders_missing_fee);
+          s.push({ t: `Record the sales-tax${feeBooked ? '' : ' / card-fee'} JE in Wave dated ${esc(D.period.end)}: debit the income accounts <b>${money(incDebit)}</b> (tax ${money(tax)}${feeBooked ? '' : ' &minus; fees ' + money(fee)}, split across the accounts the Square rows were categorized into)${feeBooked ? '' : `, debit <b>Merchant Fees - Square ${money(fee)}</b>`}, credit <b>${liab} ${money(tax)}</b>${credited > 0 ? ` (${money(credited)} credited so far)` : ''}${nMiss > 0 ? ` &mdash; ${nMiss} order${nMiss === 1 ? '' : 's'} still awaiting posted card fees` : ''}. Then re-export + upload.`, a: '#ph1' });
+        }
+      }
       if (cash && item('p1_balances') && st(item('p1_balances')) === 'open')
         s.push({ t: `Count the drawer against Cash on Hand <b>${money(cash.ending_balance)}</b>; check M1st + the card against statements.`, a: '#ph1' });
     }
