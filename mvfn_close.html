@@ -46,6 +46,7 @@
   .tile.bad { border-color: #9b2c1f; background: #fdf1ef; }
   .tile.bad .t-value { color: #9b2c1f; }
   .tile.dim .t-value { color: #8a8a70; font-size: .95rem; }
+  .verdict { font-family: 'Fraunces', serif; font-size: .95rem; line-height: 1.35; margin: 6px 0 2px; }
 
   table { width: 100%; border-collapse: collapse; font-size: .78rem; margin: 6px 0; }
   th { text-align: left; color: #8a8a70; font-weight: 400; font-size: .68rem; text-transform: uppercase;
@@ -388,31 +389,58 @@
       ${waveDep.map(r => `<tr><td>${esc(r.txn_date)}</td><td>${esc(r.description)}</td><td class="num">${money(r.debit)}</td></tr>`).join('')}
       </table></div></details>` : ''}`;
 
-    // Phase 3 scorecard
+    // Phase 3 scorecard — six numbers, verdict first (SOP Phase 3, 2026-09-17)
     const ibm = sc.income_by_month;
     const incomeRow = ibm.find(r => r.month === month);
     const priorRow = ibm.find(r => r.month === stepMonth(month, -12));
     const untyped = Number(sc.untyped_accounts);
-    const incomeTile = untyped > 0 && !incomeRow
-      ? `<div class="tile dim"><div class="t-label">Income (books)</div><div class="t-value">locked</div>
-           <div class="t-note">${untyped} accounts untyped &mdash; classify them below to compute income</div></div>`
-      : `<div class="tile"><div class="t-label">Income (books)</div>
-           <div class="t-value">${incomeRow ? money(incomeRow.income) : '—'}</div>
-           <div class="t-note">${priorRow ? 'YoY ' + yoy(incomeRow, priorRow) : 'no prior-year import for YoY'}</div></div>`;
-    const scorecard = `<div class="tiles">
-      ${incomeTile}
-      <div class="tile"><div class="t-label">Owner investment added</div>
+    const plm = sc.pl_by_month || [];
+    const pl = plm.find(r => r.month === month);
+    const plPrev = plm.find(r => r.month === stepMonth(month, -1));
+    const ratio = r => (r && Number(r.opex) > 0) ? Number(r.income || 0) / Number(r.opex) : null;
+    const pctf = v => v == null ? '—' : Math.round(v * 100) + '%';
+    const trail = plm.filter(r => r.month <= month).slice(-3).map(r => `${esc(r.month.slice(5))} ${pctf(ratio(r))}`).join(' · ');
+    const channels = D.accounts.filter(a => a.account_type === 'income' && a.balance_change != null)
+      .map(a => `${esc(a.account.replace('Plant Sales - ', ''))} ${money(a.balance_change)}`).join(' · ');
+    const sl = sc.sellable || {}, bf = sc.bench || {}, hrs = sc.hours || {};
+    const incomeNum = pl && pl.income != null ? Number(pl.income) : (incomeRow ? Number(incomeRow.income) : null);
+    const turn = (incomeNum != null && Number(sl.retail_value) > 0) ? incomeNum / Number(sl.retail_value) : null;
+    const perSqft = (incomeNum != null && Number(bf.sqft) > 0) ? incomeNum / Number(bf.sqft) : null;
+    const minutes = Number(hrs.potting_min || 0) + Number(hrs.task_min || 0);
+    // per-hour only once REAL minutes exist (Potting Bench, V162); task effort is an estimate
+    const perHour = (incomeNum != null && Number(hrs.potting_min) > 0) ? incomeNum / (minutes / 60) : null;
+    const lockedNote = `${untyped} account${untyped === 1 ? '' : 's'} untyped &mdash; classify them below`;
+    const sold = Number(sc.units_sold), culled = Number(sc.cull_units);
+    const verdict = pl
+      ? `${esc(D.period.label)}: income covered <b>${pctf(ratio(pl))}</b> of operating costs${plPrev ? ` (${pctf(ratio(plPrev))} in ${esc(plPrev.month)})` : ''}; owner put in <b>${money(sc.owner_investment_change || 0)}</b>; culled <b>${culled}</b> units against <b>${sold}</b> sold. Name the leak in the close notes.`
+      : `No typed books import for ${esc(D.period.label)} yet &mdash; the verdict line needs Phase 1 first.`;
+    const scorecard = `<div class="verdict">${verdict}</div><div class="tiles">
+      <div class="tile ${pl ? '' : 'dim'}"><div class="t-label">1 &middot; Self-funding (income &divide; opex)</div>
+        <div class="t-value">${pl ? pctf(ratio(pl)) : 'locked'}</div>
+        <div class="t-note">${pl ? `trailing: ${trail}${pl.production_inputs != null ? ` &middot; production inputs ${money(pl.production_inputs)}` : ''}` : (untyped > 0 ? lockedNote : 'needs a books import')}</div></div>
+      <div class="tile"><div class="t-label">2 &middot; Owner cash in</div>
         <div class="t-value">${sc.owner_investment_change == null ? '—' : money(sc.owner_investment_change)}</div>
         <div class="t-note">trend toward $0</div></div>
-      <div class="tile"><div class="t-label">Units / orders</div>
-        <div class="t-value">${sc.units_sold} / ${sc.orders}</div>
-        <div class="t-note">avg ticket ${sc.orders > 0 ? money(Number(sc.sales_amount) / Number(sc.orders)) : '—'} (Square channel)</div></div>
-      <div class="tile ${Number(sc.cull_units) > 0 ? '' : 'good'}"><div class="t-label">Culls (net)</div>
-        <div class="t-value">${sc.cull_units}</div><div class="t-note">units, from count deltas</div></div>
+      <div class="tile ${incomeRow || untyped === 0 ? '' : 'dim'}"><div class="t-label">3 &middot; Income by channel</div>
+        <div class="t-value">${incomeRow ? money(incomeRow.income) : (untyped > 0 ? 'locked' : '—')}</div>
+        <div class="t-note">${channels || (untyped > 0 ? lockedNote : 'no income accounts this month')}${incomeRow && priorRow ? ' &middot; YoY ' + yoy(incomeRow, priorRow) : ' &middot; no prior-year import for YoY'}</div></div>
+      <div class="tile ${culled > sold ? 'bad' : (culled === 0 ? 'good' : '')}"><div class="t-label">4 &middot; Sold vs culled</div>
+        <div class="t-value">${sold} / ${culled}</div>
+        <div class="t-note">units sold / units culled (net count deltas)</div></div>
+      <div class="tile ${Number(sl.past_ready_growing) > Number(sl.for_sale_units) ? 'bad' : ''}"><div class="t-label">5 &middot; Sellable stock (as of ${esc(sl.as_of || 'today')})</div>
+        <div class="t-value">${sl.units == null ? '—' : sl.units + ' units &middot; ' + money(sl.retail_value)}</div>
+        <div class="t-note">turn ${turn == null ? '—' : (turn * 100).toFixed(1) + '%'} &middot; ${sl.past_ready_growing == null ? '—' : sl.past_ready_growing} past ready, never listed &middot; ${sl.unpriced_units == null ? '—' : sl.unpriced_units} unpriced (value is a floor)</div></div>
+      <div class="tile"><div class="t-label">6 &middot; Yield per ${perHour != null ? 'Ian-hour' : 'bench sqft'}</div>
+        <div class="t-value">${perHour != null ? money(perHour) + '/h' : (perSqft == null ? '—' : money(perSqft) + '/sqft')}</div>
+        <div class="t-note">${bf.sqft == null ? '—' : bf.sqft} sqft on hand${Number(bf.units_on_unknown_dims) > 0 ? ` (${bf.units_on_unknown_dims} units on un-taped codes)` : ''} &middot; ${Number(hrs.potting_min) > 0 ? `${(Number(hrs.potting_min) / 60).toFixed(1)} h potting logged` : 'no potting minutes logged yet'}${Number(hrs.task_min) > 0 ? ` + ${(Number(hrs.task_min) / 60).toFixed(1)} h task estimates` : ''}</div></div>
     </div>
-    ${ibm.length ? `<details><summary>income by month (imported + typed only)</summary>
-      <div class="scrollwrap"><table><tr><th>month</th><th class="num">income</th></tr>
-      ${ibm.map(r => `<tr><td>${esc(r.month)}</td><td class="num">${money(r.income)}</td></tr>`).join('')}
+    ${(sc.sold_culled_by_month || []).length ? `<details><summary>sold vs culled by month</summary>
+      <div class="scrollwrap"><table><tr><th>month</th><th class="num">sold</th><th class="num">culled</th></tr>
+      ${sc.sold_culled_by_month.map(r => `<tr><td>${esc(r.month)}</td><td class="num">${r.sold}</td><td class="num">${r.culled}</td></tr>`).join('')}
+      </table></div></details>` : ''}
+    ${plm.length ? `<details><summary>income vs opex by month (imported + typed only)</summary>
+      <div class="scrollwrap"><table><tr><th>month</th><th class="num">income</th><th class="num">opex</th><th class="num">self-funding</th></tr>
+      ${plm.map(r => `<tr><td>${esc(r.month)}</td><td class="num">${money(r.income)}</td><td class="num">${money(r.opex)}</td><td class="num">${pctf(ratio(r))}</td></tr>`).join('')}
       </table></div></details>` : ''}`;
 
     // Phase 4 compliance
