@@ -351,9 +351,11 @@
     var g = (state && state.week_games || []).filter(function (x) { return String(x.game_id) === gid; })[0];
     var ts = $('f_team');
     var keep = ts.value;
+    // Home team listed first = the default selection (the field's pick is the
+    // favourite far more often than not, and the favourite is usually home).
     ts.innerHTML = g
-      ? '<option value="' + g.away_abbr + '">' + g.away_abbr + ' (away)</option>'
-        + '<option value="' + g.home_abbr + '">' + g.home_abbr + ' (home)</option>'
+      ? '<option value="' + g.home_abbr + '">' + g.home_abbr + ' (home)</option>'
+        + '<option value="' + g.away_abbr + '">' + g.away_abbr + ' (away)</option>'
       : '<option value="">— pick a game first —</option>';
     if (g && (keep === g.away_abbr || keep === g.home_abbr)) ts.value = keep;
   }
