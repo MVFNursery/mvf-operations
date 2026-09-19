@@ -22,6 +22,12 @@
   main { max-width:560px; margin:0 auto; padding:12px 12px 60px; }
   .banner { display:none; background:var(--red); color:#fff; padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:.85rem; }
   .banner.ok { background:var(--green); }
+  .banner button { margin-left:10px; border:0; border-radius:6px; padding:4px 10px; font-family:inherit;
+    font-size:.82rem; font-weight:700; background:#fff; color:var(--red); cursor:pointer; }
+  td.act { white-space:nowrap; text-align:right; padding-right:0; }
+  td.act button { border:0; background:none; font-family:inherit; font-size:1rem; line-height:1;
+    cursor:pointer; padding:2px 5px; color:var(--moss); }
+  td.act button.del { color:var(--red); }
   .card { background:var(--card); border-radius:12px; padding:12px 14px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.25); }
   .card h2 { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--moss); margin:0 0 8px; }
 
@@ -106,9 +112,18 @@
   var state = null;          // last GET payload
   var lastLoad = 0;
 
-  function banner(msg, kind) {
+  // banner(msg, kind, action?) — action = {label, fn} renders a button inside
+  // the banner (the "Replace" confirm on a duplicate-week refusal).
+  function banner(msg, kind, action) {
     var b = $('banner');
     b.textContent = msg || '';
+    if (msg && action) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = action.label;
+      btn.addEventListener('click', action.fn);
+      b.appendChild(btn);
+    }
     b.className = 'banner' + (kind ? ' ' + kind : '');
     b.style.display = msg ? 'block' : 'none';
   }
@@ -196,13 +211,15 @@
       .filter(function (n) { return !pickedNames[n]; });
     var h = '';
     if (picks.length) {
-      h += '<table><tr><th>player</th><th>pick</th><th class="num">total</th><th>announced</th><th class="num">pts</th></tr>';
+      h += '<table><tr><th>player</th><th>pick</th><th class="num">total</th><th>announced</th><th class="num">pts</th><th></th></tr>';
       picks.forEach(function (p) {
         var me = players.some(function (pl) { return pl.name === p.name && pl.is_me; });
         var pts = p.win_pts === null ? '<span class="dim">—</span>' : (p.win_pts + p.total_pts);
         h += '<tr' + (me ? ' class="me"' : '') + '><td>' + esc(p.name) + '</td><td>' + esc(p.picked_abbr)
           + '</td><td class="num">' + p.total_guess + '</td><td>' + fmtAnn(p.announced_at)
-          + '</td><td class="num">' + pts + '</td></tr>';
+          + '</td><td class="num">' + pts + '</td>'
+          + '<td class="act"><button type="button" class="ed" data-pid="' + p.pick_id + '" title="Edit this pick">&#x270E;</button>'
+          + '<button type="button" class="del" data-pid="' + p.pick_id + '" title="Delete this pick">&#x2715;</button></td></tr>';
       });
       h += '</table>';
     } else {
@@ -214,6 +231,41 @@
     $('weekBody').className = '';
     $('weekBody').innerHTML = h;
   }
+  // Edit = prefill the form from the row (player/game/team/total; announce
+  // time left blank — a replace keeps the recorded one when it's omitted), so
+  // Save goes through the normal duplicate-week → "Replace" confirm.
+  // Delete = confirm, then delete_pick (the wrong-player case a replace can't fix).
+  $('weekBody').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('button[data-pid]');
+    if (!btn) return;
+    var pid = parseInt(btn.getAttribute('data-pid'), 10);
+    var p = (state.results || []).filter(function (r) { return r.pick_id === pid; })[0];
+    if (!p) { banner('Pick not found — refresh'); return; }
+    if (btn.classList.contains('del')) {
+      if (!window.confirm('Delete ' + p.name + "'s week " + p.week + ' pick (' + p.picked_abbr + ', total ' + p.total_guess + ')?')) return;
+      banner('');
+      postJson({ action: 'delete_pick', pick_id: pid }).then(function (j) {
+        var res = (j && j.result) || {};
+        banner('Deleted: ' + (res.player_name || p.name) + ' ' + (res.picked_abbr || p.picked_abbr)
+          + '-' + res.total_guess + ' (week ' + res.week + ')', 'ok');
+        load();
+      }).catch(function (e) { banner(String(e.message || e)); });
+      return;
+    }
+    var g = (state.week_games || []).filter(function (x) {
+      return x.home_abbr === p.home_abbr && x.away_abbr === p.away_abbr;
+    })[0];
+    $('f_player').value = String(p.player_id);
+    $('newNameRow').style.display = 'none';
+    $('f_game').value = g ? String(g.game_id) : '';
+    fillTeams();
+    $('f_team').value = p.picked_abbr;
+    $('f_total').value = p.total_guess;
+    $('f_ann').value = '';
+    $('addBox').open = true;
+    banner('Editing ' + p.name + "'s week " + p.week + ' pick — change it and Save; you’ll be asked to confirm the replace');
+    $('addBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 
   // ---- last completed week's results --------------------------------------
   function renderResults() {
@@ -332,25 +384,44 @@
     var ann = $('f_ann').value;
     if (ann) payload.announced_at = new Date(ann).toISOString();
 
-    var btn = $('f_go');
-    btn.disabled = true;
-    banner('');
-    fetch(API, {
+    sendPick(payload);
+  });
+
+  // POST envelope → resolved json, or an Error carrying the API's code /
+  // existing-pick fields (duplicate_week) for the replace prompt.
+  function postJson(payload) {
+    return fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }).then(function (r) {
       return r.json().catch(function () { return null; }).then(function (j) {
         if (!r.ok || (j && j.status === 'error')) {
-          throw new Error((j && j.message) || ('HTTP ' + r.status));
+          var err = new Error((j && j.message) || ('HTTP ' + r.status));
+          err.code = j && j.code;
+          err.existing = j && j.existing;
+          throw err;
         }
         return j;
       });
-    }).then(function (j) {
+    });
+  }
+  // Overwrite is never silent: the first Save on a taken week comes back as
+  // the duplicate refusal with the existing pick, and only the banner's
+  // "Replace" button re-sends with replace:true ([[feedback-confirmed-writes-only]]).
+  function sendPick(payload) {
+    var btn = $('f_go');
+    btn.disabled = true;
+    banner('');
+    postJson(payload).then(function (j) {
       var res = (j && j.result) || {};
-      banner('Recorded: ' + (res.player_name || '?') + ' → ' + (res.picked_abbr || '?')
-        + ', total ' + res.total_guess + ' (week ' + res.week + ')'
-        + (res.created_player ? ' · new player created' : ''), 'ok');
+      var prev = res.previous || {};
+      banner(res.replaced
+        ? 'Replaced: ' + (res.player_name || '?') + ' ' + prev.picked_abbr + '-' + prev.total_guess
+          + ' → ' + res.picked_abbr + '-' + res.total_guess + ' (week ' + res.week + ')'
+        : 'Recorded: ' + (res.player_name || '?') + ' → ' + (res.picked_abbr || '?')
+          + ', total ' + res.total_guess + ' (week ' + res.week + ')'
+          + (res.created_player ? ' · new player created' : ''), 'ok');
       $('f_total').value = '';
       $('f_newname').value = '';
       $('f_player').value = '';
@@ -358,9 +429,16 @@
       $('f_ann').value = '';
       load();
     }).catch(function (e) {
-      banner(String(e.message || e));
+      if (e.code === 'duplicate_week' && e.existing) {
+        var ex = e.existing;
+        banner(e.message + ': ' + ex.picked_abbr + ', total ' + ex.total_guess
+          + '. Replace it with ' + payload.picked_abbr + ', total ' + payload.total_guess + '?', '',
+          { label: 'Replace', fn: function () { payload.replace = true; sendPick(payload); } });
+      } else {
+        banner(String(e.message || e));
+      }
     }).finally(function () { btn.disabled = false; });
-  });
+  }
 
   // ---- load ----------------------------------------------------------------
   // New-PWA contract ([[gotcha_pwa_stale_no_refetch]]): explicit refresh
