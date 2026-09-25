@@ -47,6 +47,7 @@
        color:var(--moss); padding:3px 6px 3px 0; border-bottom:1px solid #d8e2d8; }
   td { padding:5px 6px 5px 0; border-bottom:1px solid #eef3ee; vertical-align:top; }
   td.num, th.num { text-align:right; padding-right:14px; }
+  td.ctr, th.ctr { text-align:center; }
   tr.me td { font-weight:700; background:#f2f7ee; }
   .dim { color:#888; }
   .missing { font-size:.78rem; color:var(--moss); margin-top:8px; }
@@ -212,13 +213,13 @@
       .filter(function (n) { return !pickedNames[n]; });
     var h = '';
     if (picks.length) {
-      h += '<table><tr><th>player</th><th>pick</th><th class="num">total</th><th>announced</th><th class="num">pts</th><th></th></tr>';
+      h += '<table><tr><th>player</th><th class="ctr">pick</th><th class="ctr">total</th><th>announced</th><th class="ctr">pts</th><th></th></tr>';
       picks.forEach(function (p) {
         var me = players.some(function (pl) { return pl.name === p.name && pl.is_me; });
         var pts = p.win_pts === null ? '<span class="dim">—</span>' : (p.win_pts + p.total_pts);
-        h += '<tr' + (me ? ' class="me"' : '') + '><td>' + esc(p.name) + '</td><td>' + esc(p.picked_abbr)
-          + '</td><td class="num">' + p.total_guess + '</td><td>' + fmtAnn(p.announced_at)
-          + '</td><td class="num">' + pts + '</td>'
+        h += '<tr' + (me ? ' class="me"' : '') + '><td>' + esc(p.name) + '</td><td class="ctr">' + esc(p.picked_abbr)
+          + '</td><td class="ctr">' + p.total_guess + '</td><td>' + fmtAnn(p.announced_at)
+          + '</td><td class="ctr">' + pts + '</td>'
           + '<td class="act"><button type="button" class="ed" data-pid="' + p.pick_id + '" title="Edit this pick">&#x270E;</button>'
           + '<button type="button" class="del" data-pid="' + p.pick_id + '" title="Delete this pick">&#x2715;</button></td></tr>';
       });
@@ -276,11 +277,11 @@
     if (wk === state.week) { $('resultsCard').style.display = 'none'; return; } // already in this-week table
     var rows = scored.filter(function (r) { return r.week === wk; })
       .sort(function (a, b) { return (b.win_pts + b.total_pts) - (a.win_pts + a.total_pts) || a.name.localeCompare(b.name); });
-    var h = '<table><tr><th>player</th><th>pick</th><th class="num">guess</th><th class="num">actual</th><th class="num">pts</th></tr>';
+    var h = '<table><tr><th>player</th><th class="ctr">pick</th><th class="ctr">guess</th><th class="ctr">actual</th><th class="ctr">pts</th></tr>';
     rows.forEach(function (r) {
       var actual = r.final_home === null ? '—' : (r.final_home + r.final_away);
-      h += '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.picked_abbr) + '</td><td class="num">' + r.total_guess
-        + '</td><td class="num">' + actual + '</td><td class="num">' + (r.win_pts + r.total_pts)
+      h += '<tr><td>' + esc(r.name) + '</td><td class="ctr">' + esc(r.picked_abbr) + '</td><td class="ctr">' + r.total_guess
+        + '</td><td class="ctr">' + actual + '</td><td class="ctr">' + (r.win_pts + r.total_pts)
         + ' <span class="dim">(' + r.win_pts + 'w+' + r.total_pts + 'b)</span></td></tr>';
     });
     h += '</table>';

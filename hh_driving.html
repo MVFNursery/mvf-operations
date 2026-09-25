@@ -14,7 +14,7 @@
   :root { --ink:#1f3a5f; --slate:#4a6584; --paper:#eef1f5; --card:#fbfcfe;
           --red:#9b2c1f; --green:#2d6a3f; --amber:#9a6b1f; }
   * { box-sizing:border-box; }
-  body { margin:0; background:#14263d; font-family:Georgia,serif; color:#222; }
+  body { margin:0; background:#14263d; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; font-variant-numeric:tabular-nums lining-nums; color:#222; }
   header { background:var(--ink); color:#fff; padding:14px 16px 12px; display:flex; align-items:baseline; gap:10px; }
   header h1 { font-size:1.15rem; margin:0; flex:1; }
   header button { border:0; border-radius:6px; padding:5px 10px; font-family:inherit; font-size:.78rem;
@@ -86,7 +86,7 @@
   @media print {
     body > header, body > main { display:none !important; }
     body { background:#fff; }
-    #printLog { display:block; font-family:Georgia,serif; color:#000; padding:0.2in; }
+    #printLog { display:block; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; font-variant-numeric:tabular-nums lining-nums; color:#000; padding:0.2in; }
     #printLog h1 { font-size:16pt; margin:0 0 4pt; }
     #printLog .drv { margin:6pt 0 10pt; font-size:11pt; }
     #printLog table { width:100%; border-collapse:collapse; font-size:9pt; }
