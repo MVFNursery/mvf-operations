@@ -417,7 +417,7 @@
     const scorecard = `<div class="verdict">${verdict}</div><div class="tiles">
       <div class="tile ${pl ? '' : 'dim'}"><div class="t-label">1 &middot; Self-funding (income &divide; opex)</div>
         <div class="t-value">${pl ? pctf(ratio(pl)) : 'locked'}</div>
-        <div class="t-note">${pl ? `trailing: ${trail}${pl.production_inputs != null ? ` &middot; production inputs ${money(pl.production_inputs)}` : ''}` : (untyped > 0 ? lockedNote : 'needs a books import')}</div></div>
+        <div class="t-note">${pl ? `trailing: ${trail}${pl.production_inputs != null ? ` &middot; production inputs ${money(pl.production_inputs)}` : ''}${Number(pl.non_cash) > 0 ? ` &middot; non-cash ${money(pl.non_cash)} excluded` : ''}` : (untyped > 0 ? lockedNote : 'needs a books import')}</div></div>
       <div class="tile"><div class="t-label">2 &middot; Owner cash in</div>
         <div class="t-value">${sc.owner_investment_change == null ? '—' : money(sc.owner_investment_change)}</div>
         <div class="t-note">trend toward $0</div></div>
@@ -440,7 +440,7 @@
       </table></div></details>` : ''}
     ${plm.length ? `<details><summary>income vs opex by month (imported + typed only)</summary>
       <div class="scrollwrap"><table><tr><th>month</th><th class="num">income</th><th class="num">opex</th><th class="num">self-funding</th></tr>
-      ${plm.map(r => `<tr><td>${esc(r.month)}</td><td class="num">${money(r.income)}</td><td class="num">${money(r.opex)}</td><td class="num">${pctf(ratio(r))}</td></tr>`).join('')}
+      ${plm.map(r => `<tr><td>${esc(r.month)}</td><td class="num">${money(r.income)}</td><td class="num">${money(r.opex)}${Number(r.non_cash) > 0 ? ` <span class="chip" title="non-cash excluded">+${money(r.non_cash)} nc</span>` : ''}</td><td class="num">${pctf(ratio(r))}</td></tr>`).join('')}
       </table></div></details>` : ''}`;
 
     // Phase 4 compliance

@@ -6,7 +6,7 @@
 // household, inventory, field, driving, potting, close, all of them. Anything
 // this file does casually, it does to all of them.
 
-const CACHE_NAME = 'mvfn-shell-v14';
+const CACHE_NAME = 'mvfn-shell-v15';
 const BASE = '/mvf-operations';
 
 const APP_SHELL = [
