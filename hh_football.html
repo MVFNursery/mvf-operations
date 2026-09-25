@@ -14,7 +14,8 @@
   :root { --ink:#1e4423; --moss:#4a6b4f; --paper:#eef3ee; --card:#fbfdfb;
           --leather:#7a4a21; --red:#9b2c1f; --green:#2d6a3f; --amber:#9a6b1f; }
   * { box-sizing:border-box; }
-  body { margin:0; background:#122b17; font-family:Georgia,serif; color:#222; }
+  body { margin:0; background:#122b17; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         font-variant-numeric:tabular-nums lining-nums; color:#222; }
   header { background:var(--ink); color:#fff; padding:14px 16px 12px; display:flex; align-items:baseline; gap:10px; }
   header h1 { font-size:1.15rem; margin:0; flex:1; }
   header button { border:0; border-radius:6px; padding:5px 10px; font-family:inherit; font-size:.85rem;
@@ -45,7 +46,7 @@
   th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em;
        color:var(--moss); padding:3px 6px 3px 0; border-bottom:1px solid #d8e2d8; }
   td { padding:5px 6px 5px 0; border-bottom:1px solid #eef3ee; vertical-align:top; }
-  td.num, th.num { text-align:right; }
+  td.num, th.num { text-align:right; padding-right:14px; }
   tr.me td { font-weight:700; background:#f2f7ee; }
   .dim { color:#888; }
   .missing { font-size:.78rem; color:var(--moss); margin-top:8px; }
