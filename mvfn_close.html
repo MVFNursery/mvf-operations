@@ -100,6 +100,7 @@
   .steps li.alldone { list-style: none; margin-left: -22px; font-family: 'Fraunces', serif; font-weight: 600; }
   .steps .stepbtn { margin-left: 8px; }
   .steps li.warn { color: #7a5a00; font-weight: 600; }
+  .steps li .hint { display: block; font-weight: 400; margin: 2px 0 0; }
   .attn ul { margin: 6px 0 0; padding-left: 18px; }
   .attn li { margin: 4px 0; }
   .attn li .sev { font-size: .66rem; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 10px; margin-right: 6px; }
@@ -245,7 +246,17 @@
     const expRows = unc.filter(r => r.debit != null).length;
     const cash = D.accounts.find(a => a.account === 'Cash on Hand');
     const item = k => D.checklist.find(c => c.item_key === k);
-    const open = D.checklist.filter(c => st(c) === 'open');
+    // Per-feed "entered in Wave" boxes (V175) are the FIRST thing a human does each
+    // month — M1st export -> Wave, then Wells Fargo (sign flipped), Square, Venmo,
+    // cash, personal cards — so they lead the list, one step each, in checklist
+    // order. They are left out of the trailing "work the checklist" count.
+    const feed = D.checklist.filter(c => c.item_key.startsWith('p1_entered_'));
+    const feedOpen = feed.filter(c => st(c) === 'open');
+    feedOpen.forEach(c => {
+      const flip = /flip the sign/i.test(c.label || '');
+      s.push({ t: esc(c.label), h: flip && c.detail ? esc(c.detail) : '', a: '#ph1', warn: flip });
+    });
+    const open = D.checklist.filter(c => st(c) === 'open' && !c.item_key.startsWith('p1_entered_'));
     // Cash-tender Square orders: Wave's Square connection books every sale into
     // the `Square` asset account, but cash never deposits, so it sits there until
     // a Wave transfer Square -> Cash on Hand for the month's cash total is recorded.
@@ -265,8 +276,8 @@
         s.push({ t: `&#9888; Wave's <b>Square</b> account ends the month at <b>${money(sqBal)}</b> &mdash; it should be $0.00 after the cash transfer (card sales clear against the SQUARE INC deposits; anything left is cash tender that never deposited).`, a: '#ph2', warn: true });
     };
     if (!D.import) {
-      s.push({ t: `In Wave, run <b>Reports &rarr; Account Transactions</b> for ${esc(D.period.label)} (cash basis), export the CSV, and upload it here.`, act: 'upload' });
       cashStep();
+      s.push({ t: `In Wave, run <b>Reports &rarr; Account Transactions</b> for ${esc(D.period.label)} (cash basis), export the CSV, and upload it here.`, act: 'upload' });
     } else {
       if (uncCredit > 0) {
         // The Square split is measured nightly (books.square_order_money via the
@@ -314,8 +325,8 @@
     if (Number(D.scorecard.untyped_accounts) > 0)
       s.push({ t: `Type <b>${D.scorecard.untyped_accounts} account${Number(D.scorecard.untyped_accounts) === 1 ? '' : 's'}</b> in the Accounts table &mdash; unlocks computed income + the liability panel.`, a: '#accounts' });
     if (open.length)
-      s.push({ t: `Work the checklist: <b>${open.length} of ${D.checklist.length}</b> steps open (next: &ldquo;${esc(open[0].label)}&rdquo;).`, a: '#ph' + Math.min(open[0].phase, 5) });
-    if (D.import && !unc.length && !open.length && !sqBalOff)
+      s.push({ t: `Work the checklist: <b>${open.length} of ${D.checklist.length - feed.length}</b> steps open (next: &ldquo;${esc(open[0].label)}&rdquo;).`, a: '#ph' + Math.min(open[0].phase, 5) });
+    if (D.import && !unc.length && !open.length && !feedOpen.length && !sqBalOff)
       s.push({ t: `Everything's green &mdash; <b>close ${esc(D.period.label)}</b>.`, a: '#closeout' });
     return s;
   }
@@ -324,7 +335,7 @@
     const s = nextSteps();
     const items = s.map(x => x.done
       ? `<li class="alldone">&#10003; ${x.t}</li>`
-      : `<li${x.warn ? ' class="warn"' : ''}>${x.t}${x.act === 'upload' ? '<button class="small stepbtn" data-upload>Upload CSV</button>' : ''}${x.a ? ` <a href="${x.a}">&darr; go</a>` : ''}</li>`).join('');
+      : `<li${x.warn ? ' class="warn"' : ''}>${x.t}${x.act === 'upload' ? '<button class="small stepbtn" data-upload>Upload CSV</button>' : ''}${x.a ? ` <a href="${x.a}">&darr; go</a>` : ''}${x.h ? `<span class="hint">${x.h}</span>` : ''}</li>`).join('');
     return `<div class="card steps"><h2>What's left &mdash; ${esc(D.period.label)}</h2><ol>${items}</ol></div>`;
   }
 
