@@ -100,6 +100,12 @@
   .steps li.alldone { list-style: none; margin-left: -22px; font-family: 'Fraunces', serif; font-weight: 600; }
   .steps .stepbtn { margin-left: 8px; }
   .steps li.warn { color: #7a5a00; font-weight: 600; }
+  .attn ul { margin: 6px 0 0; padding-left: 18px; }
+  .attn li { margin: 4px 0; }
+  .attn li .sev { font-size: .66rem; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 10px; margin-right: 6px; }
+  .attn li.warn .sev { background: #fdf1ef; color: #9b2c1f; border: 1px solid #9b2c1f; }
+  .attn li.watch .sev { background: #fbf6e6; color: #7a5a00; border: 1px solid #7a5a00; }
+  .attn .quiet { color: #5a6b2d; font-weight: 600; }
   .steps .je { margin: 6px 0 4px; border: 1px solid #c9d6b8; border-radius: 6px; background: #fff; padding: 6px 8px; max-width: 560px; }
   .steps .je-head { font-size: .78rem; color: #4a5a3a; margin-bottom: 4px; }
   .steps .je-head span { font-family: 'Fraunces', serif; font-weight: 600; color: #2d5016; }
@@ -322,6 +328,23 @@
     return `<div class="card steps"><h2>What's left &mdash; ${esc(D.period.label)}</h2><ol>${items}</ol></div>`;
   }
 
+  // "Where to look" — signals from the GET's rules pass (SOP Phase 3 trend section).
+  // Only rules that fired are listed; the footer says what ran and what still waits on history.
+  function attentionHTML() {
+    const A = D.attention || [], M = D.attention_meta || {};
+    const label = esc(D.period.label);
+    // inventory rules (culls, stock) run without books; books rules need Phase 1 first
+    const list = A.length
+      ? `<ul>${A.map(a => `<li class="${esc(a.severity)}"><span class="sev">${esc(a.severity)}</span><b>${esc(a.title)}</b> &mdash; ${esc(a.detail)}${a.anchor ? ` <a href="${esc(a.anchor)}">&darr; go</a>` : ''}</li>`).join('')}</ul>`
+      : '';
+    const body = !M.has_books
+      ? `${list}<div class="hint">No books imported for ${label} yet &mdash; spending, income and owner-cash rules run once Phase 1 is in.</div>`
+      : (A.length ? list : `<div class="quiet">Nothing moved outside its band in ${label}.</div>`);
+    const waiting = (M.waiting || []).length ? ` &middot; waiting on history: ${M.waiting.map(esc).join('; ')}` : '';
+    const foot = `<div class="hint">${M.rules} rules over ${M.books_months} months of books, ${M.snapshots} snapshot${Number(M.snapshots) === 1 ? '' : 's'}${waiting}</div>`;
+    return `<div class="card attn" id="attention"><h2>Where to look &mdash; ${label}</h2>${body}${foot}</div>`;
+  }
+
   function render() {
     const sc = D.scorecard, sq = D.square, comp = D.compliance;
     $('monthLabel').textContent = D.period.label;
@@ -475,6 +498,7 @@
 
     $('app').innerHTML = `
       ${stepsHTML()}
+      ${attentionHTML()}
       <div class="card" id="ph1"><h2>Phase 1 &mdash; Books (Wave) ${prog(1)}</h2>
         <div class="sub">get the books current, categorized, and imported</div>
         <div class="tiles">${importTile}${uncTile}</div>
