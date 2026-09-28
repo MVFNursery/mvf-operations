@@ -436,7 +436,7 @@
     const trail = plm.filter(r => r.month <= month).slice(-3).map(r => `${esc(r.month.slice(5))} ${pctf(ratio(r))}`).join(' · ');
     const channels = D.accounts.filter(a => a.account_type === 'income' && a.balance_change != null)
       .map(a => `${esc(a.account.replace('Plant Sales - ', ''))} ${money(a.balance_change)}`).join(' · ');
-    const sl = sc.sellable || {}, bf = sc.bench || {}, hrs = sc.hours || {};
+    const sl = sc.sellable || {}, bf = sc.bench || {}, hrs = sc.hours || {}, sv = sc.stock_cost || null;
     const incomeNum = pl && pl.income != null ? Number(pl.income) : (incomeRow ? Number(incomeRow.income) : null);
     const turn = (incomeNum != null && Number(sl.retail_value) > 0) ? incomeNum / Number(sl.retail_value) : null;
     const perSqft = (incomeNum != null && Number(bf.sqft) > 0) ? incomeNum / Number(bf.sqft) : null;
@@ -463,7 +463,7 @@
         <div class="t-note">units sold / units culled (net count deltas)</div></div>
       <div class="tile ${Number(sl.past_ready_growing) > Number(sl.for_sale_units) ? 'bad' : ''}"><div class="t-label">5 &middot; Sellable stock (as of ${esc(sl.as_of || 'today')})</div>
         <div class="t-value">${sl.units == null ? '—' : sl.units + ' units &middot; ' + money(sl.retail_value)}</div>
-        <div class="t-note">turn ${turn == null ? '—' : (turn * 100).toFixed(1) + '%'} &middot; ${sl.past_ready_growing == null ? '—' : sl.past_ready_growing} past ready, never listed &middot; ${sl.unpriced_units == null ? '—' : sl.unpriced_units} unpriced (value is a floor)</div></div>
+        <div class="t-note">turn ${turn == null ? '—' : (turn * 100).toFixed(1) + '%'} &middot; ${sl.past_ready_growing == null ? '—' : sl.past_ready_growing} past ready, never listed &middot; ${sl.unpriced_units == null ? '—' : sl.unpriced_units} unpriced (value is a floor)${sv ? ` &middot; all stock at cost ${money(sv.value)} (${sv.units} units${Number(sv.uncosted_units) > 0 ? `, ${sv.uncosted_units} uncosted, a floor` : ''})` : ''}</div></div>
       <div class="tile"><div class="t-label">6 &middot; Yield per ${perHour != null ? 'Ian-hour' : 'bench sqft'}</div>
         <div class="t-value">${perHour != null ? money(perHour) + '/h' : (perSqft == null ? '—' : money(perSqft) + '/sqft')}</div>
         <div class="t-note">${bf.sqft == null ? '—' : bf.sqft} sqft on hand${Number(bf.units_on_unknown_dims) > 0 ? ` (${bf.units_on_unknown_dims} units on un-taped codes)` : ''} &middot; ${Number(hrs.potting_min) > 0 ? `${(Number(hrs.potting_min) / 60).toFixed(1)} h potting logged` : 'no potting minutes logged yet'}${Number(hrs.task_min) > 0 ? ` + ${(Number(hrs.task_min) / 60).toFixed(1)} h task estimates` : ''}</div></div>
