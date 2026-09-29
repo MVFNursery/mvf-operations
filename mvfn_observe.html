@@ -827,15 +827,21 @@ function dedupeAppend(existing, newText) {
 
   const eWords = existing.trim().split(/\s+/).filter(Boolean);
   const nWords = newText.split(/\s+/).filter(Boolean);
-  const existingLower = existing.trim().toLowerCase();
-  const newLower = newText.toLowerCase();
+  // Space-padded word strings so the containment test matches whole words
+  // only — a short final like "no" must not vanish inside "not".
+  const existingLower = ' ' + eWords.join(' ').toLowerCase() + ' ';
+  const newLower = ' ' + nWords.join(' ').toLowerCase() + ' ';
 
-  // Entire new text already present
+  // Entire new text already present (as whole words)
   if (existingLower.includes(newLower)) return existing;
 
   // Case A: restart overlap — suffix of existing matches prefix of new
   // e.g. existing="…D E", new="D E F G" → append "F G"
-  for (let len = Math.min(nWords.length - 1, 20); len > 0; len--) {
+  // Android Chrome re-sends 21-29 words after a continuous-mode auto-restart
+  // (obs 0e6cf887, 2026-09-23), so the window must be well above that.
+  // Exact suffix/prefix only — no fuzzy "found anywhere → replace" rule: that
+  // deletes real speech and Observe auto-submits (tests/observe_dedupe_test.html).
+  for (let len = Math.min(nWords.length - 1, 60); len > 0; len--) {
     if (eWords.slice(-len).join(' ').toLowerCase() === nWords.slice(0, len).join(' ').toLowerCase()) {
       const remainder = nWords.slice(len).join(' ');
       return existing.trimEnd() + (remainder ? ' ' + remainder + ' ' : ' ');
@@ -844,7 +850,11 @@ function dedupeAppend(existing, newText) {
 
   // Case B: rebuild — new text starts with all (or most) of existing then continues
   // e.g. existing="A B C", new="A B C D E" → append "D E"
-  for (let len = Math.min(eWords.length, nWords.length); len > 2; len--) {
+  // "Most" = all but the last 2 words (the recognizer revising its tail). A
+  // shorter shared prefix is just two sentences that start alike ("I need to
+  // get neem oil…" / "I need to get more trays") and must append in full.
+  const minB = Math.max(3, eWords.length - 2);
+  for (let len = Math.min(eWords.length, nWords.length); len >= minB; len--) {
     if (eWords.slice(0, len).join(' ').toLowerCase() === nWords.slice(0, len).join(' ').toLowerCase()) {
       const remainder = nWords.slice(len).join(' ');
       if (remainder) return existing.trimEnd() + ' ' + remainder + ' ';

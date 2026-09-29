@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Observe dedupe tests</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; background: #fff; color: #111; }
+  .pass { color: #176b2c; } .fail { color: #b00020; } .known { color: #8a5a00; }
+  pre { white-space: pre-wrap; background: #f4f4f4; padding: 6px; margin: 4px 0 12px; }
+  #summary { font-weight: 600; font-size: 16px; }
+</style>
+</head>
+<body>
+<!--
+  Tests dedupeAppend() from ../mvfn_observe.html — the REAL function, pulled out
+  of the page source at load time, so there is no port to drift.
+  Run: serve the repo root (python -m http.server 8765) and open
+  http://localhost:8765/tests/observe_dedupe_test.html
+  Result is in #summary and in window.__dedupeResult = {pass, fail}.
+-->
+<div id="summary">running…</div>
+<div id="out"></div>
+<script>
+// Observation 0e6cf887-9db5-4891-bb57-d16125a0384d (2026-09-23, task #349):
+// the transcript as STORED with the old 20-word Case A cap. Every final after
+// an Android auto-restart re-sent 21-29 words, so each fell through to a plain
+// append. Splitting at each "trays for the white" rebuilds the 9 finals.
+const STORED_349 = "so I basically swapped out all the Sodom solid solid bottom trays for the white ones with holes in them pretty much across the board except for like a couple of swamp trays for the white ones with holes in them pretty much across the board except for like a couple of swamp milkweed trays for the white ones with holes in them pretty much across the board except for like a couple of swamp milkweed and trays for the white ones with holes in them pretty much across the board except for like a couple of swamp milkweed and maybe trays for the white ones with holes in them pretty much across the board except for like a couple of swamp milkweed and maybe like trays for the white ones with holes in them pretty much across the board except for like a couple of swamp milkweed and maybe like a trays for the white ones with holes in them pretty much across the board except for like a couple of swamp milkweed and maybe like a toxic trays for the white ones with holes in them pretty much across the board except for like a couple of swamp milkweed and maybe like a toxic sedge and trays for the white ones with holes in them pretty much across the board except for like a couple of swamp milkweed and maybe like a toxic sage and cup planned Rosemount of that kind of stuff but otherwise everything is in white trays";
+
+function finals349() {
+  const parts = STORED_349.split(/ (?=trays for the white)/);
+  // parts[0] ("so I … solid bottom") and parts[1] were one final.
+  return [parts[0] + ' ' + parts[1], ...parts.slice(2)];
+}
+
+// Expected with the raised cap: one clean pass, plus ONE leftover repeat where
+// the recognizer revised "toxic sedge" → "toxic sage" in its last final (an
+// exact-match rule cannot, and deliberately does not, reconcile that).
+const EXPECTED_349 = "so I basically swapped out all the Sodom solid solid bottom trays for the white ones with holes in them pretty much across the board except for like a couple of swamp milkweed and maybe like a toxic sedge and trays for the white ones with holes in them pretty much across the board except for like a couple of swamp milkweed and maybe like a toxic sage and cup planned Rosemount of that kind of stuff but otherwise everything is in white trays";
+
+// [name, finals[] (null = #349), expected, kind]  kind: 'must' | 'known'
+// ('known' documents an accepted limitation; asserted so a change is noticed).
+const CASES = [
+  ['#349 rebuilt: 9 finals, 21-29 word restart overlaps', null, EXPECTED_349, 'must'],
+
+  // Legitimate repeats inside one final survive.
+  ['"very very hot" in one final', ['it was very very hot today'], 'it was very very hot today', 'must'],
+  ['"I had had enough" in one final', ['I had had enough of the aphids'], 'I had had enough of the aphids', 'must'],
+  ['sentence repeated on purpose in one final',
+    ['water the ferns tonight water the ferns tonight'], 'water the ferns tonight water the ferns tonight', 'must'],
+  ['repeated phrase with new words around it, across finals',
+    ['water the ferns', 'then the hostas', 'and water the ferns again'],
+    'water the ferns then the hostas and water the ferns again', 'must'],
+
+  // Two sentences that start alike: both kept in full (old Case B dropped
+  // "I need to get" from the second; the rejected fuzzy rule dropped the first).
+  ['neem oil / 1020 trays both kept',
+    ['I need to get neem oil for the aphids', 'I need to get more 1020 trays'],
+    'I need to get neem oil for the aphids I need to get more 1020 trays', 'must'],
+
+  // Word-boundary containment: short finals are not swallowed by substrings.
+  ['"no" after "not"', ['it is not ready', 'no'], 'it is not ready no', 'must'],
+  ['"ten" after "often"', ['I water these often', 'ten'], 'I water these often ten', 'must'],
+  ['exact word re-send is still dropped', ['check the tomatoes today', 'tomatoes today'], 'check the tomatoes today', 'must'],
+
+  // The ordinary restart-overlap and rebuild paths.
+  ['short restart overlap', ['A B C D E', 'D E F G'], 'A B C D E F G', 'must'],
+  ['rebuild: new starts with all of existing', ['A B C', 'A B C D E'], 'A B C D E', 'must'],
+  ['rebuild with revised last word', ['one two three four', 'one two three for five six'],
+    'one two three four for five six', 'must'],
+  ['case-insensitive re-send', ['Swamp milkweed trays', 'swamp milkweed trays'], 'Swamp milkweed trays', 'must'],
+
+  // Known, accepted limitations (unchanged by this fix).
+  ['KNOWN: repeat split across finals is absorbed as restart overlap',
+    ['it was very', 'very hot'], 'it was very hot', 'known'],
+  ['KNOWN: whole earlier phrase re-said as its own final is dropped',
+    ['water the ferns', 'check the mail', 'water the ferns'], 'water the ferns check the mail', 'known'],
+];
+
+function esc(s) { return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+(async () => {
+  const out = document.getElementById('out');
+  let pass = 0, fail = 0;
+  try {
+    const src = await (await fetch('../mvfn_observe.html', {cache: 'no-store'})).text();
+    const m = src.match(/function dedupeAppend\(existing, newText\) \{[\s\S]*?\n\}\n/);
+    if (!m) throw new Error('dedupeAppend not found in mvfn_observe.html');
+    const dedupeAppend = new Function(m[0] + '\nreturn dedupeAppend;')();
+
+    for (const [name, fin, expected, kind] of CASES) {
+      const finals = fin || finals349();
+      let t = '';
+      for (const f of finals) t = dedupeAppend(t, f);
+      const got = t.trim();
+      const ok = got === expected;
+      ok ? pass++ : fail++;
+      const cls = ok ? (kind === 'known' ? 'known' : 'pass') : 'fail';
+      out.insertAdjacentHTML('beforeend',
+        `<div class="${cls}">${ok ? 'PASS' : 'FAIL'} — ${esc(name)}` +
+        (fin ? '' : ` (${finals.length} finals, ${got.length} chars; stored was ${STORED_349.length})`) + `</div>` +
+        (ok ? '' : `<pre>expected: ${esc(expected)}\ngot:      ${esc(got)}</pre>`));
+    }
+  } catch (e) {
+    fail++;
+    out.insertAdjacentHTML('beforeend', `<div class="fail">ERROR — ${esc(String(e))}</div>`);
+  }
+  const s = document.getElementById('summary');
+  s.textContent = `${pass} passed, ${fail} failed`;
+  s.className = fail ? 'fail' : 'pass';
+  window.__dedupeResult = {pass, fail};
+})();
+</script>
+</body>
+</html>
