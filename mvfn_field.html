@@ -110,12 +110,24 @@
   .origin-note { margin: 0 12px 10px 56px; padding: 8px 10px; border-left: 3px solid var(--amber); background: rgba(240,184,64,0.06); border-radius: 0 6px 6px 0; font-size: 13px; line-height: 1.4; }
   .origin-note .origin-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .65; margin-bottom: 3px; }
   .origin-note .origin-text { white-space: pre-wrap; }
-  .edit-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: transparent; color: inherit; font-size: 14px; cursor: pointer; }
+  .edit-btn { flex: 0 0 44px; padding: 0; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: transparent; color: inherit; font-size: 14px; cursor: pointer; }
   .edit-btn:active { opacity: 0.7; }
   .proposed-edit { margin: 0 12px 12px 56px; display: flex; flex-direction: column; gap: 8px; }
   .proposed-edit input, .proposed-edit textarea { width: 100%; box-sizing: border-box; padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.25); color: inherit; font: inherit; font-size: 15px; }
   .proposed-edit textarea { min-height: 70px; resize: vertical; }
   .proposed-edit .row { display: flex; gap: 8px; }
+  .proposed-edit select { width: 100%; box-sizing: border-box; padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.25); color: inherit; font: inherit; font-size: 15px; }
+  .keep-btn {
+    flex: 1; height: 36px; border-radius: 8px;
+    border: 1px solid var(--amber); background: transparent;
+    color: var(--amber); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+  }
+  .keep-btn:active { opacity: 0.7; }
+  .note-card { border: 1px solid var(--border2); border-radius: 10px; margin: 8px 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .note-card .note-meta { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text3); }
+  .note-card .note-text { font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+  .note-card .note-tasks { font-size: 12px; color: var(--text2); display: flex; flex-direction: column; gap: 2px; }
+  .note-card .proposed-edit { margin: 0; }
 
   /* CLOSED CARD (done / cancelled, server-backed — see renderTasks) */
   .closed-header {
@@ -565,6 +577,7 @@ const WEBHOOK_GET  = N8N_BASE + '/mvfn-field-get';
 // ──────────────────────────────────────────────────────────
 
 let allTasks = [];
+let allNotes = [];           // kept Observe notes (V178) [{id, transcript, created_at, kept_at, kept_by, observer, tasks}]
 let squareProposals = [];     // [{catalog_object_id, item_name, variation_name, sku, task_source_ref, candidates}] — Square→inventory mapping suggestions
 let allProjects = [];         // [{id, slug, name, status, open_tasks}] — business tasks.projects (V019)
 let projectDrill = null;      // project id, or 'none' for the unfiled bucket, while inside the Projects view
@@ -601,6 +614,7 @@ async function loadTasks() {
       // single-payload shape: {tasks, areas, users, ownership, me, categories, household_categories}
       allTasks = row.tasks;
       squareProposals = Array.isArray(row.square_proposals) ? row.square_proposals : [];
+      allNotes = Array.isArray(row.notes) ? row.notes : [];
       allProjects = row.projects || [];
       allAreas = row.areas || [];
       allUsers = row.users || [];
@@ -611,6 +625,7 @@ async function loadTasks() {
     } else {
       allTasks = rows; // legacy shape: bare task rows
       squareProposals = []; // legacy payload never carries proposals
+      allNotes = [];
     }
     renderFilterChips();
     renderTasks();
@@ -644,7 +659,7 @@ function renderFilterChips() {
   const bar = document.getElementById('filterBar');
   if (!bar) return;
   // If the previously active category disappeared, fall back to All.
-  if (activeFilter !== 'All' && activeFilter !== 'Mine' && activeFilter !== 'Proposed'
+  if (activeFilter !== 'All' && activeFilter !== 'Mine' && activeFilter !== 'Proposed' && activeFilter !== 'Notes'
       && !categories.some(c => c.category_id === activeFilter)) {
     activeFilter = 'All';
   }
@@ -655,6 +670,7 @@ function renderFilterChips() {
   if (allProjects.length) html += chip('Projects', 'Projects');
   categories.forEach(c => { html += chip(c.category_id, c.label); });
   html += '<button class="filter-chip' + (activeFilter === 'Proposed' ? ' active proposed-chip' : '') + '" id="proposedChip" onclick="setFilter(\'Proposed\',this)">Proposed</button>';
+  html += '<button class="filter-chip' + (activeFilter === 'Notes' ? ' active proposed-chip' : '') + '" id="notesChip" onclick="setFilter(\'Notes\',this)">' + (allNotes.length ? 'Notes (' + allNotes.length + ')' : 'Notes') + '</button>';
   bar.innerHTML = html;
 }
 function setFilter(val, el) {
@@ -662,7 +678,7 @@ function setFilter(val, el) {
   projectDrill = null;   // leaving or re-entering the Projects view always starts at the list
   document.querySelectorAll('.filter-chip').forEach(c => { c.classList.remove('active'); c.classList.remove('proposed-chip'); });
   el.classList.add('active');
-  if (val === 'Proposed') el.classList.add('proposed-chip');
+  if (val === 'Proposed' || val === 'Notes') el.classList.add('proposed-chip');
   renderTasks();
 }
 
@@ -672,6 +688,18 @@ function renderTasks() {
 
   if (activeFilter === 'Projects') {
     renderProjectsView(list);
+    return;
+  }
+
+  if (activeFilter === 'Notes') {
+    const nchip = document.getElementById('notesChip');
+    if (nchip) nchip.textContent = allNotes.length ? `Notes (${allNotes.length})` : 'Notes';
+    document.getElementById('countBadge').textContent = allNotes.length + (allNotes.length === 1 ? ' note' : ' notes');
+    if (!allNotes.length) {
+      list.innerHTML = '<div class="empty">No kept notes yet.<br><small>Use “Keep as note” on a proposed task to save its Observe note here.</small></div>';
+      return;
+    }
+    list.innerHTML = allNotes.map(n => noteCard(n)).join('');
     return;
   }
 
@@ -916,8 +944,9 @@ function proposedCard(t) {
       ${originNoteHtml(t)}
       <div class="proposed-actions" id="pactions-${esc(id)}">
         <button class="accept-btn" onclick="acceptTask('${esc(id)}')">✓ Accept</button>
-        <button class="edit-btn" onclick="editProposed('${esc(id)}')">✎ Edit</button>
-        <button class="dismiss-btn" onclick="dismissTask('${esc(id)}')">Dismiss</button>
+        ${String(t.source_ref || '').startsWith('obs:') ? `<button class="keep-btn" onclick="keepAsNote('${esc(id)}')">Keep as note</button>` : ''}
+        <button class="dismiss-btn" onclick="dismissTask('${esc(id)}')" title="The AI got this wrong">Dismiss</button>
+        <button class="edit-btn" onclick="editProposed('${esc(id)}')" aria-label="Edit this proposal" title="Edit">✎</button>
       </div>
     </div>
   </div>`;
@@ -1581,6 +1610,92 @@ async function acceptTask(taskId) {
   } catch(e) {
     if (card) card.style.opacity = '';
     reportWriteFailure(e, 'Accept');
+  }
+}
+
+// Keep as note (V178): the proposal goes away, the Observe note it came from
+// moves to the Notes list. Distinct from Dismiss, which means the model got it wrong.
+async function keepAsNote(taskId) {
+  const card = document.getElementById('card-' + taskId);
+  if (card) card.style.opacity = '0.4';
+  showToast('Keeping note…', '');
+  try {
+    const r = await post({ action: 'keep_as_note', task_id: taskId });
+    if (r.status === 'ok') {
+      const res = (r && r.result) || {};
+      const t = taskById(taskId);
+      const obsId = res.observation_id || (t && String(t.source_ref || '').replace(/^obs:/, ''));
+      if (obsId && !allNotes.some(n => n.id === obsId)) {
+        allNotes.unshift({ id: obsId, transcript: t ? t.origin_note : '', created_at: t ? t.origin_at : null,
+                           kept_at: new Date().toISOString(), kept_by: me, tasks: [] });
+      }
+      markClosedLocally(String(taskId), 'cancelled');
+      if (card) card.style.opacity = '';
+      showToast('Kept as note ✓', 'success');
+      renderFilterChips();
+      renderTasks();
+    } else {
+      if (card) card.style.opacity = '';
+      showToast('Failed', 'error');
+    }
+  } catch(e) {
+    if (card) card.style.opacity = '';
+    reportWriteFailure(e, 'Keep as note');
+  }
+}
+
+function noteCard(n) {
+  const id = String(n.id || '');
+  const when = n.created_at ? new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+  const who = n.observer ? userLabel(n.observer) : '';
+  const tasks = Array.isArray(n.tasks) ? n.tasks : [];
+  return `
+  <div class="note-card" id="note-${esc(id)}">
+    <div class="note-meta">${escH([when, who].filter(Boolean).join(' · '))}</div>
+    <div class="note-text">${escH(collapseStutter(n.transcript || ''))}</div>
+    ${tasks.length ? `<div class="note-tasks">${tasks.map(x => `<span>→ #${escH(x.task_id)} ${escH(x.title)}${x.status && x.status !== 'open' ? ' (' + escH(x.status) + ')' : ''}</span>`).join('')}</div>` : ''}
+    <div class="proposed-actions" id="nactions-${esc(id)}" style="padding:0">
+      <button class="accept-btn" onclick="noteToTaskEditor('${esc(id)}')">+ Make a task</button>
+    </div>
+  </div>`;
+}
+
+function noteToTaskEditor(obsId) {
+  const row = document.getElementById('nactions-' + obsId);
+  if (!row) return;
+  const def = categories.some(c => c.category_id === 'production') ? 'production' : (categories[0] && categories[0].category_id);
+  const opts = categories.map(c => `<option value="${esc(c.category_id)}"${c.category_id === def ? ' selected' : ''}>${escH(c.label)}</option>`).join('');
+  row.outerHTML = `
+    <div class="proposed-edit" id="nedit-${esc(obsId)}">
+      <input type="text" id="nedit-title-${esc(obsId)}" maxlength="400" placeholder="What needs doing?" aria-label="Task title">
+      <textarea id="nedit-detail-${esc(obsId)}" placeholder="Details (optional)" aria-label="Task details"></textarea>
+      <select id="nedit-cat-${esc(obsId)}" aria-label="Category">${opts}</select>
+      <div class="row">
+        <button class="accept-btn" onclick="saveNoteTask('${esc(obsId)}')">Create task</button>
+        <button class="dismiss-btn" onclick="renderTasks()">Cancel</button>
+      </div>
+    </div>`;
+  const inp = document.getElementById('nedit-title-' + obsId);
+  if (inp) inp.focus();
+}
+
+async function saveNoteTask(obsId) {
+  const title = (document.getElementById('nedit-title-' + obsId).value || '').trim();
+  const detail = (document.getElementById('nedit-detail-' + obsId).value || '').trim();
+  const category_id = document.getElementById('nedit-cat-' + obsId).value;
+  if (!title) { showToast('Title is required', 'error'); return; }
+  showToast('Creating…', '');
+  try {
+    const r = await post({ action: 'note_to_task', observation_id: obsId, title, detail, category_id });
+    if (r.status === 'ok') {
+      const res = (r && r.result) || {};
+      await loadTasks();   // the new task and the note's task list both come from the server
+      showToast(res.task_id ? `Task #${res.task_id} created ✓` : 'Task created ✓', 'success');
+    } else {
+      showToast('Failed', 'error');
+    }
+  } catch(e) {
+    reportWriteFailure(e, 'Make a task');
   }
 }
 
