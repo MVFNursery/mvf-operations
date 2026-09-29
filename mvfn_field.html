@@ -123,6 +123,8 @@
     color: var(--amber); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
   }
   .keep-btn:active { opacity: 0.7; }
+  .due-chip { align-self: flex-start; margin: 0 12px 10px 56px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--green-dim); background: transparent; color: var(--green); font: inherit; font-size: 12px; cursor: pointer; }
+  .due-chip.off { border-color: var(--border2); color: var(--text3); text-decoration: line-through; }
   .note-card { border: 1px solid var(--border2); border-radius: 10px; margin: 8px 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .note-card .note-meta { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text3); }
   .note-card .note-text { font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
@@ -942,6 +944,7 @@ function proposedCard(t) {
         </div>
       </div>
       ${originNoteHtml(t)}
+      ${dueChipHtml(t)}
       <div class="proposed-actions" id="pactions-${esc(id)}">
         <button class="accept-btn" onclick="acceptTask('${esc(id)}')">✓ Accept</button>
         ${String(t.source_ref || '').startsWith('obs:') ? `<button class="keep-btn" onclick="keepAsNote('${esc(id)}')">Keep as note</button>` : ''}
@@ -982,6 +985,72 @@ function collapseStutter(text) {
     if (!hit) break;
   }
   return w.join(' ');
+}
+
+// ── DUE DATE FROM TEXT (V179) ─────────────────────────────
+// A date Ian put in the proposal (title, then details) or in the Observe note it
+// came from becomes the task's due date on Accept. Shown on the card first; a tap
+// on the chip turns it off. Explicit dates only ("10/1/26", "10/1", "Oct 1",
+// "October 1st", "the 1st of October", "2026-10-01"); relative phrases like
+// "this week" are ignored rather than guessed. A bare "m/d" needs a lead-in word
+// ("by 10/1", "on 10/1") so fractions such as "1/2 flat" never read as dates.
+const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+const MONTH_RE = '(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
+const dueSkipped = new Set();   // task ids whose detected date Ian switched off
+
+function isoDate(y, m, d) {
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  return dt.toISOString().slice(0, 10);
+}
+
+// Year missing -> the reference date's year, rolled forward when that lands
+// more than a month before the reference ("Jan 5" said in December = next year).
+function withYear(y, m, d, ref) {
+  if (y != null) return isoDate(y < 100 ? 2000 + y : y, m, d);
+  let iso = isoDate(ref.getFullYear(), m, d);
+  if (iso && new Date(iso) < new Date(ref.getTime() - 31 * 864e5)) iso = isoDate(ref.getFullYear() + 1, m, d);
+  return iso;
+}
+
+function findDate(text, ref) {
+  if (!text) return null;
+  const s = String(text);
+  let m;
+  if ((m = s.match(/\b(20\d\d)-(\d{1,2})-(\d{1,2})\b/))) return isoDate(+m[1], +m[2], +m[3]);
+  if ((m = s.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})\b/))) return withYear(+m[3], +m[1], +m[2], ref);
+  if ((m = s.match(/\b(?:by|on|due|until|til|till|before|around|for)\s+(\d{1,2})\/(\d{1,2})\b(?!\/)/i))) return withYear(null, +m[1], +m[2], ref);
+  const named = new RegExp('\\b' + MONTH_RE + '\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:,?\\s+(20\\d\\d))?', 'i');
+  if ((m = s.match(named))) return withYear(m[3] ? +m[3] : null, MONTHS[m[1].slice(0, 3).toLowerCase()], +m[2], ref);
+  const ofMonth = new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+of\\s+' + MONTH_RE + '\\b(?:,?\\s+(20\\d\\d))?', 'i');
+  if ((m = s.match(ofMonth))) return withYear(m[3] ? +m[3] : null, MONTHS[m[2].slice(0, 3).toLowerCase()], +m[1], ref);
+  return null;
+}
+
+function detectDueDate(t) {
+  if (t.due_date) return null;   // a date already set wins
+  const created = t.created_date ? new Date(t.created_date + 'T12:00:00') : new Date();
+  const noteRef = t.origin_at ? new Date(t.origin_at) : created;
+  const tries = [['title', t.title, created], ['details', t.detail, created], ['your note', t.origin_note, noteRef]];
+  for (const [from, text, ref] of tries) {
+    const date = findDate(text, ref);
+    if (date) return { date, from };
+  }
+  return null;
+}
+
+function dueChipHtml(t) {
+  const id = String(t.task_id);
+  const due = detectDueDate(t);
+  if (!due) return '';
+  const off = dueSkipped.has(id);
+  const label = new Date(due.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  return `<button class="due-chip${off ? ' off' : ''}" onclick="toggleDue('${esc(id)}')" aria-pressed="${off ? 'false' : 'true'}" title="${off ? 'Tap to use this due date' : 'Tap to accept without a due date'}">📅 Due ${escH(label)} · from ${escH(due.from)}${off ? ' (off)' : ''}</button>`;
+}
+
+function toggleDue(taskId) {
+  if (dueSkipped.has(taskId)) dueSkipped.delete(taskId); else dueSkipped.add(taskId);
+  renderTasks();
 }
 
 function originNoteHtml(t) {
@@ -1590,7 +1659,10 @@ async function acceptTask(taskId) {
   if (card) card.style.opacity = '0.4';
   showToast('Accepting…', '');
   try {
-    const r = await post({ action: 'accept_task', task_id: taskId });
+    const t0 = taskById(taskId);
+    const due = t0 && !dueSkipped.has(String(taskId)) ? detectDueDate(t0) : null;
+    const r = await post(due ? { action: 'accept_task', task_id: taskId, due_date: due.date }
+                             : { action: 'accept_task', task_id: taskId });
     if (r.status === 'ok') {
       // The server resolves the suggested assignee; take its answer rather than
       // guessing locally, so the row shows who it is really assigned to.
@@ -1598,10 +1670,11 @@ async function acceptTask(taskId) {
       const t = taskById(res.task_id != null ? String(res.task_id) : taskId);
       if (t) {
         t.status = 'open';
+        if (res.due_date) t.due_date = String(res.due_date).slice(0, 10);
         t.assignee = (res.assignee !== undefined) ? res.assignee
           : (t.assignee || t.suggested_assignee);
       }
-      showToast('Added to tasks ✓', 'success');
+      showToast(res.due_date ? 'Added to tasks · due ' + String(res.due_date).slice(0, 10) + ' ✓' : 'Added to tasks ✓', 'success');
       renderTasks();
     } else {
       if (card) card.style.opacity = '';
