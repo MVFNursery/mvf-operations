@@ -925,10 +925,40 @@ function proposedCard(t) {
 
 // The Observe note this proposal was generated from. Null when the proposal
 // predates the origin link or came from somewhere other than an observation.
+// Speech-to-text restarts ("Sne Snee Sneeze we Sneeze weed is ready…"): drop a
+// fragment when the words right after it repeat it, where the fragment's last
+// word may be cut short ("ret" → "retail"). Display only; the stored transcript
+// stays raw. A 1-word fragment must repeat exactly or be a 2+ letter prefix.
+function collapseStutter(text) {
+  const norm = w => w.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '');
+  let w = String(text || '').split(/\s+/).filter(Boolean);
+  for (let guard = 0; guard < 200; guard++) {
+    let hit = false;
+    for (let i = 0; i < w.length && !hit; i++) {
+      for (let len = 1; len <= Math.floor((w.length - i) / 1) && !hit; len++) {
+        const j = i + len;
+        if (j >= w.length) break;
+        let ok = true;
+        for (let k = 0; k < len; k++) {
+          const a = norm(w[i + k]), b = norm(w[j + k] || '');
+          if (!a || !b) { ok = false; break; }
+          const last = k === len - 1;
+          if (a === b) continue;
+          if (last && b.startsWith(a) && a.length >= 2) continue;
+          ok = false; break;
+        }
+        if (ok) { w.splice(i, len); hit = true; }
+      }
+    }
+    if (!hit) break;
+  }
+  return w.join(' ');
+}
+
 function originNoteHtml(t) {
   if (!t.origin_note) return '';
   const when = t.origin_at ? new Date(t.origin_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
-  return `<div class="origin-note"><span class="origin-label">You said${when ? ' · ' + escH(when) : ''}</span><span class="origin-text">${escH(t.origin_note)}</span></div>`;
+  return `<div class="origin-note"><span class="origin-label">You said${when ? ' · ' + escH(when) : ''}</span><span class="origin-text">${escH(collapseStutter(t.origin_note))}</span></div>`;
 }
 
 // Swap the Accept/Edit/Dismiss row for an inline editor. Title and detail are the
