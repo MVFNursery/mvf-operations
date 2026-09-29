@@ -107,6 +107,15 @@
     color: var(--text3); font-size: 13px; font-family: inherit; cursor: pointer;
   }
   .dismiss-btn:active { opacity: 0.7; }
+  .origin-note { margin: 0 12px 10px 56px; padding: 8px 10px; border-left: 3px solid var(--amber); background: rgba(240,184,64,0.06); border-radius: 0 6px 6px 0; font-size: 13px; line-height: 1.4; }
+  .origin-note .origin-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .65; margin-bottom: 3px; }
+  .origin-note .origin-text { white-space: pre-wrap; }
+  .edit-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: transparent; color: inherit; font-size: 14px; cursor: pointer; }
+  .edit-btn:active { opacity: 0.7; }
+  .proposed-edit { margin: 0 12px 12px 56px; display: flex; flex-direction: column; gap: 8px; }
+  .proposed-edit input, .proposed-edit textarea { width: 100%; box-sizing: border-box; padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.25); color: inherit; font: inherit; font-size: 15px; }
+  .proposed-edit textarea { min-height: 70px; resize: vertical; }
+  .proposed-edit .row { display: flex; gap: 8px; }
 
   /* CLOSED CARD (done / cancelled, server-backed — see renderTasks) */
   .closed-header {
@@ -904,12 +913,61 @@ function proposedCard(t) {
           </div>
         </div>
       </div>
-      <div class="proposed-actions">
+      ${originNoteHtml(t)}
+      <div class="proposed-actions" id="pactions-${esc(id)}">
         <button class="accept-btn" onclick="acceptTask('${esc(id)}')">✓ Accept</button>
+        <button class="edit-btn" onclick="editProposed('${esc(id)}')">✎ Edit</button>
         <button class="dismiss-btn" onclick="dismissTask('${esc(id)}')">Dismiss</button>
       </div>
     </div>
   </div>`;
+}
+
+// The Observe note this proposal was generated from. Null when the proposal
+// predates the origin link or came from somewhere other than an observation.
+function originNoteHtml(t) {
+  if (!t.origin_note) return '';
+  const when = t.origin_at ? new Date(t.origin_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+  return `<div class="origin-note"><span class="origin-label">You said${when ? ' · ' + escH(when) : ''}</span><span class="origin-text">${escH(t.origin_note)}</span></div>`;
+}
+
+// Swap the Accept/Edit/Dismiss row for an inline editor. Title and detail are the
+// model's words; this is how Ian puts his own back before accepting.
+function editProposed(taskId) {
+  const t = taskById(taskId);
+  const row = document.getElementById('pactions-' + taskId);
+  if (!t || !row) return;
+  row.outerHTML = `
+    <div class="proposed-edit" id="pedit-${esc(taskId)}">
+      <input type="text" id="pedit-title-${esc(taskId)}" maxlength="400" value="${escH(t.title || '')}" aria-label="Task title">
+      <textarea id="pedit-detail-${esc(taskId)}" placeholder="Details (optional)" aria-label="Task details">${escH(t.detail || '')}</textarea>
+      <div class="row">
+        <button class="accept-btn" onclick="saveProposedEdit('${esc(taskId)}')">Save</button>
+        <button class="dismiss-btn" onclick="renderTasks()">Cancel</button>
+      </div>
+    </div>`;
+  const inp = document.getElementById('pedit-title-' + taskId);
+  if (inp) inp.focus();
+}
+
+async function saveProposedEdit(taskId) {
+  const t = taskById(taskId);
+  const title = (document.getElementById('pedit-title-' + taskId).value || '').trim();
+  const detail = (document.getElementById('pedit-detail-' + taskId).value || '').trim();
+  if (!title) { showToast('Title is required', 'error'); return; }
+  showToast('Saving…', '');
+  try {
+    const r = await post({ action: 'edit_proposed', task_id: taskId, title, detail });
+    if (r.status === 'ok') {
+      if (t) { t.title = title; t.detail = detail || null; }
+      showToast('Saved ✓', 'success');
+      renderTasks();
+    } else {
+      showToast('Failed', 'error');
+    }
+  } catch(e) {
+    reportWriteFailure(e, 'Edit');
+  }
 }
 
 function card(t, rank) {
