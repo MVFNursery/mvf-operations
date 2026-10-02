@@ -15,6 +15,14 @@
  *  - Re-shows the overlay if the server rejects the token mid-session (401/403).
  *
  * The token is NEVER hard-coded here — it lives only in the user's localStorage.
+ *
+ * Usage ping (docs/usage_tracking_design.md in the infra repo): a page whose tag
+ * carries data-usage-app="<app>" sends one fire-and-forget hit per open to the
+ * usage webhook (data-usage-url, default the business one). It also re-counts an
+ * open when the page comes back after 30+ min hidden, since phones keep PWAs alive
+ * in the background. window.mvfnUsageHit(feature) logs an in-app feature. A failed
+ * ping is swallowed, and it uses the ORIGINAL fetch so a 401/403 from the usage
+ * webhook can never trip the lock-out handler below.
  */
 (function () {
   var script = document.currentScript;
@@ -135,6 +143,63 @@
     go.addEventListener('click', submit);
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     setTimeout(function () { try { inp.focus(); } catch (e) {} }, 50);
+  }
+
+  // ---- usage ping (opt-in per page via data-usage-app) ----
+  var USAGE_APP = (ds.usageApp || '').trim();
+  var USAGE_URL = (ds.usageUrl || 'https://homelab.taile865b6.ts.net:5678/webhook/mvfn-usage').trim();
+  var ACTOR_KEY = 'mvfn_usage_actor';
+  function ls(k) { try { return (localStorage.getItem(k) || '').trim(); } catch (e) { return ''; } }
+  function usageHit(feature) {
+    if (!USAGE_APP) return;
+    try {
+      var t = getTok();
+      if (!t) return;                       // locked device: nothing to count yet
+      var hdrs = { 'Content-Type': 'application/json' }; hdrs[HEADER] = t;
+      _fetch(USAGE_URL, {
+        method: 'POST', headers: hdrs,
+        body: JSON.stringify({
+          app: USAGE_APP, feature: String(feature || 'open').trim(),
+          device_token: ls('mvfn_device_token'), actor_choice: ls(ACTOR_KEY)
+        })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  window.mvfnUsageHit = usageHit;
+
+  // One-time, non-blocking "who uses this device?" chip -- only when the server
+  // can't tell (no per-user device_token) and nobody has answered yet.
+  function askActor() {
+    if (!USAGE_APP || ls('mvfn_device_token') || ls(ACTOR_KEY) || !getTok()) return;
+    var bar = document.createElement('div');
+    bar.setAttribute('style', 'position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483646;' +
+      'background:#2d5016;color:#fff;border-radius:12px;padding:10px 12px;display:flex;gap:8px;' +
+      'align-items:center;font:14px system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.3)');
+    bar.innerHTML = '<span style="flex:1">Who uses this device?</span>';
+    ['Ian', 'Kerri'].forEach(function (name) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = name;
+      b.setAttribute('style', 'border:0;border-radius:8px;padding:8px 14px;background:#f5f0e8;' +
+        'color:#2d5016;font-weight:700;font-size:14px');
+      b.addEventListener('click', function () {
+        try { localStorage.setItem(ACTOR_KEY, name.toLowerCase()); } catch (e) {}
+        bar.remove();
+      });
+      bar.appendChild(b);
+    });
+    document.body.appendChild(bar);
+  }
+
+  if (USAGE_APP) {
+    usageHit('open');
+    var hiddenAt = 0;
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+      if (hiddenAt && Date.now() - hiddenAt >= 30 * 60 * 1000) usageHit('open');
+      hiddenAt = 0;
+    });
+    if (document.body) askActor();
+    else document.addEventListener('DOMContentLoaded', askActor);
   }
 
   // gate immediately on load when there's no token yet
