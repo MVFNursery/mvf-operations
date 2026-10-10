@@ -59,7 +59,15 @@
   .add input, .add select {
     width:100%; padding:9px 10px; border:1.5px solid var(--moss); border-radius:8px;
     font-family:inherit; font-size:.95rem; background:#fff; }
-  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  /* announce day: radio row; the date is resolved to the most recent such day */
+  .days { display:grid; grid-template-columns:repeat(8,1fr); gap:3px; }
+  .add .days label { margin:0; text-transform:none; letter-spacing:0; font-size:.9rem; color:var(--ink); }
+  .days input { position:absolute; opacity:0; width:auto; }
+  .days span { display:block; text-align:center; padding:8px 0; border:1.5px solid var(--moss);
+    border-radius:8px; background:#fff; cursor:pointer; }
+  .days input:checked + span { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:700; }
+  .days input:focus-visible + span { outline:2px solid var(--amber); outline-offset:1px; }
+  .annprev { font-size:.8rem; color:var(--moss); margin-top:4px; min-height:1em; }
   .add button.go { margin-top:12px; width:100%; padding:12px; border:0; border-radius:8px;
     background:var(--ink); color:#fff; font-family:inherit; font-size:1rem; font-weight:700; cursor:pointer; }
   .add button.go:disabled { opacity:.5; }
@@ -93,12 +101,22 @@
     <select id="f_game"></select>
     <label>Team</label>
     <select id="f_team"></select>
-    <div class="row2">
-      <div><label>Total guess</label>
-        <input type="number" id="f_total" min="0" max="150" inputmode="numeric"></div>
-      <div><label>Announced (optional)</label>
-        <input type="datetime-local" id="f_ann"></div>
+    <label>Total guess</label>
+    <input type="number" id="f_total" min="0" max="150" inputmode="numeric">
+    <label>Announced (optional) — day</label>
+    <div class="days" id="f_day">
+      <label><input type="radio" name="f_day" value="" checked><span>—</span></label>
+      <label><input type="radio" name="f_day" value="2"><span>Tue</span></label>
+      <label><input type="radio" name="f_day" value="3"><span>Wed</span></label>
+      <label><input type="radio" name="f_day" value="4"><span>Thu</span></label>
+      <label><input type="radio" name="f_day" value="5"><span>Fri</span></label>
+      <label><input type="radio" name="f_day" value="6"><span>Sat</span></label>
+      <label><input type="radio" name="f_day" value="0"><span>Sun</span></label>
+      <label><input type="radio" name="f_day" value="1"><span>Mon</span></label>
     </div>
+    <label>Time</label>
+    <input type="time" id="f_time">
+    <div class="annprev" id="f_annprev"></div>
     <button class="go" id="f_go" type="button">Save pick</button>
   </details>
 
@@ -263,7 +281,7 @@
     fillTeams();
     $('f_team').value = p.picked_abbr;
     $('f_total').value = p.total_guess;
-    $('f_ann').value = '';
+    clearAnn();
     $('addBox').open = true;
     banner('Editing ' + p.name + "'s week " + p.week + ' pick — change it and Save; you’ll be asked to confirm the replace');
     $('addBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -361,6 +379,37 @@
       : '<option value="">— pick a game first —</option>';
     if (g && (keep === g.away_abbr || keep === g.home_abbr)) ts.value = keep;
   }
+  // Announced = weekday radio + time; the date is the most recent such day on
+  // or before today (picks are entered as the texts arrive, never ahead).
+  // Returns {err} | {ms} | null (nothing entered = not recorded).
+  function annValue() {
+    var dayEl = document.querySelector('input[name="f_day"]:checked');
+    var day = dayEl ? dayEl.value : '';
+    var tm = $('f_time').value;
+    if (day === '' && !tm) return null;
+    if (day === '') return { err: 'Pick the day it was announced (or clear the time)' };
+    if (!tm) return { err: 'Announced time is required when a day is picked' };
+    var now = new Date();
+    var back = (now.getDay() - parseInt(day, 10) + 7) % 7;
+    var hm = tm.split(':');
+    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back,
+                     parseInt(hm[0], 10), parseInt(hm[1], 10));
+    return { ms: d.getTime() };
+  }
+  function showAnn() {
+    var a = annValue();
+    $('f_annprev').textContent = !a ? '' : a.err ? ''
+      : '→ ' + new Date(a.ms).toLocaleString([], { weekday:'short', month:'short', day:'numeric',
+                                                   hour:'numeric', minute:'2-digit' });
+  }
+  function clearAnn() {
+    document.querySelector('input[name="f_day"][value=""]').checked = true;
+    $('f_time').value = '';
+    showAnn();
+  }
+  $('f_day').addEventListener('change', showAnn);
+  $('f_time').addEventListener('input', showAnn);
+
   $('f_game').addEventListener('change', fillTeams);
   $('f_player').addEventListener('change', function () {
     $('newNameRow').style.display = this.value === '__new__' ? '' : 'none';
@@ -385,8 +434,9 @@
     var total = $('f_total').value.trim();
     if (!/^\d+$/.test(total)) { banner('Total guess is required (whole number)'); return; }
     payload.total_guess = parseInt(total, 10);
-    var ann = $('f_ann').value;
-    if (ann) payload.announced_at = new Date(ann).toISOString();
+    var ann = annValue();
+    if (ann && ann.err) { banner(ann.err); return; }
+    if (ann) payload.announced_at = new Date(ann.ms).toISOString();
 
     sendPick(payload);
   });
@@ -430,7 +480,7 @@
       $('f_newname').value = '';
       $('f_player').value = '';
       $('newNameRow').style.display = 'none';
-      $('f_ann').value = '';
+      clearAnn();
       load();
     }).catch(function (e) {
       if (e.code === 'duplicate_week' && e.existing) {
