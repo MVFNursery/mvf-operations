@@ -30,6 +30,8 @@
   var TOKEN_KEY = ds.tokenKey || 'mvfn_field_token';
   var VALIDATE_URL = ds.validateUrl || '';
   var HEADER = 'X-MVFN-Token';
+  var LEGACY_KEY = 'mvfn_device_token';   // Observe's per-user device id
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   // homelab only since 2026-08-17: megamachine's :5678/:5680 serve bridges are
   // RETIRED (they'd already been dead through the 8/17 MM tailnet outage, so
   // no cached-HTML device can still be working through them). If a stale
@@ -145,14 +147,40 @@
     setTimeout(function () { try { inp.focus(); } catch (e) {} }, 50);
   }
 
+  // ---- one-time key migration (10/14) ----
+  // Potting + Driving used to keep the Field Auth secret under mvfn_device_token,
+  // which is ALSO Observe's per-user device id, so each clobbered the other. They
+  // now use mvfn_field_token like every other Field Auth page. On any Field Auth
+  // page: if mvfn_device_token holds something that is not a UUID (Observe ids
+  // are), use it provisionally when this page has no token, and clear the old
+  // key only once the server accepts it. A UUID is never touched.
+  function migrateLegacy() {
+    if (TOKEN_KEY !== 'mvfn_field_token' || !VALIDATE_URL) return;
+    var old = ls(LEGACY_KEY);
+    if (!old || UUID_RE.test(old)) return;
+    var cur = getTok();
+    if (cur && cur !== old) return;          // a different value: not ours to move
+    if (!cur) setTok(old);                    // so this load's requests carry it
+    validateToken(old).then(function (r) {
+      if (r === 'ok') { if (ls(LEGACY_KEY) === old) try { localStorage.removeItem(LEGACY_KEY); } catch (e) {} }
+      else if (r === 'bad' && getTok() === old) {
+        setTok('');                           // not the secret: leave the old key alone
+        if (document.body) showOverlay();
+        else document.addEventListener('DOMContentLoaded', function () { showOverlay(); });
+      }
+      // 'unreachable': keep both; the next online load finishes it
+    });
+  }
+  try { migrateLegacy(); } catch (e) {}
+
   // ---- usage ping (opt-in per page via data-usage-app) ----
   var USAGE_APP = (ds.usageApp || '').trim();
   var USAGE_URL = (ds.usageUrl || 'https://homelab.taile865b6.ts.net:5678/webhook/mvfn-usage').trim();
   var ACTOR_KEY = 'mvfn_usage_actor';
   function ls(k) { try { return (localStorage.getItem(k) || '').trim(); } catch (e) { return ''; } }
-  // Per-user device id (Observe/Field). Potting + Driving keep the shared AUTH
-  // secret under the same key, so on those pages it is not a user id at all.
-  function userTok() { return TOKEN_KEY === 'mvfn_device_token' ? '' : ls('mvfn_device_token'); }
+  // Per-user device id (Observe/Field). Never send it if it is still the auth
+  // secret (a device that has not finished the key migration above).
+  function userTok() { var d = ls(LEGACY_KEY); return d && d !== getTok() ? d : ''; }
   function usageHit(feature) {
     if (!USAGE_APP) return;
     try {
