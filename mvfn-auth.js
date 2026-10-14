@@ -150,6 +150,9 @@
   var USAGE_URL = (ds.usageUrl || 'https://homelab.taile865b6.ts.net:5678/webhook/mvfn-usage').trim();
   var ACTOR_KEY = 'mvfn_usage_actor';
   function ls(k) { try { return (localStorage.getItem(k) || '').trim(); } catch (e) { return ''; } }
+  // Per-user device id (Observe/Field). Potting + Driving keep the shared AUTH
+  // secret under the same key, so on those pages it is not a user id at all.
+  function userTok() { return TOKEN_KEY === 'mvfn_device_token' ? '' : ls('mvfn_device_token'); }
   function usageHit(feature) {
     if (!USAGE_APP) return;
     try {
@@ -160,7 +163,7 @@
         method: 'POST', headers: hdrs,
         body: JSON.stringify({
           app: USAGE_APP, feature: String(feature || 'open').trim(),
-          device_token: ls('mvfn_device_token'), actor_choice: ls(ACTOR_KEY)
+          device_token: userTok(), actor_choice: ls(ACTOR_KEY)
         })
       }).catch(function () {});
     } catch (e) {}
@@ -170,7 +173,7 @@
   // One-time, non-blocking "who uses this device?" chip -- only when the server
   // can't tell (no per-user device_token) and nobody has answered yet.
   function askActor() {
-    if (!USAGE_APP || ls('mvfn_device_token') || ls(ACTOR_KEY) || !getTok()) return;
+    if (!USAGE_APP || userTok() || ls(ACTOR_KEY) || !getTok()) return;
     var bar = document.createElement('div');
     bar.setAttribute('style', 'position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483646;' +
       'background:#2d5016;color:#fff;border-radius:12px;padding:10px 12px;display:flex;gap:8px;' +

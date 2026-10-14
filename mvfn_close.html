@@ -10,7 +10,7 @@
 <link rel="manifest" href="close-manifest.json">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-close.svg">
 <title>MVFN Month Close</title>
-<script src="mvfn-auth.js" data-validate-url="https://homelab.taile865b6.ts.net:5678/webhook/mvfn-close-get"></script>
+<script src="mvfn-auth.js" data-validate-url="https://homelab.taile865b6.ts.net:5678/webhook/mvfn-close-get" data-usage-app="close"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:wght@400;600;700&display=swap" rel="stylesheet">
@@ -642,6 +642,10 @@
     });
   }
 
+  // Usage: does anyone follow a "Where to look" signal? (the card re-renders, so delegate)
+  document.addEventListener('click', e => {
+    if (e.target.closest && e.target.closest('#attention a') && window.mvfnUsageHit) window.mvfnUsageHit('attention_go');
+  });
   $('prevBtn').addEventListener('click', () => load(stepMonth(month, -1)));
   $('nextBtn').addEventListener('click', () => load(stepMonth(month, 1)));
   $('actorSel').addEventListener('change', () => localStorage.setItem('mvfn_close_actor', $('actorSel').value));
