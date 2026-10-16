@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3a5f">
+<link rel="manifest" href="hh-mail-manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-hh-mail.png">
+<title>Mail</title>
+<!-- Household mail attention page (hh 311). Plan: docs/mail_attention_page_plan.md in the infra
+     repo. This repo is PUBLIC: the page holds no mail, everything comes from the hh-mail API. -->
+<script src="mvfn-auth.js"
+        data-token-key="mvfn_household_token"
+        data-validate-url="https://homelab.taile865b6.ts.net:5680/webhook/hh-mail"></script>
+<style>
+:root {
+  --ink:#1f3a5f; --slate:#4a6584; --paper:#eef1f5; --card:#fbfcfe; --line:#d6dde6;
+  --text:#1b2533; --muted:#5d6b7c; --eyes:#9a5b12; --eyes-bg:#fbefdc; --file:#2d6a3f; --file-bg:#e3f0e6;
+  --held:#4a6584; --held-bg:#e6ecf3; --dot:#c2410c; --sheet:#ffffff; --focus:#2f6fb5; --red:#9b2c1f;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink:#0f1d2f; --slate:#9fb3cb; --paper:#15202e; --card:#1b2837; --line:#2b3a4c;
+  --text:#e5ebf2; --muted:#9aa8b8; --eyes:#f1b765; --eyes-bg:#3a2c17; --file:#86c99a; --file-bg:#1d3324;
+  --held:#a9bdd6; --held-bg:#22324a; --dot:#fb8a4c; --sheet:#1e2c3d; --focus:#7fb0ea; --red:#e0877a; color-scheme:dark } }
+:root[data-theme="dark"] {
+  --ink:#0f1d2f; --slate:#9fb3cb; --paper:#15202e; --card:#1b2837; --line:#2b3a4c;
+  --text:#e5ebf2; --muted:#9aa8b8; --eyes:#f1b765; --eyes-bg:#3a2c17; --file:#86c99a; --file-bg:#1d3324;
+  --held:#a9bdd6; --held-bg:#22324a; --dot:#fb8a4c; --sheet:#1e2c3d; --focus:#7fb0ea; --red:#e0877a; color-scheme:dark }
+* { box-sizing:border-box; }
+html, body { margin:0; }
+body { background:var(--paper); color:var(--text); font-family:var(--sans); font-variant-numeric:tabular-nums lining-nums;
+  font-size:15px; line-height:1.35; padding-bottom:env(safe-area-inset-bottom,0px); }
+.wrap { max-width:480px; margin:0 auto; padding-bottom:40px; }
+header { background:var(--ink); color:#fff; padding:calc(12px + env(safe-area-inset-top,0px)) 16px 16px; position:sticky; top:0; z-index:5; }
+header .top { display:flex; align-items:center; gap:8px; }
+header h1 { font-size:17px; margin:0; font-weight:650; }
+header .upd { font-size:12px; opacity:.75; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+header .upd.stale { opacity:1; color:#ffd19a; }
+header select, header .hb { border:0; border-radius:6px; padding:4px 8px; font:inherit; font-size:12.5px;
+  background:rgba(255,255,255,.14); color:#fff; cursor:pointer; }
+header select option { color:#000; }
+.verdict { margin-top:10px; display:flex; align-items:baseline; gap:10px; }
+.verdict .n { font-size:40px; font-weight:700; line-height:1; }
+.verdict .what { font-size:16px; font-weight:600; }
+.verdict .sub { font-size:12.5px; opacity:.8; margin-top:3px; }
+.tabs { display:flex; gap:6px; margin-top:14px; }
+.tab { flex:1; border:0; border-radius:8px; padding:8px 4px; background:rgba(255,255,255,.12); color:#fff; font:inherit; font-size:14px;
+  cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:1px; }
+.tab b { font-size:17px; }
+.tab small { font-size:11px; opacity:.8; }
+.tab[aria-selected="true"] { background:#fff; color:#1f3a5f; }
+.tab:focus-visible, button:focus-visible, a:focus-visible, select:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+.hint { font-size:12.5px; color:var(--muted); padding:10px 16px 4px; }
+.hint.pend { color:var(--file); }
+.empty { padding:28px 16px; text-align:center; color:var(--muted); }
+.banner { margin:10px 16px 0; padding:9px 12px; border-radius:8px; background:var(--red); color:#fff; font-size:13.5px; }
+ul.list { list-style:none; margin:0; padding:0; }
+.row { display:flex; gap:10px; padding:11px 16px; border-bottom:1px solid var(--line); background:var(--card); color:inherit; text-decoration:none; }
+a.row:active { background:var(--paper); }
+.dotcol { width:8px; flex:none; padding-top:7px; }
+.dotcol i { display:block; width:8px; height:8px; border-radius:50%; background:var(--dot); }
+.row .body, .grp .head .body { flex:1; min-width:0; }
+.l1 { display:flex; gap:8px; align-items:baseline; }
+.who { font-weight:650; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.when { font-size:12.5px; color:var(--muted); flex:none; }
+.subj { margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.addr { font-size:12.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.why { font-size:12.5px; color:var(--muted); margin-top:3px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.count { display:inline-block; font-size:11.5px; font-weight:650; padding:1px 7px; border-radius:10px; background:var(--held-bg); color:var(--held); margin-left:4px; vertical-align:1px; }
+.pkg { background:var(--file-bg); color:var(--file); }
+.grp { background:var(--card); border-bottom:1px solid var(--line); }
+.grp .head { display:flex; gap:10px; padding:12px 16px 6px; }
+.grp .acts { display:flex; gap:8px; padding:4px 16px 12px 34px; flex-wrap:wrap; }
+.grp details summary { list-style:none; cursor:pointer; font-size:12.5px; color:var(--slate); padding:0 16px 10px 34px; }
+.grp details summary::-webkit-details-marker { display:none; }
+.grp details .row { padding-left:34px; background:transparent; border-bottom:0; border-top:1px dashed var(--line); }
+.grp > .row { border-bottom:0; }
+.note { font-size:12.5px; color:var(--file); padding:0 16px 12px 34px; }
+.note.kept { color:var(--muted); }
+.kept { opacity:.6; }
+.btn { border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:8px; padding:8px 12px; font:inherit; font-size:13.5px; cursor:pointer; }
+.btn.go { background:var(--ink); color:#fff; border-color:var(--ink); }
+.btn[disabled] { opacity:.55; cursor:wait; }
+:root[data-theme="dark"] .btn.go { background:var(--focus); border-color:var(--focus); color:#0d1724; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.go { background:var(--focus); border-color:var(--focus); color:#0d1724; } }
+.scrim { position:fixed; inset:0; background:rgba(10,18,30,.45); z-index:20; display:flex; align-items:flex-end; justify-content:center; }
+.sheet { background:var(--sheet); width:100%; max-width:480px; border-radius:14px 14px 0 0; padding:16px 16px calc(18px + env(safe-area-inset-bottom,0px));
+  display:flex; flex-direction:column; gap:12px; }
+.sheet h2 { margin:0; font-size:17px; overflow-wrap:anywhere; }
+.sheet .q { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:650; }
+.opt { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--line); border-radius:10px; cursor:pointer; }
+.opt input { margin-top:3px; }
+.opt small { display:block; color:var(--muted); font-size:12.5px; }
+.sheet .acts { display:flex; gap:8px; justify-content:flex-end; }
+.toast { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(18px + env(safe-area-inset-bottom,0px)); background:var(--text); color:var(--paper);
+  padding:10px 14px; border-radius:10px; font-size:13.5px; z-index:30; max-width:calc(100% - 32px); }
+.reader { position:fixed; inset:0; background:var(--card); z-index:15; display:flex; flex-direction:column; padding-top:env(safe-area-inset-top,0px);
+  width:100%; max-width:480px; margin:0 auto; }
+.rbar { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--line); }
+.rclock { margin-left:auto; font-size:12.5px; color:var(--muted); }
+.rhead { padding:12px 16px 10px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:4px; }
+.rhead .rwho { font-weight:650; overflow-wrap:anywhere; }
+.rhead .rwho span { font-weight:400; font-size:12.5px; color:var(--muted); }
+.rhead h2 { margin:0; font-size:18px; line-height:1.25; text-wrap:balance; overflow-wrap:anywhere; }
+.rmeta, .rwhy { font-size:12.5px; color:var(--muted); }
+.v-eyes { color:var(--eyes); font-weight:650; } .v-file { color:var(--file); font-weight:650; } .v-held { color:var(--held); font-weight:650; }
+.rbody { flex:1; overflow-y:auto; padding:14px 16px 20px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:15.5px; line-height:1.5; }
+.rbody a { color:var(--focus); }
+.cut { color:var(--muted); font-size:13px; font-style:italic; }
+.rfoot { display:flex; gap:8px; flex-wrap:wrap; padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px)); border-top:1px solid var(--line); }
+.rfoot a.btn { text-decoration:none; }
+@media (prefers-reduced-motion: no-preference) { .sheet { animation: up .18s ease-out; } @keyframes up { from { transform:translateY(30px); opacity:.6 } } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <h1>Mail</h1><span class="upd" id="upd">loading…</span>
+      <select id="user" aria-label="Who is reading"><option value="ian">Ian</option><option value="kerri">Kerri</option></select>
+      <button class="hb" onclick="load()">Refresh</button>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+  </header>
+  <div id="banner"></div>
+  <div id="list"><div class="empty">Loading…</div></div>
+</div>
+<div id="overlay"></div>
+
+<script>
+var API = 'https://homelab.taile865b6.ts.net:5680/webhook/hh-mail';
+var D = { lines: [], pending: [] }, loadedAt = 0;
+var S = { tab: 'eyes', kept: {}, seen: {} };   // seen: opened on this phone since the last load
+var R = null;                                  // the open reader session
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function ls(k, v){ try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+function user(){ return $('user').value; }
+function toast(msg){ var t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 4200); }
+function gmail(id){ try { return 'https://mail.google.com/mail/u/0/#all/' + BigInt(id).toString(16); } catch (e) { return 'https://mail.google.com/'; } }
+// registrable domain, the same rule as mail_attend.py (last two labels)
+function domainOf(a){ var d = (a || '').split('@')[1] || ''; var m = d.match(/([^.]+\.[^.]+)$/); return m ? m[1] : d; }
+function who(r){ return r.from_name || r.from_addr || '?'; }
+function at(r){ return new Date(r.received_at); }
+function when(d){
+  var now = new Date(), day = function(x){ return new Date(x.getFullYear(), x.getMonth(), x.getDate()); };
+  var diff = Math.round((day(now) - day(d)) / 864e5);
+  if (diff === 0) return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  if (diff === 1) return 'Yesterday';
+  if (diff < 7) return d.toLocaleDateString([], {weekday:'short'});
+  return d.toLocaleDateString([], {month:'short', day:'numeric'});
+}
+// new = never opened in the page, or marked unread since (the same on every phone)
+function isNew(r){ if (S.seen[r.message_pk]) return false; return r.last_event === '' || r.last_event === 'unread'; }
+
+function groupBy(list){ var g = [], ix = {}; list.forEach(function(r){ var k = r.from_addr || '?';
+  if (!(k in ix)) { ix[k] = g.length; g.push([]); } g[ix[k]].push(r); }); return g; }
+
+function rowHtml(r, extra){
+  return '<li><a class="row" href="#" data-open="' + r.message_pk + '">' +
+    '<span class="dotcol">' + (isNew(r) ? '<i title="new"></i>' : '') + '</span>' +
+    '<span class="body"><span class="l1"><span class="who">' + esc(who(r)) + (extra || '') + '</span><span class="when">' + esc(when(at(r))) + '</span></span>' +
+    '<div class="subj">' + esc(r.subject || '(no subject)') + '</div>' +
+    (r.reason ? '<div class="why">' + esc(r.reason) + '</div>' : '') + '</span></a></li>';
+}
+
+function renderEyes(list){
+  if (!list.length) return '<div class="empty">Nothing to look at. Held mail waits in the next tab.</div>';
+  return '<ul class="list">' + groupBy(list).map(function(g){
+    var top = g[0]; if (g.length === 1) return rowHtml(top);
+    return '<li class="grp">' + rowHtml(top, ' <span class="count">' + g.length + '</span>').replace(/^<li>|<\/li>$/g, '') +
+      '<details><summary>' + (g.length - 1) + ' earlier from ' + esc(who(top)) + (g.slice(1).some(isNew) ? ' · new' : '') + '</summary><ul class="list">' +
+      g.slice(1).map(function(r){ return rowHtml(r); }).join('') + '</ul></details></li>';
+  }).join('') + '</ul>';
+}
+
+function renderFile(list){
+  if (!list.length) return '<div class="empty">Nothing filed in the last 30 days.</div>';
+  return '<ul class="list">' + list.map(function(r){
+    return rowHtml(r, r.notices > 1 ? ' <span class="count pkg">' + r.notices + ' notices</span>' : '');
+  }).join('') + '</ul>';
+}
+
+function heldGroup(g, pending){
+  var top = g[0], from = top.from_addr, kept = !pending && S.kept[from];
+  var subjects = [];
+  g.forEach(function(r){ if (subjects.indexOf(r.subject) < 0) subjects.push(r.subject); });
+  var head = '<div class="head"><span class="dotcol">' + (g.some(isNew) ? '<i></i>' : '') + '</span>' +
+    '<span class="body"><span class="l1"><span class="who">' + esc(who(top)) + (g.length > 1 ? ' <span class="count">' + g.length + '</span>' : '') +
+    '</span><span class="when">' + esc(when(at(top))) + '</span></span>' +
+    '<div class="addr">' + esc(from) + '</div>' +
+    '<div style="margin-top:2px">' + subjects.slice(0, 2).map(function(s){ return esc(s || '(no subject)'); }).join(' · ') + (subjects.length > 2 ? ' …' : '') + '</div>' +
+    (top.reason ? '<div class="why">' + esc(top.reason) + '</div>' : '') + '</span></div>';
+  var acts = pending ? '<div class="note">Re-sorting under your new rule at the next mail check (every 15 min).</div>'
+    : kept ? '<div class="note kept">Kept holding on this phone. <a href="#" data-unkeep="' + esc(from) + '">Undo</a></div>'
+    : '<div class="acts"><button class="btn go" data-let="' + esc(from) + '">Let them through</button><button class="btn" data-keep="' + esc(from) + '">Keep holding</button></div>';
+  var more = '<details><summary>Read ' + (g.length === 1 ? 'it' : 'the ' + g.length + ' messages') + '</summary><ul class="list">' +
+    g.map(function(r){ return rowHtml(r); }).join('') + '</ul></details>';
+  return '<li class="grp' + (kept ? ' kept' : '') + '">' + head + acts + more + '</li>';
+}
+
+function renderHeld(list){
+  var groups = groupBy(list);
+  // kept senders sink to the bottom, otherwise newest first
+  groups.sort(function(a, b){ return (S.kept[a[0].from_addr] ? 1 : 0) - (S.kept[b[0].from_addr] ? 1 : 0); });
+  var pend = groupBy(D.pending);
+  var html = '';
+  if (pend.length) html += '<div class="hint pend">Re-sorting (' + D.pending.length + ')</div><ul class="list">' +
+    pend.map(function(g){ return heldGroup(g, true); }).join('') + '</ul>';
+  if (!groups.length) return html + '<div class="empty">Nothing held.</div>';
+  return html + (pend.length ? '<div class="hint">Held</div>' : '') + '<ul class="list">' + groups.map(function(g){ return heldGroup(g, false); }).join('') + '</ul>';
+}
+
+function render(){
+  var by = { eyes: [], file: [], held: [] };
+  D.lines.forEach(function(r){ (by[r.verdict] || by.held).push(r); });
+  var newE = by.eyes.filter(isNew).length, newH = by.held.filter(isNew).length, newF = by.file.filter(isNew).length;
+  $('verdict').innerHTML = '<span class="n">' + newE + '</span><div><div class="what">' + (newE ? 'new to look at' : 'Nothing needs you') + '</div>' +
+    '<div class="sub">' + newH + ' new held · ' + newF + ' new filed' + (D.pending.length ? ' · ' + D.pending.length + ' re-sorting' : '') + '</div></div>';
+  var label = { eyes: 'Eyes', held: 'Held', file: 'File' };
+  var sub = { eyes: 'look soon', held: groupBy(by.held).length + ' senders', file: 'for the record' };
+  $('tabs').innerHTML = ['eyes', 'held', 'file'].map(function(k){
+    return '<button class="tab" role="tab" aria-selected="' + (S.tab === k) + '" data-tab="' + k + '"><b>' + by[k].length + '</b>' + label[k] + '<small>' + sub[k] + '</small></button>';
+  }).join('');
+  var hint = { eyes: 'Look soon. Tap a line to read it here.',
+    held: 'Read when you have time. Nothing here is junk. One choice per sender.',
+    file: 'Kept for the record. Never needs reading.' }[S.tab];
+  $('list').innerHTML = '<div class="hint">' + hint + '</div>' +
+    (S.tab === 'eyes' ? renderEyes(by.eyes) : S.tab === 'file' ? renderFile(by.file) : renderHeld(by.held));
+}
+
+function freshness(){
+  // A feed run that finds nothing writes nothing, so this is "newest mail loaded", not "last check".
+  var t = D.last_mail_loaded ? new Date(D.last_mail_loaded) : null;
+  if (!t) { $('upd').textContent = 'no mail loaded yet'; return; }
+  var hrs = (Date.now() - t) / 36e5;
+  $('upd').textContent = 'newest mail ' + when(t) + (when(t).indexOf(':') < 0 ? ' ' + t.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) : '');
+  $('upd').className = 'upd' + (hrs > 12 ? ' stale' : '');
+  $('upd').title = hrs > 12 ? 'No new mail loaded for ' + Math.round(hrs) + ' h. The feed alerts on ntfy if it is failing.' : '';
+}
+
+function load(){
+  return fetch(API, { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(j){
+    if (j.status !== 'ok') throw new Error(j.message || 'load failed');
+    D = j; S.seen = {}; loadedAt = Date.now();
+    $('banner').innerHTML = '';
+    freshness(); render();
+  }).catch(function(e){
+    $('banner').innerHTML = '<div class="banner">Could not load mail (' + esc(e.message || 'network') + '). Check Tailscale, then Refresh.</div>';
+  });
+}
+
+// ── reader ───────────────────────────────────────────────────────────────
+// Text only, never the sender's HTML: no remote images load, so tracking pixels never fire.
+// Long tracking links shrink to "<domain> link"; [text](url) shows its text.
+function tidy(s){
+  // marketing mail pads with nbsp and zero-width characters; a line of only those is blank
+  var out = esc(String(s || '').replace(/\r/g, '').replace(/[ ͏​-‍⁠﻿]/g, ' '))
+    .replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+  out = out.replace(/\[([^\]\n]*)\]\((https?:[^)\s]+)\)/g, function(_, t, u){ t = t.replace(/^\s*\[|\]\s*$/g, '').trim();
+    return t ? '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + t + '</a>' : ''; });
+  out = out.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, function(_, p, u){
+    var short = u.length > 45 ? u.replace(/^https?:\/\/([^\/]+).*$/, '$1') + ' link' : u;
+    return p + '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + short + '</a>'; });
+  return out.replace(/^\s*\[[^\]\n]*\]\s*$|^\s*\]\(.*\)\s*$|^\s*[\[\]]\s*$/gm, '').replace(/\n{3,}/g, '\n\n');
+}
+function fmt(s){ return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+function findLine(pk){
+  pk = +pk;
+  return D.lines.filter(function(x){ return x.message_pk === pk; })[0] || D.pending.filter(function(x){ return x.message_pk === pk; })[0];
+}
+
+function openReader(pk){
+  var r = findLine(pk); if (!r) return;
+  var v = r.verdict || 'pending';
+  R = { pk: r.message_pk, secs: 0, lastTouch: Date.now(), end: false, orig: false, sent: false };
+  $('overlay').innerHTML = '<div class="reader" role="dialog" aria-label="Message">' +
+    '<div class="rbar"><button class="btn" id="rclose">‹ Back</button><span id="rclock" class="rclock">reading 0:00</span></div>' +
+    '<div class="rhead"><div class="rwho">' + esc(who(r)) + ' <span>' + esc(r.from_addr) + '</span></div>' +
+    '<h2>' + esc(r.subject || '(no subject)') + '</h2><div class="rmeta">' +
+    esc(at(r).toLocaleString([], {weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})) +
+    ' · <span class="v-' + esc(v) + '">' + esc(v) + '</span></div>' + (r.reason ? '<div class="rwhy">' + esc(r.reason) + '</div>' : '') + '</div>' +
+    '<div class="rbody" id="rbody"><span class="cut">Loading the message…</span></div>' +
+    '<div class="rfoot"><button class="btn" id="runread">Mark unread</button>' +
+    '<a class="btn" id="rorig" href="' + gmail(r.gmail_msgid) + '" target="_blank" rel="noopener noreferrer">Open original in Gmail ↗</a>' +
+    (r.verdict === 'held' ? '<button class="btn go" data-let="' + esc(r.from_addr) + '">Let them through</button>' : '') + '</div></div>';
+  S.seen[r.message_pk] = 1;
+  var body = $('rbody');
+  fetch(API + '?message_pk=' + r.message_pk, { cache: 'no-store' }).then(function(x){ return x.json(); }).then(function(j){
+    if (!R || R.pk !== r.message_pk) return;
+    if (j.status !== 'ok') throw new Error(j.message);
+    var txt = j.body_text ? tidy(j.body_text) : '<span class="cut">This message has no text part.</span>';
+    if (j.body_len > (j.body_text || '').length) txt += '\n\n<span class="cut">… showing the first ' + j.body_text.length.toLocaleString() + ' of ' + j.body_len.toLocaleString() + ' characters. The rest is in the original.</span>';
+    if (j.attachment_count) txt += '\n\n<span class="cut">' + j.attachment_count + ' attachment' + (j.attachment_count > 1 ? 's' : '') + ': open the original to see ' + (j.attachment_count > 1 ? 'them' : 'it') + '.</span>';
+    body.innerHTML = txt;
+    checkEnd();
+  }).catch(function(e){ body.innerHTML = '<span class="cut">Could not load the text (' + esc(e.message || 'network') + '). The original is one tap below.</span>'; });
+  body.addEventListener('scroll', function(){ touch(); checkEnd(); }, { passive: true });
+  $('rclose').onclick = function(){ closeReader('read'); };
+  $('runread').onclick = function(){ closeReader('unread'); };
+  $('rorig').addEventListener('click', function(){ if (R) R.orig = true; });
+  R.timer = setInterval(function(){
+    // the clock runs only while the reader is on screen and in use
+    if (document.visibilityState === 'visible' && Date.now() - R.lastTouch < 90000) { R.secs++; $('rclock').textContent = 'reading ' + fmt(R.secs); }
+    else $('rclock').textContent = 'paused ' + fmt(R.secs);
+  }, 1000);
+  render();
+}
+function touch(){ if (R) R.lastTouch = Date.now(); }
+function checkEnd(){ var b = $('rbody'); if (R && b && b.scrollTop + b.clientHeight >= b.scrollHeight - 24) R.end = true; }
+
+function sendEvent(action, keepalive){
+  if (!R || R.sent) return;
+  R.sent = true;
+  var body = { action: action, message_pk: R.pk, user: user(), seconds_visible: R.secs, reached_end: R.end, opened_original: R.orig };
+  return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: !!keepalive })
+    .then(function(x){ return x.json(); })
+    .then(function(j){ if (j.status !== 'ok') toast('Read log not saved: ' + (j.message || 'error')); })
+    .catch(function(){ if (!keepalive) toast('Read log not saved (network).'); });
+}
+function closeReader(action){
+  if (!R) return;
+  var pk = R.pk;
+  clearInterval(R.timer);
+  sendEvent(action);
+  var r = findLine(pk);
+  if (r) r.last_event = action;
+  if (action === 'unread') { delete S.seen[pk]; toast('Marked unread here. Gmail is not touched.'); }
+  R = null;
+  $('overlay').innerHTML = '';
+  render();
+}
+
+// ── let through ──────────────────────────────────────────────────────────
+function openSheet(from){
+  var d = domainOf(from);
+  var n = D.lines.filter(function(r){ return r.from_addr === from && r.verdict === 'held'; }).length;
+  var sib = {}; D.lines.forEach(function(r){ if (r.verdict === 'held' && domainOf(r.from_addr) === d) sib[r.from_addr] = 1; });
+  var nsib = Object.keys(sib).length;
+  $('overlay').innerHTML = '<div class="scrim" id="scrim"><form class="sheet" id="sheet">' +
+    '<h2>Let ' + esc(from) + ' through</h2>' +
+    '<div class="q">Who</div>' +
+    '<label class="opt"><input type="radio" name="who" value="address" checked><span>Just this address<small>' + esc(from) + ' · ' + n + ' held message' + (n === 1 ? '' : 's') + '</small></span></label>' +
+    '<label class="opt"><input type="radio" name="who" value="domain"><span>Everyone at ' + esc(d) + '<small>' + nsib + ' held sender' + (nsib === 1 ? '' : 's') + ' from ' + esc(d) + ' right now</small></span></label>' +
+    '<div class="q">As</div>' +
+    '<label class="opt"><input type="radio" name="as" value="establishment" checked><span>A person or place I deal with<small>Everything from them goes to Eyes.</small></span></label>' +
+    '<label class="opt"><input type="radio" name="as" value="vendor"><span>A vendor<small>Receipts, bills and security go to Eyes; shipping and payment confirmations go to File; marketing stays held.</small></span></label>' +
+    '<div class="acts"><button type="button" class="btn" id="cancel">Cancel</button><button type="submit" class="btn go" id="letgo">Let through</button></div>' +
+    '</form></div>';
+  $('cancel').onclick = function(){ $('overlay').innerHTML = ''; };
+  $('scrim').onclick = function(e){ if (e.target.id === 'scrim') $('overlay').innerHTML = ''; };
+  $('sheet').onsubmit = function(e){
+    e.preventDefault();
+    var f = e.target, matchOn = f.who.value, rule = f.as.value;
+    var value = (matchOn === 'domain' ? d : from).trim();
+    $('letgo').disabled = true; $('letgo').textContent = 'Saving…';
+    fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'let_through', match_on: matchOn, match_value: value, rule: rule, user: user() }) })
+    .then(function(x){ return x.json(); })
+    .then(function(j){
+      $('overlay').innerHTML = '';
+      if (j.status !== 'ok') { toast(j.message || 'Not saved.'); return; }
+      var n = j.result.resorting;
+      toast('Saved. ' + (n ? n + ' message' + (n === 1 ? '' : 's') + ' re-sort' + (n === 1 ? 's' : '') + ' at the next mail check (every 15 min).' : 'Their next mail is sorted under the new rule.'));
+      load();
+    })
+    .catch(function(){ $('letgo').disabled = false; $('letgo').textContent = 'Let through'; toast('Not saved (network). Try again.'); });
+  };
+}
+
+document.addEventListener('click', function(e){
+  var o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); openReader(o.dataset.open); return; }
+  var t = e.target.closest('[data-tab],[data-let],[data-keep],[data-unkeep]'); if (!t) return;
+  if (t.dataset.tab) { S.tab = t.dataset.tab; ls('hh_mail_tab', S.tab); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.let) { if (R) closeReader('read'); openSheet(t.dataset.let); return; }
+  if (t.dataset.keep) { S.kept[t.dataset.keep] = 1; ls('hh_mail_kept', JSON.stringify(S.kept)); render(); return; }
+  if (t.dataset.unkeep) { e.preventDefault(); delete S.kept[t.dataset.unkeep]; ls('hh_mail_kept', JSON.stringify(S.kept)); render(); }
+});
+['touchstart', 'pointerdown', 'keydown', 'wheel'].forEach(function(ev){ document.addEventListener(ev, touch, { passive: true }); });
+// swiping the app away still logs the read (keepalive fetch: sendBeacon can't carry the auth header)
+window.addEventListener('pagehide', function(){ if (R) { clearInterval(R.timer); sendEvent('read', true); } });
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'visible') { touch(); if (!R && Date.now() - loadedAt > 60000) load(); }
+});
+// while something is re-sorting, check back every minute
+setInterval(function(){ if (!R && D.pending.length && document.visibilityState === 'visible') load(); }, 60000);
+
+$('user').value = ls('hh_mail_user') === 'kerri' ? 'kerri' : 'ian';
+$('user').onchange = function(){ ls('hh_mail_user', user()); };
+S.tab = ['eyes', 'held', 'file'].indexOf(ls('hh_mail_tab')) >= 0 ? ls('hh_mail_tab') : 'eyes';
+try { S.kept = JSON.parse(ls('hh_mail_kept') || '{}') || {}; } catch (e) { S.kept = {}; }
+load();
+</script>
+</body>
+</html>
