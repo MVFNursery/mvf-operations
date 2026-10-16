@@ -259,7 +259,7 @@ function load(){
 // Long tracking links shrink to "<domain> link"; [text](url) shows its text.
 function tidy(s){
   // marketing mail pads with nbsp and zero-width characters; a line of only those is blank
-  var out = esc(String(s || '').replace(/\r/g, '').replace(/[ ͏​-‍⁠﻿]/g, ' '))
+  var out = esc(String(s || '').replace(/\r/g, '').replace(/[\u00a0\u034f\u200b-\u200d\u2060\ufeff]/g, ' '))
     .replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
   out = out.replace(/\[([^\]\n]*)\]\((https?:[^)\s]+)\)/g, function(_, t, u){ t = t.replace(/^\s*\[|\]\s*$/g, '').trim();
     return t ? '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + t + '</a>' : ''; });
