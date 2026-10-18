@@ -250,6 +250,7 @@
   .rmodal-card {
     background: white; border: 2px solid #2d3319; border-radius: 14px 14px 0 0;
     padding: 20px 20px 26px; width: 100%; max-width: 640px;
+    max-height: 92vh; overflow-y: auto;            /* eight reasons + note must fit a phone */
     box-shadow: 0 -8px 30px rgba(0,0,0,0.2);
     animation: toastpop .15s ease-out;
   }
@@ -763,8 +764,10 @@
     updateDelta();
 
     // Save count. Unchanged count -> plain set_qty (a "verified today" record).
-    // Changed count -> reason modal first (moved / culled / new / recount / other),
-    // which saves via adjust_qty and can mirror a move onto the counterpart row.
+    // Changed count -> reason modal first (planted out / sold for cash / moved / culled /
+    // given away / recount / other), which saves via adjust_qty and can mirror a move
+    // onto the counterpart row. The server refuses set_qty when the count differs
+    // (V197), so a stale card can never write a reason-less count-down.
     card.querySelector('[data-act="count"]').addEventListener('click', async () => {
       const val = countInput.value.trim();
       const n = parseInt(val, 10);
@@ -784,7 +787,13 @@
       }
       btn.disabled = true; setMsg('Saving…', 'saving');
       try {
-        await postAction({ action: 'set_qty', stock_id: stockId, quantity: n });
+        const data = await postAction({ action: 'set_qty', stock_id: stockId, quantity: n });
+        const r = (data && data.result) || {};
+        if (r.applied === false) {
+          setMsg(`✗ ${r.error || 'count changed elsewhere'}`, 'err');
+          await load();                              // pick the reason against the real count
+          return;
+        }
         s.quantity = n;
         updateDelta();
         setMsg('✓ saved', 'ok');
@@ -1187,6 +1196,16 @@
 
   function sideName(status) { return status === 'for-sale' ? 'retail' : 'nursery'; }
 
+  // The note box lives in rmDetail for every reason; one-tap reasons take whatever is in
+  // it, Other requires it. Trimmed here and again on the server (house rule).
+  function noteBox(placeholder, value) {
+    return `<textarea rows="2" placeholder="${esc(placeholder)}">${esc(value || '')}</textarea>`;
+  }
+  function currentNote() {
+    const el = $('rmDetail').querySelector('textarea');
+    return el ? el.value.trim() : '';
+  }
+
   function openReasonModal(s, newQty, { onSaved }) {
     const sp = speciesById[speciesKey(s.species_id)] || {};
     const oldQty = Number(s.quantity ?? 0);
@@ -1200,16 +1219,22 @@
       `${sideName(s.status)} · ${oldQty} → ${newQty} (${delta > 0 ? '+' : ''}${delta})`;
     $('rmQ').textContent = 'What happened?';       // the close-out modal reuses this dialog
     $('rmMsg').textContent = '';
-    $('rmDetail').innerHTML = '';
+    $('rmDetail').innerHTML = noteBox('Note (optional)');
     $('rmConfirm').style.display = 'none';
 
-    // One-tap options; cull/recount/new save immediately, move/other need Confirm.
+    // One-tap options save immediately (with whatever is in the note box); move / cash /
+    // other need Confirm; "potted up" is not a count change here, it belongs to the
+    // Potting Bench, which writes the pot_up pair.
     const opts = delta < 0
       ? [
-          { key: 'transfer', label: `Moved to ${sideName(otherStatus)}` },
-          { key: 'cull',     label: 'Culled' },
-          { key: 'recount',  label: 'Recount / correction' },
-          { key: 'other',    label: 'Other…' },
+          { key: 'planted_out', label: 'Planted on our property' },
+          { key: 'cash',        label: 'Sold for cash' },
+          { key: 'transfer',    label: `Moved to ${sideName(otherStatus)}` },
+          { key: 'cull',        label: 'Culled' },
+          { key: 'given_away',  label: 'Given away' },
+          { key: 'potted',      label: 'Potted up / divided' },
+          { key: 'recount',     label: 'Miscount / recount' },
+          { key: 'other',       label: 'Other…' },
         ]
       : [
           { key: 'new',      label: 'New stock (in / potted up / divided)' },
@@ -1222,11 +1247,17 @@
       `<button type="button" data-reason="${o.key}">${esc(o.label)}</button>`).join('');
 
     let chosen = null;
+    const ONE_TAP = ['cull', 'recount', 'new', 'planted_out', 'given_away'];
 
     async function submit(reason) {
       const payload = { action: 'adjust_qty', stock_id: s.stock_id, quantity: newQty, reason };
-      const noteEl = $('rmDetail').querySelector('textarea');
-      if (noteEl && noteEl.value.trim()) payload.notes = noteEl.value.trim();
+      const note = currentNote();
+      if (reason === 'other' && !note) { $('rmMsg').textContent = 'Say what happened — a note is required for Other'; return; }
+      if (note) payload.notes = note;
+      if (reason === 'cash') {
+        const priceEl = $('rmDetail').querySelector('input.sprice');
+        if (priceEl && priceEl.value.trim()) payload.sale_price = priceEl.value.trim();
+      }
       if (reason === 'transfer') {
         if (cp) payload.target_stock_id = cp.stock_id;
         else {
@@ -1238,7 +1269,14 @@
       }
       setModalBusy(true);
       try {
-        await postAction(payload);
+        const data = await postAction(payload);
+        const r = (data && data.result) || {};
+        if (r.applied === false) {                     // server-side gate (V197)
+          setModalBusy(false);
+          $('rmMsg').textContent = `✗ ${r.error || 'not saved'}`;
+          if (r.error && /changed|not found/.test(r.error)) { closeReasonModal(); await load(); }
+          return;
+        }
         closeReasonModal();
         onSaved();
         if (reason === 'transfer') {
@@ -1259,6 +1297,18 @@
 
     function showDetail(reason) {
       const det = $('rmDetail');
+      const keep = currentNote();
+      if (reason === 'potted') {
+        det.innerHTML = `<div class="preview warn">Pot-ups and divisions are recorded at the <a href="mvfn_potting.html">Potting Bench</a>, which moves the plants into their new pots. Nothing is saved here.</div>`;
+        return false;
+      }
+      if (reason === 'cash') {
+        const dflt = s.price_per_unit != null ? String(s.price_per_unit) : '';
+        det.innerHTML = `<div class="preview">${Math.abs(delta)} sold for cash · writes a sale, not a cull</div>`
+          + `<input class="sprice" type="number" inputmode="decimal" step="0.01" min="0" value="${esc(dflt)}" placeholder="Price each (blank = house price)">`
+          + noteBox('Note (optional): who / where', keep);
+        return true;
+      }
       if (reason === 'transfer') {
         const moving = Math.abs(delta);
         if (cp) {
@@ -1273,7 +1323,8 @@
           det.innerHTML = `<div class="preview">No ${esc(sideName(otherStatus))} entry yet — one will be created (+${moving})</div>`
             + (otherStatus === 'for-sale'
               ? `<input class="rprice" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Price (optional)">`
-              : '');
+              : '')
+            + noteBox('Note (optional)', keep);
         } else {
           det.innerHTML = `<div class="preview warn">No ${esc(sideName(otherStatus))} entry for this species + container — nothing to move from. Pick another reason, or fix that side first.</div>`;
           $('rmConfirm').style.display = 'none';
@@ -1282,10 +1333,11 @@
         return true;
       }
       if (reason === 'other') {
-        det.innerHTML = `<textarea rows="2" placeholder="What happened?"></textarea>`;
+        det.innerHTML = noteBox('What happened? (required)', keep);
+        det.querySelector('textarea').focus();
         return true;
       }
-      det.innerHTML = '';
+      det.innerHTML = noteBox('Note (optional)', keep);
       return true;
     }
 
@@ -1295,7 +1347,7 @@
         chosen = reason;
         $('rmOpts').querySelectorAll('button').forEach(b => b.classList.toggle('sel', b === btn));
         $('rmMsg').textContent = '';
-        if (reason === 'cull' || reason === 'recount' || reason === 'new') { submit(reason); return; }
+        if (ONE_TAP.includes(reason)) { submit(reason); return; }
         const ok = showDetail(reason);
         $('rmConfirm').style.display = ok ? '' : 'none';
       });
