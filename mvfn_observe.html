@@ -215,6 +215,27 @@
   .success-back:active { background: var(--bg3); }
   .success-timer { font-size: 12px; color: var(--text3); }
 
+  /* ── NOTES SCREEN ── */
+  #screenNotes { justify-content: flex-start; }
+  .notes-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px; }
+  .note-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px; user-select: text;
+  }
+  .note-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+  .note-meta .when { flex: 1; }
+  .note-chip { font-size: 10px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--border2); color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; }
+  .note-chip.new { border-color: var(--green); color: var(--green); }
+  .note-chip.kept { border-color: var(--blue); color: var(--blue); }
+  .note-chip.task { border-color: var(--amber); color: var(--amber); }
+  .note-text { font-size: 15px; line-height: 1.55; color: var(--text); white-space: pre-wrap; }
+  .note-text.photo-only { color: var(--text3); font-style: italic; }
+  .note-species { font-size: 12px; color: var(--text2); margin-top: 6px; }
+  .note-tasks { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; font-size: 12px; color: var(--text2); }
+  .notes-empty { color: var(--text3); font-size: 14px; text-align: center; padding: 40px 10px; line-height: 1.6; }
+  .notes-foot { display: flex; gap: 10px; padding-top: 10px; }
+  .notes-foot .more-btn { flex: 1; }
+
   /* ── TOAST ── */
   .toast {
     position: fixed; bottom: 32px; left: 50%;
@@ -241,7 +262,10 @@
 <div class="screen active" id="screenReady">
   <div class="hdr">
     <span class="hdr-logo">MVFN Observe</span>
-    <span class="hdr-nav" onclick="goToField()">Tasks →</span>
+    <span>
+      <span class="hdr-nav" onclick="openNotes()">Notes</span>
+      <span class="hdr-nav" onclick="goToField()">Tasks →</span>
+    </span>
   </div>
 
   <div class="type-selector">
@@ -371,7 +395,23 @@
   <div class="success-msg">Observation saved</div>
   <div class="success-sub" id="successSub"></div>
   <button class="success-back" onclick="returnToReady()">New Observation</button>
+  <button class="success-back" style="margin-top:0" onclick="openNotes()">View notes</button>
   <div class="success-timer" id="successTimer"></div>
+</div>
+
+<!-- ── NOTES (biz 393) ────────────────────────────────────── -->
+<div class="screen" id="screenNotes">
+  <div class="hdr">
+    <span class="hdr-logo">Notes · last 14 days</span>
+    <span>
+      <span class="hdr-nav" onclick="loadNotes()" title="Refresh">↻</span>
+      <span class="hdr-nav" onclick="showScreen('screenReady')">← Back</span>
+    </span>
+  </div>
+  <div class="notes-list" id="notesList"><div class="notes-empty">Loading…</div></div>
+  <div class="notes-foot">
+    <button class="more-btn" onclick="showScreen('screenReady')">+ New Observation</button>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -380,6 +420,7 @@
 // ── CONFIG ────────────────────────────────────────────────
 const N8N_BASE = 'https://homelab.taile865b6.ts.net:5678/webhook';
 const OBSERVE_WEBHOOK = N8N_BASE + '/mvfn-observe';
+const OBSERVE_GET     = N8N_BASE + '/mvfn-observe-get';   // biz 393: recent notes
 // ─────────────────────────────────────────────────────────
 
 // ── DEVICE TOKEN ─────────────────────────────────────────
@@ -820,6 +861,87 @@ function returnToReady() {
   initGPS();
 }
 
+// ── NOTES (biz 393) ───────────────────────────────────────
+// Read-only list of the last 14 days of observations, every observer, newest
+// first, straight from operations.observations via /mvfn-observe-get. The
+// Field app's Notes tab shows only KEPT notes; this shows what was just taken.
+let notesLoadedAt = 0;
+
+function openNotes() {
+  if (successTimer) { clearInterval(successTimer); successTimer = null; document.getElementById('successTimer').textContent = ''; }
+  showScreen('screenNotes');
+  if (window.mvfnUsageHit) { try { window.mvfnUsageHit('notes'); } catch(e) {} }
+  loadNotes();
+}
+
+async function loadNotes() {
+  const list = document.getElementById('notesList');
+  if (!notesLoadedAt) list.innerHTML = '<div class="notes-empty">Loading…</div>';
+  try {
+    const r = await fetch(OBSERVE_GET, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    const row = Array.isArray(data) ? data[0] : data;
+    const notes = row && Array.isArray(row.observations) ? row.observations : [];
+    notesLoadedAt = Date.now();
+    renderNotes(notes);
+  } catch(e) {
+    console.error('Observe notes — load failed:', e);
+    const msg = e instanceof TypeError ? "Can't reach server — Tailscale on?" : 'Notes failed: ' + e.message;
+    if (!notesLoadedAt) list.innerHTML = '<div class="notes-empty">' + escH(msg) + '</div>';
+    showToast(msg, 'error');
+  }
+}
+
+function renderNotes(notes) {
+  const list = document.getElementById('notesList');
+  if (!notes.length) {
+    list.innerHTML = '<div class="notes-empty">No observations in the last 14 days.</div>';
+    return;
+  }
+  let lastDay = '';
+  let html = '';
+  for (const n of notes) {
+    const d = n.created_at ? new Date(n.created_at) : null;
+    const day = d ? d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+    if (day !== lastDay) { html += '<div class="review-label" style="margin:6px 0 0">' + escH(day) + '</div>'; lastDay = day; }
+    html += noteCard(n, d);
+  }
+  list.innerHTML = html;
+}
+
+function noteStatus(n) {
+  const tasks = Array.isArray(n.tasks) ? n.tasks : [];
+  if (tasks.some(t => t.status && t.status !== 'proposed')) return ['task', 'Task made'];
+  if (tasks.length) return ['task', 'Task proposed'];
+  if (n.status === 'kept') return ['kept', 'Kept'];
+  if (n.status === 'captured') return ['new', 'New'];
+  if (n.status === 'processing') return ['', 'Processing'];
+  return ['', 'Reviewed'];   // processed / actioned with nothing attached
+}
+
+function noteCard(n, d) {
+  const time = d ? d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
+  const icon = n.obs_type === 'plant_id' ? '🌿' : n.obs_type === 'pest_disease' ? '🔍' : '🎙️';
+  const st = noteStatus(n);
+  const tasks = Array.isArray(n.tasks) ? n.tasks : [];
+  const who = n.observer ? ' · ' + n.observer : '';
+  const text = (n.transcript || '').trim();
+  const taskLines = tasks.map(t => '<span>→ #' + escH(t.task_id) + ' ' + escH(t.title) + (t.status && t.status !== 'open' ? ' (' + escH(t.status) + ')' : '') + '</span>').join('');
+  return '<div class="note-card">'
+    + '<div class="note-meta"><span>' + icon + '</span>'
+    + '<span class="when">' + escH(time + who) + (n.has_photo ? ' · 📷' : '') + '</span>'
+    + '<span class="note-chip ' + st[0] + '">' + escH(st[1]) + '</span></div>'
+    + '<div class="note-text' + (text ? '' : ' photo-only') + '">' + (text ? escH(text) : '(photo only — no transcript)') + '</div>'
+    + (n.species_name ? '<div class="note-species">' + escH(n.species_name) + ' · ' + escH(n.species_conf || 'tentative') + '</div>' : '')
+    + (tasks.length ? '<div class="note-tasks">' + taskLines + '</div>' : '')
+    + '</div>';
+}
+
+function escH(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // ── UTILS ─────────────────────────────────────────────────
 function dedupeAppend(existing, newText) {
   newText = newText.trim();
@@ -922,6 +1044,10 @@ function goToField() {
 
 // ── INIT ──────────────────────────────────────────────────
 initGPS();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && document.getElementById('screenNotes').classList.contains('active')
+      && Date.now() - notesLoadedAt > 60000) loadNotes();
+});
 </script>
 </body>
 </html>
