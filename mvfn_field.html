@@ -372,6 +372,17 @@
   }
   .sheet-btn:active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
   .sheet-empty { grid-column: 1 / -1; font-size: 13px; color: var(--text3); padding: 12px 4px; }
+  .sheet-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .sheet-date label { display: block; font-size: 12px; color: var(--text3); margin-bottom: 4px; }
+  .sheet-date input {
+    width: 100%; box-sizing: border-box; min-height: 44px; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 8px 10px; color: var(--text); font-size: 14px; font-family: inherit;
+    color-scheme: dark; -webkit-appearance: none; appearance: none;
+  }
+  .sheet-date input:focus { outline: none; border-color: var(--green-dim); }
+  .sheet-date-err { grid-column: 1 / -1; font-size: 12px; color: #e0a060; min-height: 16px; }
+  .sheet-btn.primary { background: var(--green-dim); border-color: var(--green); color: var(--text); }
+  .sheet-btn:disabled { opacity: 0.4; }
   .sheet-cancel { width: 100%; height: 44px; border: none; border-radius: 10px; background: transparent; color: var(--text3); font-size: 14px; font-family: inherit; cursor: pointer; }
   .sheet-cancel:active { opacity: 0.6; }
 
@@ -511,6 +522,20 @@
         <button class="sheet-btn" onclick="pickLocation('indoor')">🏠 Indoor</button>
         <button class="sheet-btn" onclick="pickLocation('mixed')">🔀 Mixed</button>
         <button class="sheet-btn" onclick="pickLocation('unknown')">🤷 Not sure</button>
+      </div>
+    </div>
+    <!-- Stage 4: window (both domains, both dates optional). Window = [not_before, due_by];
+         the server rejects not_before > due_by, so the sheet refuses it first. -->
+    <div id="dateStage" style="display:none">
+      <div class="sheet-title">When? (optional)</div>
+      <div class="sheet-dates">
+        <div class="sheet-date"><label for="addNotBefore">Not before</label><input type="date" id="addNotBefore" oninput="_checkAddDates()"></div>
+        <div class="sheet-date"><label for="addDueBy">Due by</label><input type="date" id="addDueBy" oninput="_checkAddDates()"></div>
+        <div class="sheet-date-err" id="addDateErr"></div>
+      </div>
+      <div class="sheet-btns">
+        <button class="sheet-btn" onclick="finishAdd(false)">No dates</button>
+        <button class="sheet-btn primary" id="addWithDatesBtn" onclick="finishAdd(true)">Add task</button>
       </div>
     </div>
     <button class="sheet-cancel" onclick="cancelAddPick()">Cancel</button>
@@ -1276,11 +1301,31 @@ async function saveNote(taskId) {
 let _pendingAddDesc = null;
 let _pendingDomain = null;
 let _pendingCategory = null;
+let _pendingLocation = null;
 
-function _showAddStage(stage) {  // 'domain' | 'category' | 'loc'
+function _showAddStage(stage) {  // 'domain' | 'category' | 'loc' | 'dates'
   document.getElementById('domainStage').style.display = (stage === 'domain') ? '' : 'none';
   document.getElementById('categoryStage').style.display = (stage === 'category') ? '' : 'none';
   document.getElementById('locStage').style.display = (stage === 'loc') ? '' : 'none';
+  document.getElementById('dateStage').style.display = (stage === 'dates') ? '' : 'none';
+}
+
+function _resetAddDates() {
+  document.getElementById('addNotBefore').value = '';
+  document.getElementById('addDueBy').value = '';
+  document.getElementById('addDateErr').textContent = '';
+  document.getElementById('addWithDatesBtn').disabled = false;
+}
+
+// Returns {not_before, due_date} (each '' when blank) or null when the pair is
+// not a window (not_before after due_by). YYYY-MM-DD strings compare as dates.
+function _checkAddDates() {
+  const nb = document.getElementById('addNotBefore').value.trim();
+  const due = document.getElementById('addDueBy').value.trim();
+  const bad = !!(nb && due && nb > due);
+  document.getElementById('addDateErr').textContent = bad ? '"Not before" is after "Due by".' : '';
+  document.getElementById('addWithDatesBtn').disabled = bad;
+  return bad ? null : { not_before: nb, due_date: due };
 }
 
 async function quickAdd() {
@@ -1291,6 +1336,8 @@ async function quickAdd() {
   _pendingAddDesc = desc;
   _pendingDomain = null;
   _pendingCategory = null;
+  _pendingLocation = null;
+  _resetAddDates();
   document.getElementById('addDesc').textContent = desc;
   _showAddStage('domain');  // domain is REQUIRED — always asked, never defaulted
   document.getElementById('addOverlay').classList.add('show');
@@ -1310,24 +1357,30 @@ function pickDomain(domain) {
   _showAddStage('category');
 }
 
-async function pickCategory(catId) {
+function pickCategory(catId) {
   _pendingCategory = catId;
   if (_pendingDomain === 'business') {
     _showAddStage('loc');  // business asks where the work happens
     return;
   }
   // Household skips the work-location stage (server defaults to 'unknown')
-  const desc = _pendingAddDesc, domain = _pendingDomain, cat = _pendingCategory;
-  cancelAddPick();  // hide + reset state
-  document.getElementById('quickAdd').value = '';
-  await _submitAdd(desc, domain, cat, null);
+  _showAddStage('dates');
 }
 
-async function pickLocation(loc) {
-  const desc = _pendingAddDesc, domain = _pendingDomain, cat = _pendingCategory;
+function pickLocation(loc) {
+  _pendingLocation = loc;
+  _showAddStage('dates');
+}
+
+// Last stage: "No dates" adds with an open window; "Add task" carries whatever
+// is filled in (either, both, or neither — a blank pair is the same as "No dates").
+async function finishAdd(withDates) {
+  const dates = withDates ? _checkAddDates() : { not_before: '', due_date: '' };
+  if (!dates) return;  // not a window — the error line says why
+  const desc = _pendingAddDesc, domain = _pendingDomain, cat = _pendingCategory, loc = _pendingLocation;
   cancelAddPick();  // hide + reset state
   document.getElementById('quickAdd').value = '';
-  await _submitAdd(desc, domain, cat, loc);
+  await _submitAdd(desc, domain, cat, loc, dates);
 }
 
 function cancelAddPick(e) {
@@ -1336,17 +1389,23 @@ function cancelAddPick(e) {
   _pendingAddDesc = null;
   _pendingDomain = null;
   _pendingCategory = null;
+  _pendingLocation = null;
+  _resetAddDates();
   _showAddStage('domain');  // reset to first stage for next time
 }
 
-async function _submitAdd(desc, domain, categoryId, workLocation) {
+async function _submitAdd(desc, domain, categoryId, workLocation, dates) {
   showToast('Adding…', '');
   try {
     const body = { action: 'add_task', domain: domain, category_id: categoryId, description: desc };
     if (domain === 'business') body.work_location = workLocation || 'unknown';
+    if (dates && dates.not_before) body.not_before = dates.not_before;
+    if (dates && dates.due_date) body.due_date = dates.due_date;
     const r = await post(body);
     if (r.status === 'ok') {
-      showToast('Added ✓', 'success');
+      const when = (dates && dates.due_date) ? ' · due ' + dates.due_date
+                 : (dates && dates.not_before) ? ' · from ' + dates.not_before : '';
+      showToast('Added' + when + ' ✓', 'success');
       loadTasks();
     } else {
       showToast('Add failed', 'error');
