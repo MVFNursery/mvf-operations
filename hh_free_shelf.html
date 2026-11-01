@@ -266,5 +266,5 @@ fetch('hh-free-shelf-catalog.json').then(r=>{if(!r.ok)throw 0;return r.json()}).
   MOVIES=d.movies;
   MOVIES.forEach(m=>{m.title=esc(m.title);m.blurb=esc(m.blurb);m.director=esc(m.director);BY_ID.set(m.id,m)});
   render();
-}).catch(()=>{app.innerHTML='<h1 tabindex="-1">The movies didn't load</h1><p>Check your connection and try again.</p><button class="btn" onclick="location.reload()">Try again</button>'});
+}).catch(()=>{app.innerHTML=`<h1 tabindex="-1">The movies did not load</h1><p>Check your connection and try again.</p><button class="btn" onclick="location.reload()">Try again</button>`});
 </script>
