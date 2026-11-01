@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-hh-free-shelf.png">
 <title>Free Shelf DEMO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://image.tmdb.org">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Figtree:wght@400;500;700&display=swap">
 <style>
 /* Layout: a phone-first rental kiosk. One column of big tap targets, poster wall on wider screens. */
@@ -43,9 +44,10 @@ select{font:inherit;font-size:16px;color:var(--fg);background:var(--panel);borde
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(146px,1fr));gap:16px 12px;padding-block:10px}
 .tile{all:unset;display:grid;gap:6px;cursor:pointer;min-width:0}
 .tile:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-.poster{aspect-ratio:2/3;max-width:100%;border-radius:4px;padding:12px;display:flex;align-items:flex-end;position:relative;overflow:hidden;font-family:var(--display);font-weight:800;font-size:25px;line-height:1;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.65)}
-.poster i{position:absolute;right:-18%;top:-8%;width:78%;aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.2)}
-.poster span{position:relative}
+.poster{aspect-ratio:2/3;max-width:100%;border-radius:4px;padding:12px;background:var(--panel);display:flex;align-items:flex-end;position:relative;overflow:hidden;font-family:var(--display);font-weight:800;font-size:25px;line-height:1;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.65)}
+.poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tmdb-credit{font-size:12px;color:var(--muted);padding-block:18px}
+.tmdb-credit a{color:inherit}
 .meta{font-size:14px;color:var(--muted)} .meta b{color:var(--good);font-weight:500}
 .meta b.wait{color:var(--accent)}
 .back{font:inherit;color:var(--muted);background:none;border:0;padding:12px 0;min-height:44px;cursor:pointer}
@@ -71,8 +73,8 @@ select{font:inherit;font-size:16px;color:var(--fg);background:var(--panel);borde
 </style>
 
 <div class="wrap">
-  <div class="demobar" role="note">DEMO · Not a real library. Nothing gets reserved.</div>
-  <div class="demo"><span><strong>Demo only.</strong> Sample library, sample movies. Nothing connects to a real library, and no movie will be waiting for you.</span>
+  <div class="demobar" role="note">DEMO · Not a real library. Availability is made up. Nothing gets reserved.</div>
+  <div class="demo"><span><strong>Demo only.</strong> Real movies, but a sample library with made-up copies and wait lists. Nothing connects to a real library, and no movie will be waiting for you.</span>
     <button id="toggle-closed" data-act="toggleClosed"></button>
     <button id="reset" data-act="reset">Start over</button></div>
   <main id="app"></main>
@@ -86,37 +88,31 @@ const BRANCHES={
   r:{name:'Ridge Road Library',hours:'Open until 5 PM today',opens:'Opens tomorrow at 9 AM',bus:null},
   h:{name:'Harbor Center Library',hours:'Open until 8 PM today',opens:'Opens tomorrow at 9 AM',bus:'Next bus 4:12 PM, Route 3, stops at the front door'}
 };
-const MOVIES=[
- ['Mabel and the Moon Engine',2019,'Family','Blu-ray',7.8,102,{m:2,r:1,h:3},0,'A girl and her grandfather rebuild a rocket from a junkyard.','#7b3fa0','#e8743b'],
- ['Last Ferry to Alder',2021,'Drama','DVD',8.1,118,{m:1,r:0,h:1},0,'One crossing, one storm, and a family that stopped talking.','#12607a','#1e2d52'],
- ['Captain Biscuit',2017,'Family','DVD',6.9,88,{m:0,r:1,h:2},2,'A very small dog takes command of a very large ship.','#d9872b','#a33a2a'],
- ['Copper Valley',2015,'Action','Blu-ray',7.4,124,{m:1,r:2,h:0},0,'A retired mine inspector follows the money underground.','#8a4b22','#2b2320'],
- ['The Quiet Referee',2022,'Comedy','Blu-ray',7.1,97,{m:0,r:0,h:1},3,'A small-town ref loses his voice before the big game.','#2c8a5e','#14433f'],
- ['Static Summer',1994,'Classics','DVD',8.6,110,{m:1,r:1,h:1},0,'Four friends run a pirate radio station from a barn.','#c23b5a','#3f2a6b'],
- ['Grandma Drives',2020,'Comedy','DVD',7.6,93,{m:1,r:0,h:2},0,'She is 81, she has a van, and she is done asking.','#3f7fd1','#274178'],
- ['Nine Rooms North',2023,'Drama','Blu-ray',8.3,131,{m:0,r:1,h:1},5,'A hotel night clerk keeps every guest\'s secret but one.','#4a5570','#1b2233'],
- ['The Long Salt Road',1978,'Classics','DVD',8.4,139,{m:1,r:0,h:0},0,'Two truckers, one last haul across the flats.','#b58b3a','#5a3d1c'],
- ['Tide Clock',2024,'Action','Blu-ray',7.0,115,{m:1,r:1,h:2},1,'A diver has twelve hours before the harbor floods.','#0f7f8f','#16345c']
-].map((a,id)=>({id,title:a[0],year:a[1],genre:a[2],format:a[3],rating:a[4],mins:a[5],copies:a[6],wait:a[7],blurb:a[8],c1:a[9],c2:a[10]}));
-const GENRES=['All','Family','Comedy','Drama','Action','Classics'];
-const NEW_LIMIT=2,HOLD_DAYS=7,LOAN_DAYS=7,MAX_RENEWS=5,DAY=864e5,KEY='free-shelf-demo';
-const fresh=()=>({view:'home',branch:'m',genre:'All',shelf:false,movie:null,user:null,items:[],closed:false,pickup:null,msg:''});
+let MOVIES=[],BY_ID=new Map();
+const GENRES=['All','Drama','Comedy','Action','Adventure','Thriller','Science Fiction','Crime','Family','Animation','Romance','Horror','Classics'];
+const POSTER='https://image.tmdb.org/t/p/w342',PAGE=60;
+const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const inGenre=(m,g)=>g==='All'||(g==='Classics'?m.year<1980:m.genres.includes(g));
+const NEW_LIMIT=2,HOLD_DAYS=7,LOAN_DAYS=7,MAX_RENEWS=5,DAY=864e5,KEY='free-shelf-demo-2';
+const fresh=()=>({view:'home',branch:'m',genre:'All',shelf:false,limit:PAGE,movie:null,user:null,items:[],closed:false,pickup:null,msg:''});
 let S=fresh(),homeY=0,chipX=0,armed=false;
 try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.items))S=s}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const snap=()=>({view:S.view,movie:S.movie,pickup:S.pickup});
 const app=document.getElementById('app'),nav=document.getElementById('nav'),live=document.getElementById('live');
-const movie=id=>MOVIES[id];
+const movie=id=>BY_ID.get(id);
 const inDays=d=>Date.now()+d*DAY;
 const when=t=>new Date(t).toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
-const poster=m=>`<div class="poster" style="background:linear-gradient(160deg,${m.c1},${m.c2})" aria-hidden="true"><i></i><span>${m.title}</span></div>`;
+const poster=m=>`<div class="poster" aria-hidden="true"><span>${m.title}</span><img src="${POSTER}${m.poster}" alt="" loading="lazy" decoding="async" onerror="this.remove()"></div>`;
 const avail=m=>m.wait?'wait':m.copies[S.branch]?'here':'far';
 const shelfText=m=>({here:`<b>On the shelf here</b>`,wait:`<b class="wait">${m.wait} waiting</b>`,far:`<b class="wait">Comes from another branch</b>`})[avail(m)];
 const open=()=>S.items.filter(i=>i.status!=='out');
 const bring=()=>`<div class="panel"><h2>Bring</h2><ul class="steps"><li>Your driver's license</li><li>Something with your address on it, like a piece of mail</li></ul></div>`;
 
+const credit=`<p class="tmdb-credit">This product uses the <a href="https://www.themoviedb.org/" rel="noopener">TMDB</a> API but is not endorsed or certified by TMDB. Movie details and posters come from TMDB.</p>`;
+
 function home(){
-  const list=MOVIES.filter(m=>(S.genre==='All'||m.genre===S.genre)&&(!S.shelf||avail(m)==='here'));
+  const list=MOVIES.filter(m=>inGenre(m,S.genre)&&(!S.shelf||avail(m)==='here'));
   const b=BRANCHES[S.branch];
   return `<div class="top"><div><div class="brand">Free Shelf</div><p class="note">Every movie is free with a library card.</p></div>
    <div class="branch"><label for="branch">Your library</label><select id="branch" data-change="branch">${Object.entries(BRANCHES).map(([k,v])=>`<option value="${k}"${k===S.branch?' selected':''}>${v.name}</option>`).join('')}</select>
@@ -124,8 +120,8 @@ function home(){
    <h1 tabindex="-1" class="sr">Browse movies</h1>
    <div class="chips" role="group" aria-label="Filter movies">
    <button class="chip" id="f-shelf" data-act="shelf" aria-pressed="${S.shelf}">On the shelf here</button>
-   ${GENRES.map(g=>`<button class="chip" id="g-${g}" data-act="genre" data-v="${g}" aria-pressed="${S.genre===g}">${g}</button>`).join('')}</div>
-   ${list.length?`<div class="grid">${list.map(m=>`<button class="tile" id="m-${m.id}" data-act="open" data-v="${m.id}"><span class="sr">${m.title}</span>${poster(m)}<span class="meta">★ ${m.rating} · ${m.format}<br>${shelfText(m)}</span></button>`).join('')}</div>`
+   ${GENRES.map(g=>`<button class="chip" id="g-${g.replace(' ','-')}" data-act="genre" data-v="${g}" aria-pressed="${S.genre===g}">${g}</button>`).join('')}</div>
+   ${list.length?`<p class="note">${list.length.toLocaleString()} movies, best rated first</p><div class="grid">${list.slice(0,S.limit).map(m=>`<button class="tile" id="m-${m.id}" data-act="open" data-v="${m.id}"><span class="sr">${m.title}</span>${poster(m)}<span class="meta">★ ${m.rating} · ${m.format}<br>${shelfText(m)}</span></button>`).join('')}</div>${list.length>S.limit?`<button class="btn alt" id="more" data-act="more">Show more movies</button>`:''}${credit}`
    :`<p class="note" style="padding-block:20px">Nothing here in this category right now. Turn off "On the shelf here" to reserve one from another branch.</p>`}`;
 }
 function title(){
@@ -135,12 +131,13 @@ function title(){
    :({here:`On the shelf at ${b.name}`,wait:`${m.wait} waiting. Your library will tell you when it's your turn.`,far:`Coming to ${b.name} from another branch.`})[avail(m)];
   return `<button class="back" data-act="home">← All movies</button>
   <div class="detail">${poster(m)}<div class="stack"><h1 tabindex="-1">${m.title}</h1>
-  <p class="meta">★ ${m.rating} · ${m.year} · ${m.mins} min · ${m.format}</p><p>${m.blurb}</p></div></div>
+  <p class="meta">★ ${m.rating} · ${m.year} · ${m.mins} min · ${m.format}<br>${m.genres.join(', ')}<br>Directed by ${m.director}</p></div></div>
+  <p>${m.blurb}</p>
   <div class="stack"><p>${line}</p>
   <button class="btn" id="reserve" data-act="reserve"${took||full?' disabled':''}>${item?(item.status==='out'?'At home':'Reserved'):'Reserve it free'}</button>
   ${full&&!took?`<p class="note">You can reserve ${NEW_LIMIT} on your first visit. More after that. (Sample rule.)</p>`:''}
   ${took?`<button class="btn alt" data-act="trip">See my trip</button>`:''}
-  <button class="link" id="trailer" data-act="trailer">Watch trailer</button>${S.msg?`<p class="note">${S.msg}</p>`:''}</div>`;
+  <button class="link" id="trailer" data-act="trailer">Watch trailer</button>${S.msg?`<p class="note">${S.msg}</p>`:''}</div>${credit}`;
 }
 function who(){
   return `<button class="back" data-act="back">← ${movie(S.movie).title}</button><div class="stack">
@@ -229,11 +226,12 @@ function say(t){live.textContent='';setTimeout(()=>{live.textContent=t},60)}
 function addItem(){
   const m=movie(S.movie);
   S.items.push({id:m.id,branch:S.branch,status:'reserved',hold:null,due:null,renews:0,ahead:m.wait});
-  say(m.title+' reserved');go('trip');
+  say('Reserved');go('trip');
 }
 const ACT={
  home:()=>go('home'),trip:()=>go('trip'),back:()=>go('title'),who:()=>go('who'),
- genre:v=>{S.genre=v;render()},shelf:()=>{S.shelf=!S.shelf;render()},
+ genre:v=>{S.genre=v;S.limit=PAGE;render()},shelf:()=>{S.shelf=!S.shelf;S.limit=PAGE;render()},
+ more:()=>{S.limit+=PAGE;render()},
  open:v=>{S.movie=+v;go('title')},
  trailer:()=>{S.msg='Trailers open on YouTube in the real app.';say(S.msg);render()},
  reserve:()=>S.user?addItem():go('who'),
@@ -264,5 +262,9 @@ window.addEventListener('popstate',e=>{
   render(true,from);
 });
 try{history.replaceState(snap(),'')}catch(e){}
-render();
+fetch('hh-free-shelf-catalog.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{
+  MOVIES=d.movies;
+  MOVIES.forEach(m=>{m.title=esc(m.title);m.blurb=esc(m.blurb);m.director=esc(m.director);BY_ID.set(m.id,m)});
+  render();
+}).catch(()=>{app.innerHTML='<h1 tabindex="-1">The movies didn't load</h1><p>Check your connection and try again.</p><button class="btn" onclick="location.reload()">Try again</button>'});
 </script>
