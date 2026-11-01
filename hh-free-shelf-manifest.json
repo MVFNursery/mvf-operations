@@ -1,0 +1,17 @@
+{
+  "id": "/mvf-operations/hh-free-shelf",
+  "name": "Free Shelf DEMO",
+  "short_name": "Shelf DEMO",
+  "start_url": "hh_free_shelf.html",
+  "display": "standalone",
+  "background_color": "#101a2b",
+  "theme_color": "#101a2b",
+  "icons": [
+    {
+      "src": "icon-hh-free-shelf.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

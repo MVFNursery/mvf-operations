@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Shelf DEMO">
+<meta name="theme-color" content="#101a2b">
+<link rel="manifest" href="hh-free-shelf-manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-hh-free-shelf.png">
+<title>Free Shelf DEMO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Figtree:wght@400;500;700&display=swap">
+<style>
+/* Layout: a phone-first rental kiosk. One column of big tap targets, poster wall on wider screens. */
+:root{
+  color-scheme:dark;
+  --bg:#101a2b; --panel:#1a2840; --line:#31435f; --fg:#f4f1e6; --muted:#b5c0d0;
+  --accent:#f6b93b; --accent-ink:#1b1405; --good:#67d79a; --warn:#ff9d7a;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"Figtree",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 96px}
+.wrap{max-width:920px;margin:0 auto}
+.demobar{position:sticky;top:0;z-index:5;background:var(--accent);color:var(--accent-ink);font-size:15px;font-weight:700;text-align:center;padding:max(8px,env(safe-area-inset-top,0px)) 12px 8px;border-radius:0 0 8px 8px}
+.demo{font-size:13px;color:var(--muted);padding-block:10px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;border-bottom:1px solid var(--line)}
+.demo strong{color:var(--accent)}
+.demo button{font:inherit;color:var(--fg);background:none;border:1px solid var(--line);border-radius:4px;padding:4px 10px;min-height:44px;cursor:pointer}
+.sr{position:absolute;left:-9999px}
+h1,h2{font-family:var(--display);font-weight:800;line-height:1.05;text-wrap:balance;margin:0;letter-spacing:.01em}
+h1{font-size:clamp(34px,8vw,48px)} h2{font-size:26px}
+h1:focus{outline:none}
+p{margin:0;max-width:62ch}
+.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;flex-wrap:wrap;padding-block:18px 12px}
+.brand{font-family:var(--display);font-weight:800;font-size:30px;color:var(--accent);letter-spacing:.03em;text-transform:uppercase}
+.branch{display:grid;gap:2px;font-size:13px;color:var(--muted);min-width:0}
+select{font:inherit;font-size:16px;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 10px;max-width:100%}
+.status{font-size:14px;color:var(--good)} .status.closed{color:var(--warn)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-block:8px;scrollbar-width:none}
+.chip{flex:none;font:inherit;font-size:15px;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 14px;min-height:42px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(146px,1fr));gap:16px 12px;padding-block:10px}
+.tile{all:unset;display:grid;gap:6px;cursor:pointer;min-width:0}
+.tile:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.poster{aspect-ratio:2/3;max-width:100%;border-radius:4px;padding:12px;display:flex;align-items:flex-end;position:relative;overflow:hidden;font-family:var(--display);font-weight:800;font-size:25px;line-height:1;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.65)}
+.poster i{position:absolute;right:-18%;top:-8%;width:78%;aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.2)}
+.poster span{position:relative}
+.meta{font-size:14px;color:var(--muted)} .meta b{color:var(--good);font-weight:500}
+.meta b.wait{color:var(--accent)}
+.back{font:inherit;color:var(--muted);background:none;border:0;padding:12px 0;min-height:44px;cursor:pointer}
+.detail{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr);gap:18px;padding-block:6px 14px}
+.stack{display:grid;gap:14px;align-content:start;min-width:0}
+.btn{font:inherit;font-weight:700;font-size:18px;min-height:54px;width:100%;border:0;border-radius:6px;padding:10px 18px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.btn.alt{background:none;color:var(--fg);border:1px solid var(--line);font-weight:500}
+.btn:disabled{background:var(--panel);color:var(--muted);cursor:not-allowed}
+.link{font:inherit;color:var(--accent);background:none;border:0;padding:8px 0;min-height:44px;cursor:pointer;text-align:left;text-decoration:underline}
+.link:disabled{color:var(--muted);text-decoration:none;cursor:not-allowed}
+.panel{background:var(--panel);border-radius:6px;padding:16px;display:grid;gap:10px;min-width:0}
+.script{border-left:4px solid var(--accent);padding-left:12px;font-size:20px;font-weight:500}
+.steps{margin:0;padding-left:22px;display:grid;gap:8px}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px}
+.pill{font-size:13px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--line)}
+.pill.ready{background:var(--good);color:#06240f}
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;padding:0 max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(16px,env(safe-area-inset-left,0px))}
+.nav button{font:inherit;font-weight:700;color:var(--muted);background:none;border:0;min-height:60px;cursor:pointer}
+.nav button[aria-current="page"]{color:var(--accent)}
+.note{font-size:14px;color:var(--muted)}
+@media (max-width:440px){.detail{grid-template-columns:minmax(0,120px) minmax(0,1fr)} .poster{font-size:22px}}
+@media (prefers-reduced-motion:no-preference){.tile:hover .poster{transform:translateY(-3px)}.poster{transition:transform .15s}}
+</style>
+
+<div class="wrap">
+  <div class="demobar" role="note">DEMO · Not a real library. Nothing gets reserved.</div>
+  <div class="demo"><span><strong>Demo only.</strong> Sample library, sample movies. Nothing connects to a real library, and no movie will be waiting for you.</span>
+    <button id="toggle-closed" data-act="toggleClosed"></button>
+    <button id="reset" data-act="reset">Start over</button></div>
+  <main id="app"></main>
+</div>
+<nav class="nav" id="nav" aria-label="Main"></nav>
+<div id="live" class="note" aria-live="polite" style="position:absolute;left:-9999px"></div>
+
+<script>
+const BRANCHES={
+  m:{name:'Mill Street Library',hours:'Open until 6 PM today',opens:'Opens tomorrow at 10 AM',bus:null},
+  r:{name:'Ridge Road Library',hours:'Open until 5 PM today',opens:'Opens tomorrow at 9 AM',bus:null},
+  h:{name:'Harbor Center Library',hours:'Open until 8 PM today',opens:'Opens tomorrow at 9 AM',bus:'Next bus 4:12 PM, Route 3, stops at the front door'}
+};
+const MOVIES=[
+ ['Mabel and the Moon Engine',2019,'Family','Blu-ray',7.8,102,{m:2,r:1,h:3},0,'A girl and her grandfather rebuild a rocket from a junkyard.','#7b3fa0','#e8743b'],
+ ['Last Ferry to Alder',2021,'Drama','DVD',8.1,118,{m:1,r:0,h:1},0,'One crossing, one storm, and a family that stopped talking.','#12607a','#1e2d52'],
+ ['Captain Biscuit',2017,'Family','DVD',6.9,88,{m:0,r:1,h:2},2,'A very small dog takes command of a very large ship.','#d9872b','#a33a2a'],
+ ['Copper Valley',2015,'Action','Blu-ray',7.4,124,{m:1,r:2,h:0},0,'A retired mine inspector follows the money underground.','#8a4b22','#2b2320'],
+ ['The Quiet Referee',2022,'Comedy','Blu-ray',7.1,97,{m:0,r:0,h:1},3,'A small-town ref loses his voice before the big game.','#2c8a5e','#14433f'],
+ ['Static Summer',1994,'Classics','DVD',8.6,110,{m:1,r:1,h:1},0,'Four friends run a pirate radio station from a barn.','#c23b5a','#3f2a6b'],
+ ['Grandma Drives',2020,'Comedy','DVD',7.6,93,{m:1,r:0,h:2},0,'She is 81, she has a van, and she is done asking.','#3f7fd1','#274178'],
+ ['Nine Rooms North',2023,'Drama','Blu-ray',8.3,131,{m:0,r:1,h:1},5,'A hotel night clerk keeps every guest\'s secret but one.','#4a5570','#1b2233'],
+ ['The Long Salt Road',1978,'Classics','DVD',8.4,139,{m:1,r:0,h:0},0,'Two truckers, one last haul across the flats.','#b58b3a','#5a3d1c'],
+ ['Tide Clock',2024,'Action','Blu-ray',7.0,115,{m:1,r:1,h:2},1,'A diver has twelve hours before the harbor floods.','#0f7f8f','#16345c']
+].map((a,id)=>({id,title:a[0],year:a[1],genre:a[2],format:a[3],rating:a[4],mins:a[5],copies:a[6],wait:a[7],blurb:a[8],c1:a[9],c2:a[10]}));
+const GENRES=['All','Family','Comedy','Drama','Action','Classics'];
+const NEW_LIMIT=2,HOLD_DAYS=7,LOAN_DAYS=7,MAX_RENEWS=5,DAY=864e5,KEY='free-shelf-demo';
+const fresh=()=>({view:'home',branch:'m',genre:'All',shelf:false,movie:null,user:null,items:[],closed:false,pickup:null,msg:''});
+let S=fresh(),homeY=0,chipX=0,armed=false;
+try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.items))S=s}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const snap=()=>({view:S.view,movie:S.movie,pickup:S.pickup});
+const app=document.getElementById('app'),nav=document.getElementById('nav'),live=document.getElementById('live');
+const movie=id=>MOVIES[id];
+const inDays=d=>Date.now()+d*DAY;
+const when=t=>new Date(t).toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+const poster=m=>`<div class="poster" style="background:linear-gradient(160deg,${m.c1},${m.c2})" aria-hidden="true"><i></i><span>${m.title}</span></div>`;
+const avail=m=>m.wait?'wait':m.copies[S.branch]?'here':'far';
+const shelfText=m=>({here:`<b>On the shelf here</b>`,wait:`<b class="wait">${m.wait} waiting</b>`,far:`<b class="wait">Comes from another branch</b>`})[avail(m)];
+const open=()=>S.items.filter(i=>i.status!=='out');
+const bring=()=>`<div class="panel"><h2>Bring</h2><ul class="steps"><li>Your driver's license</li><li>Something with your address on it, like a piece of mail</li></ul></div>`;
+
+function home(){
+  const list=MOVIES.filter(m=>(S.genre==='All'||m.genre===S.genre)&&(!S.shelf||avail(m)==='here'));
+  const b=BRANCHES[S.branch];
+  return `<div class="top"><div><div class="brand">Free Shelf</div><p class="note">Every movie is free with a library card.</p></div>
+   <div class="branch"><label for="branch">Your library</label><select id="branch" data-change="branch">${Object.entries(BRANCHES).map(([k,v])=>`<option value="${k}"${k===S.branch?' selected':''}>${v.name}</option>`).join('')}</select>
+   <span class="status${S.closed?' closed':''}">${S.closed?'Closed now. '+b.opens:b.hours}</span></div></div>
+   <h1 tabindex="-1" class="sr">Browse movies</h1>
+   <div class="chips" role="group" aria-label="Filter movies">
+   <button class="chip" id="f-shelf" data-act="shelf" aria-pressed="${S.shelf}">On the shelf here</button>
+   ${GENRES.map(g=>`<button class="chip" id="g-${g}" data-act="genre" data-v="${g}" aria-pressed="${S.genre===g}">${g}</button>`).join('')}</div>
+   ${list.length?`<div class="grid">${list.map(m=>`<button class="tile" id="m-${m.id}" data-act="open" data-v="${m.id}"><span class="sr">${m.title}</span>${poster(m)}<span class="meta">★ ${m.rating} · ${m.format}<br>${shelfText(m)}</span></button>`).join('')}</div>`
+   :`<p class="note" style="padding-block:20px">Nothing here in this category right now. Turn off "On the shelf here" to reserve one from another branch.</p>`}`;
+}
+function title(){
+  const m=movie(S.movie),b=BRANCHES[S.branch],item=S.items.find(i=>i.id===m.id);
+  const full=S.user==='new'&&open().length>=NEW_LIMIT, took=!!item;
+  const line=item?(item.status==='out'?`You have this one at home.`:`Reserved at ${BRANCHES[item.branch].name}.`)
+   :({here:`On the shelf at ${b.name}`,wait:`${m.wait} waiting. Your library will tell you when it's your turn.`,far:`Coming to ${b.name} from another branch.`})[avail(m)];
+  return `<button class="back" data-act="home">← All movies</button>
+  <div class="detail">${poster(m)}<div class="stack"><h1 tabindex="-1">${m.title}</h1>
+  <p class="meta">★ ${m.rating} · ${m.year} · ${m.mins} min · ${m.format}</p><p>${m.blurb}</p></div></div>
+  <div class="stack"><p>${line}</p>
+  <button class="btn" id="reserve" data-act="reserve"${took||full?' disabled':''}>${item?(item.status==='out'?'At home':'Reserved'):'Reserve it free'}</button>
+  ${full&&!took?`<p class="note">You can reserve ${NEW_LIMIT} on your first visit. More after that. (Sample rule.)</p>`:''}
+  ${took?`<button class="btn alt" data-act="trip">See my trip</button>`:''}
+  <button class="link" id="trailer" data-act="trailer">Watch trailer</button>${S.msg?`<p class="note">${S.msg}</p>`:''}</div>`;
+}
+function who(){
+  return `<button class="back" data-act="back">← ${movie(S.movie).title}</button><div class="stack">
+  <h1 tabindex="-1">Do you have a library card?</h1><p>Either way, this movie is free.</p>
+  <button class="btn" id="card-yes" data-act="hascard">Yes, I have a card</button>
+  <button class="btn alt" id="card-no" data-act="nocard">No, I've never had one</button></div>`;
+}
+function cardlogin(){
+  return `<button class="back" data-act="who">← Back</button><div class="stack"><h1 tabindex="-1">Sign in with your library</h1>
+  <p>You sign in once on the library's own page. Free Shelf never sees your card number or PIN.</p>
+  <button class="btn" id="login" data-act="login">Sign in at the library (demo)</button>
+  <p class="note">The demo skips the real sign-in. No card details are collected here.</p></div>`;
+}
+function signup(){
+  return `<button class="back" data-act="who">← Back</button><div class="stack"><h1 tabindex="-1">Get a free card in about a minute</h1>
+  <p>Your library asks for your driver's license or state ID number. You'll type it on the library's own page, and your movie gets reserved right after. On your first pickup, you'll finish your card at the desk.</p>
+  ${bring()}
+  <button class="btn" id="join" data-act="join">Sign up at the library (demo)</button>
+  <p class="note">The demo skips the real form. Nothing is collected here.</p></div>`;
+}
+function branchGroup(k,items){
+  const b=BRANCHES[k],ready=items.filter(i=>i.status==='ready');
+  let go='';
+  if(ready.length) go=S.closed
+    ?`<p class="status closed">Closed now. ${b.opens}.</p><p>Your movies are safe until ${when(ready[0].hold)}.</p>`
+    :`<p class="status">${b.hours}</p>${b.bus?`<p>${b.bus}</p>`:''}<p>Pick up by ${when(ready[0].hold)}.</p><button class="btn" id="go-${k}" data-act="arrive" data-v="${k}">I'm at the library</button>`;
+  return `<section class="panel"><h2>${b.name}</h2>${items.map(i=>{const m=movie(i.id);return `<div class="row"><span>${m.title}</span>
+   <span>${i.status==='ready'?'<span class="pill ready">Ready</span>':`<span class="pill">${i.ahead?i.ahead+' ahead of you':'Getting it ready'}</span>`} <button class="link" id="cancel-${i.id}" data-act="cancel" data-v="${i.id}" aria-label="Cancel ${m.title}">Cancel</button></span></div>`}).join('')}${go}</section>`;
+}
+function trip(){
+  const holding=open(),out=S.items.filter(i=>i.status==='out');
+  const groups=[...new Set(holding.map(i=>i.branch))];
+  const waiting=holding.some(i=>i.status==='reserved');
+  return `<div class="stack" style="padding-block:18px"><h1 tabindex="-1">My trip</h1>
+  ${!S.items.length?`<p>Nothing reserved yet. Pick a movie and we'll tell you when it's waiting for you.</p><button class="btn" data-act="home">Browse movies</button>`:''}
+  ${groups.map(k=>branchGroup(k,holding.filter(i=>i.branch===k))).join('')}
+  ${S.user==='new'&&holding.length?bring():''}
+  ${waiting?`<p class="note">Your library will tell you when it's ready. Wait for that before you head out.</p><button class="btn alt" id="sim-ready" data-act="ready">Demo: the library says it's ready</button>`:''}
+  ${holding.length?`<button class="link" data-act="home">Add another movie to this trip</button>`:''}
+  ${out.length?`<section class="panel"><h2>At home</h2>${out.map(i=>`<div class="row"><span>${movie(i.id).title}<br><span class="note">Due ${when(i.due)}</span></span>
+   <span><button class="link" id="renew-${i.id}" data-act="renew" data-v="${i.id}"${i.renews>=MAX_RENEWS?' disabled':''}>${i.renews>=MAX_RENEWS?'No renewals left':`Keep it ${LOAN_DAYS} more days`}</button> <button class="link" id="ret-${i.id}" data-act="ret" data-v="${i.id}">Returned</button></span></div>`).join('')}
+   <p class="note">Drop it at any library, even when it's closed. There are no late fees.</p></section>`:''}</div>`;
+}
+function inside(){
+  const b=BRANCHES[S.pickup],items=open().filter(i=>i.branch===S.pickup&&i.status==='ready');
+  const names=items.map(i=>movie(i.id).title).join(', ');
+  const body=S.user==='new'
+   ?`<h1 tabindex="-1">Your movie is waiting</h1>
+     ${bring()}
+     <p>Walk to the front desk and say:</p><p class="script">"I reserved a movie and need to finish my card."</p>
+     <p>They'll finish your card and hand you ${names}. It's free, and there are no late fees.</p>`
+   :`<h1 tabindex="-1">Grab and go</h1><ol class="steps"><li>Find your name on the holds shelf inside the door.</li><li>Take ${names} to checkout.</li></ol>`;
+  return `<button class="back" data-act="trip">← My trip</button><div class="stack">${body}
+   ${S.closed?`<p class="status closed">Closed now. ${b.opens}.</p>`:`<button class="btn" id="got" data-act="got">I have my movies</button>`}<p class="note">${b.name}. Pickup details are sample text until the library confirms them.</p></div>`;
+}
+const VIEWS={home,title,who,cardlogin,signup,trip,inside};
+function render(focusNew,from){
+  const keep=document.activeElement&&document.activeElement.id,chips=app.querySelector('.chips');
+  if(chips)chipX=chips.scrollLeft;
+  if(S.view==='title'&&S.movie===null)S.view='home';
+  if(S.view==='inside'&&!open().some(i=>i.branch===S.pickup&&i.status==='ready'))S.view='trip';
+  app.innerHTML=VIEWS[S.view]();
+  const row=app.querySelector('.chips');if(row)row.scrollLeft=chipX;
+  save();
+  document.getElementById('toggle-closed').textContent=S.closed?'Demo: open the library':'Demo: close the library';
+  const n=open().length,cur=S.view==='trip'?'trip':S.view==='home'?'home':'';
+  nav.innerHTML=`<button id="nav-home" data-act="home"${cur==='home'?' aria-current="page"':''}>Browse</button><button id="nav-trip" data-act="trip"${cur==='trip'?' aria-current="page"':''}>My trip${n?` (${n})`:''}</button>`;
+  const heading=()=>app.querySelector('h1').focus({preventScroll:true});
+  if(focusNew){
+    const tile=S.view==='home'&&from==='title'&&document.getElementById('m-'+S.movie);
+    window.scrollTo(0,S.view==='home'&&from==='title'?homeY:0);
+    tile?tile.focus({preventScroll:true}):heading();
+  }else if(keep){
+    const e=document.getElementById(keep);
+    if(e&&!e.disabled)e.focus();else heading();
+  }
+}
+function go(v){
+  const from=S.view;
+  if(from==='home')homeY=window.scrollY;
+  S.view=v;S.msg='';
+  try{history.pushState(snap(),'')}catch(e){}
+  render(true,from);
+}
+function say(t){live.textContent='';setTimeout(()=>{live.textContent=t},60)}
+function addItem(){
+  const m=movie(S.movie);
+  S.items.push({id:m.id,branch:S.branch,status:'reserved',hold:null,due:null,renews:0,ahead:m.wait});
+  say(m.title+' reserved');go('trip');
+}
+const ACT={
+ home:()=>go('home'),trip:()=>go('trip'),back:()=>go('title'),who:()=>go('who'),
+ genre:v=>{S.genre=v;render()},shelf:()=>{S.shelf=!S.shelf;render()},
+ open:v=>{S.movie=+v;go('title')},
+ trailer:()=>{S.msg='Trailers open on YouTube in the real app.';say(S.msg);render()},
+ reserve:()=>S.user?addItem():go('who'),
+ hascard:()=>go('cardlogin'),nocard:()=>go('signup'),
+ login:()=>{S.user='card';addItem()},join:()=>{S.user='new';addItem()},
+ ready:()=>{S.items.forEach(i=>{if(i.status==='reserved'){i.status='ready';i.ahead=0;i.hold=inDays(HOLD_DAYS)}});say('Your movies are ready');render()},
+ cancel:v=>{S.items=S.items.filter(i=>i.id!==+v);say('Reservation cancelled');render(true)},
+ arrive:v=>{S.pickup=v;go('inside')},
+ got:()=>{S.items.forEach(i=>{if(i.branch===S.pickup&&i.status==='ready'){i.status='out';i.due=inDays(LOAN_DAYS)}});S.user='card';say('Enjoy the movie');go('trip')},
+ renew:v=>{const i=S.items.find(x=>x.id===+v);if(i.renews<MAX_RENEWS){i.renews++;i.due+=LOAN_DAYS*DAY;say('Due date moved to '+when(i.due));render()}},
+ ret:v=>{S.items=S.items.filter(i=>i.id!==+v);say('Returned');render(true)},
+ toggleClosed:()=>{S.closed=!S.closed;render()},
+ reset:()=>{
+   if(!armed){armed=true;document.getElementById('reset').textContent='Tap again to erase';return}
+   disarm();S=fresh();go('home');
+ }
+};
+function disarm(){armed=false;document.getElementById('reset').textContent='Start over'}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)return;if(b.dataset.act!=='reset')disarm();ACT[b.dataset.act](b.dataset.v)});
+document.addEventListener('change',e=>{if(e.target.dataset.change==='branch'){S.branch=e.target.value;render()}});
+window.addEventListener('popstate',e=>{
+  if(!e.state)return;
+  const from=S.view;
+  if(from==='home')homeY=window.scrollY;
+  const last=S.movie;
+  Object.assign(S,e.state);S.msg='';
+  if(S.view==='home')S.movie=last;
+  render(true,from);
+});
+try{history.replaceState(snap(),'')}catch(e){}
+render();
+</script>
