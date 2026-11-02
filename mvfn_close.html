@@ -153,6 +153,17 @@
     const s = '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return v < 0 ? '−' + s : s;
   }
+  // Uncategorized balance owed, NETTED per account. A reclass JE that debits the
+  // Uncategorized Income row back out (Oct 2026: Square deposit $102.06 credit +
+  // $102.06 JE debit) leaves two rows that net to $0 — summing raw debits/credits
+  // read that as $102.06 income to reclass AND $102.06 "expense" to categorize.
+  function uncNet(unc) {
+    const sum = (re, sign) => unc.filter(r => re.test(r.account || ''))
+      .reduce((x, r) => x + sign * (Number(r.credit || 0) - Number(r.debit || 0)), 0);
+    const inc = Math.round(sum(/income/i, 1) * 100) / 100;
+    const exp = Math.round(sum(/expense/i, -1) * 100) / 100;
+    return { inc, exp, clean: Math.abs(inc) < 0.005 && Math.abs(exp) < 0.005 };
+  }
   function toast(msg, isErr) {
     const t = $('toast');
     t.textContent = msg;
@@ -241,9 +252,9 @@
       return s;
     }
     const unc = D.uncategorized;
-    const uncCredit = unc.reduce((x, r) => x + Number(r.credit || 0), 0);
-    const uncDebit = unc.reduce((x, r) => x + Number(r.debit || 0), 0);
-    const expRows = unc.filter(r => r.debit != null).length;
+    const un = uncNet(unc);
+    const uncCredit = un.inc, uncDebit = un.exp;
+    const expRows = unc.filter(r => /expense/i.test(r.account || '')).length;
     const cash = D.accounts.find(a => a.account === 'Cash on Hand');
     const item = k => D.checklist.find(c => c.item_key === k);
     // Per-feed "entered in Wave" boxes (V175) are the FIRST thing a human does each
@@ -326,7 +337,7 @@
       s.push({ t: `Type <b>${D.scorecard.untyped_accounts} account${Number(D.scorecard.untyped_accounts) === 1 ? '' : 's'}</b> in the Accounts table &mdash; unlocks computed income + the liability panel.`, a: '#accounts' });
     if (open.length)
       s.push({ t: `Work the checklist: <b>${open.length} of ${D.checklist.length - feed.length}</b> steps open (next: &ldquo;${esc(open[0].label)}&rdquo;).`, a: '#ph' + Math.min(open[0].phase, 5) });
-    if (D.import && !unc.length && !open.length && !feedOpen.length && !sqBalOff)
+    if (D.import && un.clean && !open.length && !feedOpen.length && !sqBalOff)
       s.push({ t: `Everything's green &mdash; <b>close ${esc(D.period.label)}</b>.`, a: '#closeout' });
     return s;
   }
@@ -367,8 +378,7 @@
 
     // Phase 1 computed tiles
     const unc = D.uncategorized;
-    const uncDebit = unc.reduce((s, r) => s + Number(r.debit || 0), 0);
-    const uncCredit = unc.reduce((s, r) => s + Number(r.credit || 0), 0);
+    const un = uncNet(unc);
     const importTile = D.import
       ? `<div class="tile good"><div class="t-label">Wave import</div>
            <div class="t-value">${D.import.line_count} rows</div>
@@ -378,11 +388,11 @@
            <div class="t-note">export Account Transactions for ${esc(D.period.label)} &rarr; run the importer on the VM</div></div>`;
     const uncTile = !D.import
       ? `<div class="tile dim"><div class="t-label">Uncategorized</div><div class="t-value">needs import</div></div>`
-      : (unc.length === 0
-        ? `<div class="tile good"><div class="t-label">Uncategorized</div><div class="t-value">$0.00</div><div class="t-note">clean</div></div>`
+      : (un.clean
+        ? `<div class="tile good"><div class="t-label">Uncategorized</div><div class="t-value">$0.00</div><div class="t-note">${unc.length ? `clean &middot; ${unc.length} rows net to $0` : 'clean'}</div></div>`
         : `<div class="tile bad"><div class="t-label">Uncategorized</div>
-             <div class="t-value">${money(uncDebit + uncCredit)}</div>
-             <div class="t-note">${unc.length} rows &middot; income ${money(uncCredit)} / expense ${money(uncDebit)}</div></div>`);
+             <div class="t-value">${money(Math.abs(un.exp) + Math.abs(un.inc))}</div>
+             <div class="t-note">${unc.length} rows &middot; income ${money(un.inc)} / expense ${money(un.exp)} (net)</div></div>`);
 
     const uncRows = unc.length ? `<details><summary>uncategorized rows (${unc.length})</summary>
       <div class="scrollwrap"><table><tr><th>date</th><th>account</th><th>description</th><th class="num">amount</th></tr>
