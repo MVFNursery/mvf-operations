@@ -164,6 +164,118 @@
     const exp = Math.round(sum(/expense/i, -1) * 100) / 100;
     return { inc, exp, clean: Math.abs(inc) < 0.005 && Math.abs(exp) < 0.005 };
   }
+  // The month's ONE Square entry, built from what the import shows (rewritten
+  // 2026-11-02 after Sep + Oct: the old "reclass the deposits into income" entry
+  // double-counted, because Wave's Square feed ALREADY credits income per sale).
+  // Goal state: Square account $0.00 for the month, income = gross − tax, tax in
+  // PA, fees in Merchant Fees. The entry credits Square its month activity + PA the
+  // tax, and debits whatever explains it: the tax (and, when Wave booked sales net
+  // of the fee as in Jul/Aug, less the fee) back out of the income accounts the
+  // sales landed in, unposted fees, SQUARE INC deposits sitting in Uncategorized
+  // Income, cash tenders to Cash on Hand, and a leftover only if it equals other
+  // uncategorized deposits (a check for a Square order — Sep 2026). If the
+  // leftover can't be explained, no entry is printed: a wrong one costs a re-close.
+  // Works in cents. Returns null when nothing is owed.
+  function squarePlan(D) {
+    const c = x => Math.round(Number(x || 0) * 100);
+    const sq = D.square || {};
+    const m = sq.money || null;
+    const acct = (D.accounts || []).find(a => a.account === 'Square') || null;
+    const change = acct ? c(acct.total_debit) - c(acct.total_credit) : 0;
+    const start = acct ? c(acct.starting_balance) : 0;
+    const out = { lines: [], warn: [], start, change, other: [] };
+    const uncInc = (D.uncategorized || []).filter(r => /income/i.test(r.account || ''));
+    const isSq = r => /square\s*inc/i.test(r.description || '');
+    const T = m ? Number(m.tax_cents) : 0, G = m ? Number(m.gross_cents) : 0, F = m ? Number(m.fee_cents) : 0;
+    const taxIn = sq.tax_liability ? c(sq.tax_liability.credit) : 0;
+    const feeIn = sq.fee_expense ? c(sq.fee_expense.debit) : 0;
+    const taxOwed = T > 0 && taxIn < T;
+    // Every uncategorized income credit that isn't spoken for stays the user's to
+    // categorize on its own bank line (Wix, Venmo, ...).
+    const otherFrom = used => uncInc.filter(r => r.credit != null && !used.includes(r));
+    // rows (up to 12) whose credits add up to `cents`, or [] — names which
+    // uncategorized deposits a leftover amount is
+    const subsetFor = (rows, cents) => {
+      rows = rows.slice(0, 12);
+      for (let mask = 1; mask < (1 << rows.length); mask++) {
+        const pick = rows.filter((_, i) => mask & (1 << i));
+        if (Math.abs(pick.reduce((x, r) => x + c(r.credit), 0) - cents) <= 1) return pick;
+      }
+      return [];
+    };
+    if (!taxOwed && change === 0) {
+      // Square entry done. Whatever Uncategorized Income still nets to is
+      // somebody else's deposit (Wix, ...): name those rows if they add up.
+      const net = uncInc.reduce((x, r) => x + c(r.credit) - c(r.debit), 0);
+      if (net > 1) {
+        const non = uncInc.filter(r => r.credit != null && !isSq(r));
+        const pick = subsetFor(non, net);
+        out.other = pick.length ? pick : non;
+        out.otherNet = net;
+      }
+      return start || out.other.length ? out : null;
+    }
+    if (taxIn > 0 && taxOwed) {
+      out.warn.push(`PA shows ${money(taxIn / 100)} of the month's ${money(T / 100)} tax &mdash; part of the Square entry is already posted. Fix it by hand rather than adding a second entry.`);
+      return out;
+    }
+    if (uncInc.some(r => r.debit != null) && change !== 0) {
+      out.warn.push(`An entry already debits Uncategorized Income, but Square still moves ${money(change / 100)} this month &mdash; edit that entry instead of adding another.`);
+      return out;
+    }
+    const lines = [];
+    let debits = 0;
+    const add = (account, cents, side) => {
+      if (!cents) return;
+      if (side === 'debit') debits += cents;
+      if (cents < 0) { cents = -cents; side = side === 'debit' ? 'credit' : 'debit'; }
+      lines.push({ account, [side]: cents / 100 });
+    };
+    // tax (± fee) back out of the income accounts the sales landed in
+    if (taxOwed) {
+      const inc = (sq.sale_income || []).map(r => ({ account: r.account, cents: c(r.amount) }));
+      const incTotal = inc.reduce((x, r) => x + r.cents, 0);
+      const back = incTotal - (G - T);           // gross-booked: = tax; net-booked: = tax − fee
+      if (inc.length && back > 0) {
+        let left = back;
+        inc.sort((a, b) => b.cents - a.cents).forEach((r, i) => {
+          const part = i === inc.length - 1 ? left : Math.round(back * r.cents / incTotal);
+          left -= part;
+          add(r.account, part, 'debit');
+        });
+      }
+    }
+    add(sq.fee_expense ? sq.fee_expense.account : 'Merchant Fees - Square', Math.max(0, F - feeIn), 'debit');
+    const sqDeps = uncInc.filter(r => r.credit != null && isSq(r));
+    let uncDebit = sqDeps.reduce((x, r) => x + c(r.credit), 0);
+    let cashC = m ? Number(m.cash_cents) : 0;
+    const credits = change + (taxOwed ? T - taxIn : 0);
+    let rest = credits - debits - uncDebit - cashC;
+    if (cashC && Math.abs(rest + cashC) <= 1) { rest += cashC; cashC = 0; }   // cash already transferred
+    let matched = [];
+    if (rest > 1) {
+      matched = subsetFor(uncInc.filter(r => r.credit != null && !isSq(r)), rest);
+      if (matched.length) { uncDebit += rest; rest = 0; }
+    }
+    out.other = otherFrom([...sqDeps, ...matched]);
+    out.matched = matched;
+    out.deposits = sqDeps;
+    out.cash = cashC;
+    if (Math.abs(rest) > 1) {
+      const nMiss = m ? Number(m.orders_missing_fee) : 0;
+      out.warn.push(`${money(rest / 100)} on the Square account doesn't match any deposit, fee or cash order${nMiss ? ` (${nMiss} order${nMiss === 1 ? '' : 's'} still awaiting posted card fees &mdash; wait a day, then re-upload)` : ''}. No entry printed: ask before posting one.`);
+      return out;
+    }
+    add('Uncategorized Income', uncDebit, 'debit');
+    add('Cash on Hand', cashC, 'debit');
+    add('Square', change, 'credit');
+    if (taxOwed) {
+      const regLiab = (D.registry || []).find(r => r.account_type === 'liability' && (r.account === 'PA' || /tax/i.test(r.account)));
+      add(sq.tax_liability ? sq.tax_liability.account : regLiab ? regLiab.account : 'PA', T - taxIn, 'credit');
+    }
+    out.lines = lines;
+    return out;
+  }
   function toast(msg, isErr) {
     const t = $('toast');
     t.textContent = msg;
@@ -268,68 +380,34 @@
       s.push({ t: esc(c.label), h: flip && c.detail ? esc(c.detail) : '', a: '#ph1', warn: flip });
     });
     const open = D.checklist.filter(c => st(c) === 'open' && !c.item_key.startsWith('p1_entered_'));
-    // Cash-tender Square orders: Wave's Square connection books every sale into
-    // the `Square` asset account, but cash never deposits, so it sits there until
-    // a Wave transfer Square -> Cash on Hand for the month's cash total is recorded.
-    const sqm = (D.square && D.square.money) || null;
-    const cashCents = sqm ? Number(sqm.cash_cents || 0) : 0;
-    const sqBal = D.square && D.square.wave_balance != null ? Number(D.square.wave_balance) : null;
-    const sqBalOff = sqBal != null && Math.abs(sqBal) >= 0.005;
-    // Owed only until the import proves it: once the Square balance is $0.00 the
-    // transfer is on the books (it's the Square-account credit "xfer to cash on
-    // hand"), so the step disappears. No import yet = can't tell = still show it.
-    const cashStep = () => {
-      if (cashCents > 0 && (!D.import || sqBalOff)) {
-        const n = Number(sqm.cash_orders || 0);
-        s.push({ t: `Transfer <b>${money(cashCents / 100)}</b> from Square to Cash on Hand in Wave (${n} cash-tender Square order${n === 1 ? '' : 's'}), then re-export + upload.`, a: '#ph2' });
-      }
-      if (sqBalOff)
-        s.push({ t: `&#9888; Wave's <b>Square</b> account ends the month at <b>${money(sqBal)}</b> &mdash; it should be $0.00 after the cash transfer (card sales clear against the SQUARE INC deposits; anything left is cash tender that never deposited).`, a: '#ph2', warn: true });
-    };
+    // Square: ONE entry per month, built by squarePlan() from the import. Do NOT
+    // categorize SQUARE INC deposits as income in Wave — the Square feed already
+    // booked each sale as income; deposits only move money out of Square.
+    const sqp = D.import ? squarePlan(D) : null;
+    const sqOwed = !!(sqp && (sqp.lines.length || sqp.warn.length || sqp.start));
     if (!D.import) {
-      cashStep();
       s.push({ t: `In Wave, run <b>Reports &rarr; Account Transactions</b> for ${esc(D.period.label)} (cash basis), export the CSV, and upload it here.`, act: 'upload' });
     } else {
-      if (uncCredit > 0) {
-        // The Square split is measured nightly (books.square_order_money via the
-        // sales-decrement sync) — print the actual Journal Entry when we have them.
-        const m = (D.square && D.square.money) || null;
-        if (m && Number(m.orders) > 0) {
-          const inc = (Number(m.gross_cents) - Number(m.tax_cents)) / 100;
-          const nMiss = Number(m.orders_missing_fee);
-          const feeWarn = nMiss > 0 ? ` (${nMiss} order${nMiss === 1 ? '' : 's'} awaiting posted card fees &mdash; fee total may still move)` : '';
-          const lines = [{ account: 'Uncategorized Income', debit: uncCredit }];
-          if (Number(m.fee_cents) > 0) lines.push({ account: 'Merchant Fees - Square', debit: Number(m.fee_cents) / 100 });
-          lines.push({ account: 'Plant Sales (plant-sale income)', credit: inc });
-          lines.push({ account: 'PA (sales-tax liability)', credit: Number(m.tax_cents) / 100 });
-          s.push({ t: `Reclass <b>${money(uncCredit)}</b> of Uncategorized Income in Wave with one summary Journal Entry &mdash; Square's month is ${m.orders} orders, gross ${money(Number(m.gross_cents) / 100)}${feeWarn}:${jeTable(D.period.end, 'Square sales split: income / PA tax / card fees', lines)} Then re-export + upload again.`, a: '#ph1' });
-        } else {
-          s.push({ t: `Reclass <b>${money(uncCredit)}</b> of Uncategorized Income in Wave. For Square deposits the split is: plant-sale income + PA sales-tax liability + card-fee expense &mdash; pull the month's tax and fee totals from the Square dashboard; one summary Journal Entry is fine. Then re-export + upload again.`, a: '#ph1' });
-        }
+      if (sqp && sqp.start)
+        s.push({ t: `&#9888; Wave's <b>Square</b> account OPENS ${esc(D.period.label)} at <b>${money(sqp.start / 100)}</b> &mdash; the month before didn't end at $0.00, or this file was exported before that month's entry was posted. Fix the earlier month first, then re-export + upload this one.`, a: '#ph2', warn: true });
+      sqp && sqp.warn.forEach(w => s.push({ t: `&#9888; Square entry: ${w}`, a: '#ph2', warn: true }));
+      if (sqp && sqp.lines.length) {
+        const m = D.square.money || {};
+        const parts = [];
+        if (sqp.deposits && sqp.deposits.length) parts.push(`${sqp.deposits.length} SQUARE INC deposit${sqp.deposits.length === 1 ? '' : 's'} (leave them in Uncategorized Income; this clears them)`);
+        if (sqp.cash) parts.push(`${money(sqp.cash / 100)} of cash-tender orders to Cash on Hand`);
+        (sqp.matched || []).forEach(r => parts.push(`${esc(r.description)} ${esc(r.txn_date)} ${money(r.credit)} = a Square order paid off-card`));
+        s.push({ t: `Record the month's <b>Square</b> Journal Entry in Wave &mdash; ${m.orders} orders, gross ${money(Number(m.gross_cents) / 100)}, tax ${money(Number(m.tax_cents) / 100)}, card fees ${money(Number(m.fee_cents) / 100)}${parts.length ? '; covers ' + parts.join('; ') : ''}. It zeroes the Square account and takes the tax out of income:${jeTable(D.period.end, 'Square month: tax to PA, fees, deposits, cash', sqp.lines)} Then re-export + upload.`, a: '#ph1' });
+      }
+      // Uncategorized Income that isn't a Square deposit: categorize it on its own
+      // bank line in Wave. No entry from here — the app can't know what it was.
+      if (sqp && sqp.other.length) {
+        const amt = sqp.otherNet != null ? sqp.otherNet / 100 : sqp.other.reduce((x, r) => x + Number(r.credit || 0), 0);
+        s.push({ t: `Categorize <b>${money(amt)}</b> of Uncategorized Income on its bank line in Wave &mdash; not a Square deposit, so no entry from here: ${sqp.other.map(r => `${esc(r.description)} ${esc(r.txn_date)} ${money(r.credit)}`).join('; ')}. Then re-export + upload.`, a: '#ph1' });
+      } else if (!sqp && uncCredit > 0) {
+        s.push({ t: `Categorize <b>${money(uncCredit)}</b> of Uncategorized Income in Wave on its bank line(s). Then re-export + upload.`, a: '#ph1' });
       }
       if (uncDebit > 0) s.push({ t: `Categorize <b>${money(uncDebit)}</b> of Uncategorized Expense in Wave (${expRows} row${expRows === 1 ? '' : 's'} &mdash; list in Phase 1). Then re-export + upload again.`, a: '#ph1' });
-      cashStep();
-      // Sales-tax / card-fee Journal Entry. Wave's Square lines carry tax inside income and
-      // are net of the card fee; once the Square rows are categorized straight to
-      // income (no Uncategorized Income to reclass) nothing else prints the split,
-      // so this step does — until the liability shows the month's tax credited.
-      if (!(uncCredit > 0) && sqm && Number(sqm.orders) > 0 && Number(sqm.tax_cents) > 0) {
-        const tax = Number(sqm.tax_cents) / 100, fee = Number(sqm.fee_cents) / 100;
-        const tl = D.square.tax_liability || null, fe = D.square.fee_expense || null;
-        const credited = tl ? Number(tl.credit || 0) : 0;
-        if (credited + 0.005 < tax) {
-          const feeBooked = fe && Number(fe.debit || 0) + 0.005 >= fee;
-          const incDebit = feeBooked ? tax : tax - fee;
-          // no activity this month -> name the account from the registry instead
-          const regLiab = (D.registry || []).find(r => r.account_type === 'liability' && (r.account === 'PA' || /tax/i.test(r.account)));
-          const liab = esc(tl ? tl.account : regLiab ? regLiab.account : 'PA (sales-tax liability)');
-          const nMiss = Number(sqm.orders_missing_fee);
-          const lines = [{ account: 'Income accounts (split across the accounts the Square rows were categorized into)', debit: incDebit }];
-          if (!feeBooked) lines.push({ account: 'Merchant Fees - Square', credit: 0, debit: fee });
-          lines.push({ account: liab, credit: tax });
-          s.push({ t: `Record the sales-tax${feeBooked ? '' : ' / card-fee'} Journal Entry in Wave &mdash; tax ${money(tax)}${feeBooked ? '' : ' &minus; fees ' + money(fee)} on ${sqm.orders} Square orders${credited > 0 ? ` (${money(credited)} credited to ${liab} so far)` : ''}${nMiss > 0 ? `; ${nMiss} order${nMiss === 1 ? '' : 's'} still awaiting posted card fees` : ''}:${jeTable(D.period.end, 'PA Tax Liability Txfr from Sales and Fees', lines)} Then re-export + upload.`, a: '#ph1' });
-        }
-      }
       if (cash && item('p1_balances') && st(item('p1_balances')) === 'open')
         s.push({ t: `Count the drawer against Cash on Hand <b>${money(cash.ending_balance)}</b>; check M1st + the card against statements.`, a: '#ph1' });
     }
@@ -337,7 +415,7 @@
       s.push({ t: `Type <b>${D.scorecard.untyped_accounts} account${Number(D.scorecard.untyped_accounts) === 1 ? '' : 's'}</b> in the Accounts table &mdash; unlocks computed income + the liability panel.`, a: '#accounts' });
     if (open.length)
       s.push({ t: `Work the checklist: <b>${open.length} of ${D.checklist.length - feed.length}</b> steps open (next: &ldquo;${esc(open[0].label)}&rdquo;).`, a: '#ph' + Math.min(open[0].phase, 5) });
-    if (D.import && un.clean && !open.length && !feedOpen.length && !sqBalOff)
+    if (D.import && un.clean && !open.length && !feedOpen.length && !sqOwed)
       s.push({ t: `Everything's green &mdash; <b>close ${esc(D.period.label)}</b>.`, a: '#closeout' });
     return s;
   }
